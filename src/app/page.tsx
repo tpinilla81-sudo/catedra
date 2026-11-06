@@ -1,31 +1,13 @@
-'use client'
+// Raíz "/" — punto de entrada único (Modo Vestuario).
+// Sin sesión → login con un toque. Con sesión → Vista Hoy.
+import { getSessionUser } from "@/lib/session";
+import { LoginView } from "@/components/hoy/login-view";
+import { HoyView } from "@/components/hoy/hoy-view";
 
-export default function Home() {
-  return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '100vh',
-      gap: '2rem',
-      padding: '1rem'
-    }}>
-      <div style={{
-        position: 'relative',
-        width: '6rem',
-        height: '6rem'
-      }}>
-        <img
-          src="/logo.svg"
-          alt="Z.ai Logo"
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain'
-          }}
-        />
-      </div>
-    </div>
-  )
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const user = await getSessionUser();
+  if (!user?.clubId) return <LoginView />;
+  return <HoyView />;
 }
