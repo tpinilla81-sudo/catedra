@@ -1,0 +1,561 @@
+// ============================================================================
+// ECOSYSTEM MÉTODO — Esquema de Base de Datos (Iteración v0.1)
+// ----------------------------------------------------------------------------
+// Stack  : PostgreSQL (Neon DB) + Prisma ORM
+// Dominio: Fútbol profesional y de cantera — Metodología "Cátedra"
+// Arquitectura: Multi-tenant estricto por Club.
+//   * TODO modelo de dominio lleva `clubId` con FK + índice.
+//   * Toda consulta del servidor se ejecuta a través de un guard de tenant
+//     (Prisma Client Extension que inyecta el clubId de la sesión).
+//   * `clubId = null` SOLO se admite en Biblioteca (Task / SubPrinciple):
+//     significa "contenido oficial de la Cátedra a nivel de plataforma",
+//     visible en modo lectura para todos los clubs.
+//
+// Cadena relacional del Motor Prescriptivo (Pilar 4):
+//   TacticalEvent + TeamPulse + Player        (datos crudos, Pilares 2 y 3)
+//      → DiagnosisIssue  (qué falló, con evidencia)
+//      → TaskSubPrinciple (biblioteca: qué tarea corrige qué subprincipio)
+//      → Microcycle → Session → SessionTask  (el microciclo listo para el césped)
+//      → EngineRun      (auditoría de cada ejecución del motor)
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS — El vocabulario táctico de la Cátedra
+// ============================================================================
+
+/// Roles de la plataforma (seguridad y permisos)
+enum Role {
+  PLATFORM_ADMIN /// Superadmin: gestiona clubs y la biblioteca global de la Cátedra
+  COACH_ADMIN /// Míster / head coach: control total de su club
+  ANALYST /// Analista / segundo entrenador: ingesta, lectura y propuesta
+}
+
+/// Fases del juego — taxonomía táctica de primer nivel
+enum GamePhase {
+  OFFENSIVE /// Organización ofensiva
+  DEFENSIVE /// Organización defensiva
+  OFF_TRANSITION /// Transición ofensiva (pérdida → reacción inmediata)
+  DEF_TRANSITION /// Transición defensiva (recuperación → progresión)
+  SET_PIECE /// Acciones a balón parado (ABP)
+}
+
+/// Demarcaciones (principal + polivalencias). Códigos internacionales estándar.
+enum Position {
+  GK /// Portero
+  CB /// Central
+  LB /// Lateral izquierdo
+  RB /// Lateral derecho
+  LWB /// Carrilero izquierdo
+  RWB /// Carrilero derecho
+  DM /// Pivot defensivo (MCD)
+  CM /// Medio centro
+  AM /// Mediapunta (MCO)
+  LM /// Interior / extremo retrasado izquierdo
+  RM /// Interior / extremo retrasado derecho
+  LW /// Extremo izquierdo
+  RW /// Extremo derecho
+  SS /// Segundo delantero (media punta alta)
+  CF /// Delantero centro (9)
+}
+
+/// Estado de disponibilidad del jugador (filtra la prescripción del motor)
+enum PlayerStatus {
+  AVAILABLE
+  INJURED
+  SUSPENDED
+  RETURNING /// Reincorporándose: el motor limita la intensidad de sus tareas
+}
+
+/// Intensidad de la tarea → el motor la cruza con la fatiga grupal del Pulso
+enum Intensity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+/// Eventing táctico en la pizarra: marcado exprés por toques
+enum TacticalEventType {
+  BALL_LOSS /// Pérdida
+  BALL_RECOVERY /// Recuperación
+  POSITIVE_DUEL /// Duelo ganado
+  NEGATIVE_DUEL /// Duelo perdido
+  ATTEMPTED_SHOT /// Remate propio
+  GOAL_FOR /// Gol a favor
+  GOAL_AGAINST /// Gol en contra
+  OPPONENT_CHANCE /// Ocasión clara del rival
+  CUSTOM /// Evento configurable por el club
+}
+
+/// Semáforo universal (sensaciones globales, notas individuales, severidad)
+enum Semaphore {
+  GREEN
+  AMBER
+  RED
+}
+
+/// Ciclo de vida del partido
+enum MatchStatus {
+  SCHEDULED /// Programado
+  PLAYED /// Jugado — ingesta pendiente (el sistema lo recuerda con un toque)
+  ANALYZED /// Ingesta post-partido completada
+}
+
+/// Ciclo de vida del microciclo semanal ("cero pantallas en blanco")
+enum MicrocycleStatus {
+  PROPOSED /// Cocinado por el motor — el míster lo encuentra el lunes listo
+  ACCEPTED /// Validado con un toque
+  ADJUSTED /// Retocado a mano por el cuerpo técnico
+  COMPLETED /// Semana ejecutada y cerrada
+}
+
+/// Naturaleza del hallazgo del diagnóstico semanal
+enum IssueKind {
+  TACTICAL /// Falla táctica detectada en el eventing de la pizarra
+  PHYSICAL /// Fatiga / carga preocupante según Pulso y sliders
+  MORALE /// Inercia anímica en riesgo según Pulso y semáforo
+}
+
+/// Estado del hallazgo (cierre del ciclo prescriptivo)
+enum IssueStatus {
+  OPEN /// Detectado por el motor
+  ADDRESSED /// Ya tiene tareas asignadas en el microciclo
+  RESOLVED /// Marcado como corregido en semanas posteriores
+}
+
+// ============================================================================
+// MULTI-TENANT: RAÍZ Y SEGURIDAD
+// ============================================================================
+
+/// Tenant raíz. Todo dato de dominio cuelga de aquí.
+model Club {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique /// Identificador para URLs (ej: "cf-metodo")
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  seasons       Season[]
+  teams         Team[]
+  players       Player[]
+  pulses        TeamPulse[]
+  matches       Match[]
+  subPrinciples SubPrinciple[] /// Subprincipios propios del club (además de los globales)
+  tasks         Task[] /// Tareas propias del club (además de la biblioteca global)
+  microcycles   Microcycle[]
+  engineRuns    EngineRun[]
+}
+
+/// Usuario autenticado (email + contraseña, sesión JWT con NextAuth).
+/// El hash nunca sale del servidor.
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(ANALYST)
+  clubId       String? /// null solo para PLATFORM_ADMIN (ámbito global)
+  lastTeamId   String? /// Contexto UX: último equipo abierto → fricción cero al reentrar
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  club           Club?         @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  lastTeam       Team?         @relation("UserLastTeam", fields: [lastTeamId], references: [id], onDelete: SetNull)
+  createdTasks   Task[]        @relation("TaskAuthor")
+  createdReports MatchReport[] @relation("ReportAuthor")
+  acceptedCycles Microcycle[]  @relation("MicrocycleAccepter")
+  capturedPulses TeamPulse[]   @relation("PulseCapturer")
+
+  @@index([clubId])
+}
+
+// ============================================================================
+// PILAR 2 — PLANTILLA Y PULSO GRUPAL
+// ============================================================================
+
+/// Temporada deportiva (las plantillas y equipos se reinician por temporada)
+model Season {
+  id        String   @id @default(cuid())
+  clubId    String
+  name      String /// "2025/26"
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  club  Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  teams Team[]
+
+  @@unique([clubId, name])
+  @@index([clubId, isActive])
+}
+
+/// Equipo dentro de una temporada del club
+model Team {
+  id        String   @id @default(cuid())
+  clubId    String
+  seasonId  String
+  name      String /// "Juvenil A", "Primer Equipo"
+  category  String? /// Etapa federada / división (opcional)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  club        Club         @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  season      Season       @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  players     Player[]
+  pulses      TeamPulse[]
+  matches     Match[]
+  microcycles Microcycle[]
+  engineRuns  EngineRun[]
+  openByUsers User[]       @relation("UserLastTeam")
+
+  @@unique([seasonId, name])
+  @@index([clubId])
+}
+
+/// Ficha ágil de jugador — nombre, dorsal, demarcación y polivalencias.
+/// Los ratings cualitativos (1-5) se editan con un toque; sin formularios largos.
+model Player {
+  id                 String       @id @default(cuid())
+  clubId             String
+  teamId             String
+  firstName          String
+  lastName           String
+  shirtNumber        Int? /// Dorsal
+  mainPosition       Position /// Demarcación principal (vital para el motor)
+  secondaryPositions Position[] /// Polivalencias — array nativo de PostgreSQL
+  technicalRating    Int? /// Perfil técnico 1-5
+  tacticalRating     Int? /// Perfil táctico 1-5
+  physicalRating     Int? /// Perfil físico 1-5
+  ratingsUpdatedAt   DateTime? /// Evolución de los perfiles cualitativos
+  status             PlayerStatus @default(AVAILABLE)
+  statusNote         String? /// Apunte corto: "molestias tobillo izq."
+  isActive           Boolean      @default(true) /// Baja lógica: nunca se borra historia
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  club       Club              @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  team       Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  events     TacticalEvent[] /// Eventos tácticos marcados en la pizarra
+  matchNotes PlayerMatchNote[] /// Notas individuales post-partido
+
+  @@unique([teamId, shirtNumber])
+  @@index([clubId, teamId])
+  @@index([mainPosition])
+}
+
+/// Pulso Colectivo del vestuario — se captura en segundos tras el partido.
+/// El motor lo lee para modular la intensidad y el tono del microciclo.
+model TeamPulse {
+  id            String   @id @default(cuid())
+  clubId        String
+  teamId        String
+  date          DateTime @db.Date /// Día de captura (normalmente el lunes)
+  moraleScore   Int /// Inercia anímica 1-10 (10 = eufórico)
+  fatigueScore  Int /// Fatiga grupal acumulada 1-10 (10 = agotado)
+  resultsStreak Int? /// Racha cacheada: +3 = tres victorias, -1 = una derrota
+  notes         String?
+  capturedById  String?
+  createdAt     DateTime @default(now())
+
+  club       Club  @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  team       Team  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  capturedBy User? @relation("PulseCapturer", fields: [capturedById], references: [id], onDelete: SetNull)
+
+  @@unique([teamId, date]) /// Un pulso por equipo y día (editable hasta cerrar)
+  @@index([teamId, date])
+}
+
+// ============================================================================
+// PILAR 3 — PARTIDO E INGESTA POST-PARTIDO (< 3 MINUTOS)
+// ============================================================================
+
+/// Partido del calendario
+model Match {
+  id           String      @id @default(cuid())
+  clubId       String
+  teamId       String
+  opponent     String /// Nombre del rival
+  competition  String? /// Liga, Copa, Amistoso...
+  isHome       Boolean     @default(true)
+  kickoffAt    DateTime
+  location     String?
+  goalsFor     Int? /// Se rellena con un toque al finalizar
+  goalsAgainst Int?
+  status       MatchStatus @default(SCHEDULED)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  club              Club              @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  team              Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  report            MatchReport? /// Ingesta 1:1 (única por partido)
+  usedInMicrocycles MicrocycleMatch[] /// Partidos que alimentaron cada microciclo
+
+  @@index([teamId, kickoffAt])
+  @@index([clubId, status])
+}
+
+/// Ingesta exprés post-partido (1:1 con el partido).
+/// Diseñada para < 3 minutos: semáforo + sliders + pizarra + notas.
+model MatchReport {
+  id                 String    @id @default(cuid())
+  matchId            String    @unique
+  createdById        String
+  sensation          Semaphore /// Semáforo global: cómo quedó el grupo (1 toque)
+  perceivedLoad      Int /// Slider 1-10: carga percibida del grupo
+  collectiveAttitude Int /// Slider 1-10: actitud y compromiso colectivo
+  tacticalExecution  Int /// Slider 1-10: ejecución de lo planificado
+  notes              String?
+  submittedAt        DateTime  @default(now())
+  createdAt          DateTime  @default(now())
+
+  match       Match             @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  createdBy   User              @relation("ReportAuthor", fields: [createdById], references: [id])
+  events      TacticalEvent[] /// Eventing táctico (pizarra de campo interactiva)
+  playerNotes PlayerMatchNote[] /// Cuaderno de notas individual
+
+  @@index([createdById])
+}
+
+/// Un toque en la pizarra = un evento geolocalizado.
+/// De aquí salen los mapas de calor y la evidencia del diagnóstico del motor.
+model TacticalEvent {
+  id        String            @id @default(cuid())
+  reportId  String
+  playerId  String? /// null = evento colectivo sin responsable claro
+  minute    Int? /// Minuto de partido (opcional en marcado exprés)
+  x         Float /// Coordenada horizontal 0-100 del campo
+  y         Float /// Coordenada vertical 0-100 del campo
+  type      TacticalEventType
+  createdAt DateTime          @default(now())
+
+  report MatchReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  player Player?     @relation(fields: [playerId], references: [id], onDelete: SetNull)
+
+  @@index([reportId, type]) /// Conteos por tipo → detección de patrones
+  @@index([playerId]) /// Historia individual del jugador
+}
+
+/// Apunte cualitativo rápido por jugador (semáforo + texto corto opcional)
+model PlayerMatchNote {
+  id        String    @id @default(cuid())
+  reportId  String
+  playerId  String
+  flag      Semaphore /// Semáforo individual: qué destacó el míster (1 toque)
+  note      String? /// Apunte corto opcional (≤ 140 caracteres)
+  createdAt DateTime  @default(now())
+
+  report MatchReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  player Player      @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([reportId, playerId]) /// Una nota por jugador y partido (editable)
+  @@index([playerId])
+}
+
+// ============================================================================
+// PILAR 1 — LA BIBLIOTECA DE SABIDURÍA (CÁTEDRA)
+// ============================================================================
+
+/// Taxonomía táctica jerárquica: fase → subprincipio → detalle (auto-relación).
+/// clubId = null → contenido oficial de la Cátedra (plataforma).
+/// clubId = X    → subprincipio privado del club.
+model SubPrinciple {
+  id          String    @id @default(cuid())
+  clubId      String? /// null = biblioteca global de la Cátedra
+  parentId    String? /// Jerarquía opcional: subprincipio → detalle
+  phase       GamePhase /// Fase del juego a la que pertenece
+  name        String /// "Salida de balón desde presión rival en 3/4"
+  description String?
+  order       Int       @default(0) /// Orden de presentación en la biblioteca
+  createdAt   DateTime  @default(now())
+
+  club     Club?              @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  parent   SubPrinciple?      @relation("SubPrincipleTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children SubPrinciple[]     @relation("SubPrincipleTree")
+  tasks    TaskSubPrinciple[] /// Tareas conectadas ("recetas")
+  issues   DiagnosisIssue[] /// Hallazgos del motor que apuntan aquí
+
+  @@index([clubId, phase])
+  @@index([parentId])
+}
+
+/// Ficha de Tarea avanzada — la unidad de conocimiento entrenable.
+/// Conecta con la taxonomía vía TaskSubPrinciple ("recetas").
+model Task {
+  id                 String      @id @default(cuid())
+  clubId             String? /// null = biblioteca global de la Cátedra
+  createdById        String?
+  title              String
+  objective          String /// Qué se busca entrenar, en lenguaje de míster
+  phases             GamePhase[] /// Fases del juego que trabaja (una tarea puede tocar varias)
+  spaceLengthM       Int? /// Dimensiones del espacio: largo (m)
+  spaceWidthM        Int? /// Dimensiones del espacio: ancho (m)
+  spaceNote          String? /// "Con dos zonas laterales libres"
+  playersMin         Int /// Jugadores requeridos (mínimo)
+  playersMax         Int? /// Jugadores requeridos (máximo, si aplica)
+  durationMin        Int /// Tiempo total sugerido (min)
+  repetitions        String? /// "3 series x 6'", "2 bloques x 8'"
+  intensity          Intensity   @default(MEDIUM) /// El motor la cruza con la fatiga grupal
+  rulesOfProvocation String[] /// Reglas de provocación — array nativo de PostgreSQL
+  coachingPoints     String[] /// Puntos clave para el entrenador
+  materials          String[] /// Conos, petos, maniquíes...
+  diagramUrl         String? /// Diagrama / pizarra de la tarea
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  club          Club?              @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  createdBy     User?              @relation("TaskAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  subPrinciples TaskSubPrinciple[] /// Conexiones con la taxonomía ("recetas")
+  sessions      SessionTask[] /// Prescripciones históricas en microciclos
+
+  @@index([clubId])
+  @@index([intensity])
+}
+
+/// La "receta": conexión tarea ↔ subprincipio con relevancia ponderada.
+/// Índice [subPrincipleId, relevance] = LA consulta estrella del motor
+/// ("dame las mejores tareas que corrigen el subprincipio X").
+model TaskSubPrinciple {
+  id             String   @id @default(cuid())
+  taskId         String
+  subPrincipleId String
+  relevance      Int      @default(2) /// 1 = apoyo periférico · 2 = secundario · 3 = núcleo
+  usageNote      String? /// Cuándo usar esta tarea para este subprincipio
+  createdAt      DateTime @default(now())
+
+  task         Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  subPrinciple SubPrinciple @relation(fields: [subPrincipleId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, subPrincipleId])
+  @@index([subPrincipleId, relevance])
+}
+
+// ============================================================================
+// PILAR 4 — EL MOTOR PRESCRIPTIVO ("LA SOLUCIÓN DEL LUNES")
+// ============================================================================
+
+/// Microciclo semanal: la propuesta cocinada que el míster acepta con un toque.
+/// Unique (teamId, weekStart) garantiza que NUNCA haya pantallas en blanco.
+model Microcycle {
+  id                     String           @id @default(cuid())
+  clubId                 String
+  teamId                 String
+  weekStart              DateTime         @db.Date /// Lunes de la semana ISO
+  status                 MicrocycleStatus @default(PROPOSED)
+  tacticalDirectives     String[] /// Directrices tácticas de la semana
+  methodologicalApproach String? /// Enfoque metodológico global
+  diagnosisSummary       String? /// Resumen legible: qué falló + estado del grupo
+  engineVersion          String? /// Versión del algoritmo que generó la propuesta
+  acceptedById           String?
+  acceptedAt             DateTime?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+
+  club            Club              @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  team            Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  acceptedBy      User?             @relation("MicrocycleAccepter", fields: [acceptedById], references: [id], onDelete: SetNull)
+  analyzedMatches MicrocycleMatch[] /// Partidos cuya ingesta alimentó esta semana
+  issues          DiagnosisIssue[] /// Diagnóstico estructurado de la semana
+  sessions        Session[] /// Sesiones listas para el césped
+
+  @@unique([teamId, weekStart])
+  @@index([clubId, teamId, weekStart])
+}
+
+/// Trazabilidad del motor: qué partidos concretos entraron en cada microciclo
+model MicrocycleMatch {
+  microcycleId String
+  matchId      String
+  createdAt    DateTime @default(now())
+
+  microcycle Microcycle @relation(fields: [microcycleId], references: [id], onDelete: Cascade)
+  match      Match      @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@id([microcycleId, matchId])
+  @@index([matchId])
+}
+
+/// Hallazgo del diagnóstico semanal con evidencia.
+/// Es el PUENTE entre los datos crudos (Pilar 3) y la prescripción (tareas).
+model DiagnosisIssue {
+  id             String      @id @default(cuid())
+  microcycleId   String
+  subPrincipleId String? /// Qué subprincipio falla (null = hallazgo físico/anímico)
+  phase          GamePhase? /// Fase donde se detecta el problema
+  kind           IssueKind
+  severity       Int         @default(2) /// 1-5 (5 = urgente) → prioriza la prescripción
+  evidence       String /// Evidencia legible: "9 pérdidas en salida por zona izquierda"
+  metric         Json? /// Números crudos del agregado (auditoría del motor)
+  status         IssueStatus @default(OPEN)
+  createdAt      DateTime    @default(now())
+
+  microcycle   Microcycle    @relation(fields: [microcycleId], references: [id], onDelete: Cascade)
+  subPrinciple SubPrinciple? @relation(fields: [subPrincipleId], references: [id], onDelete: SetNull)
+  prescribedIn SessionTask[] /// Tareas que lo abordan (trazabilidad receta → césped)
+
+  @@index([microcycleId])
+  @@index([subPrincipleId])
+}
+
+/// Sesión de entrenamiento dentro del microciclo (calendario MD+1, MD-3...)
+model Session {
+  id           String   @id @default(cuid())
+  microcycleId String
+  date         DateTime @db.Date
+  label        String /// "MD+1", "MD-3", "MD-1" — código del calendario semanal
+  objective    String? /// Objetivo de la sesión en una frase
+  durationMin  Int?
+  createdAt    DateTime @default(now())
+
+  microcycle Microcycle    @relation(fields: [microcycleId], references: [id], onDelete: Cascade)
+  tasks      SessionTask[] /// Tareas exactas listas para el césped
+
+  @@index([microcycleId, date])
+}
+
+/// Tarea prescrita en una sesión — el punto final de la cadena del motor.
+/// `prescribedIssueId` da trazabilidad total: por qué esta tarea está aquí.
+model SessionTask {
+  id                String   @id @default(cuid())
+  sessionId         String
+  taskId            String
+  order             Int /// Orden dentro de la sesión (calentamiento, principal, cierre)
+  durationMin       Int? /// Tiempo real asignado a la tarea
+  rationale         String? /// "Por qué esta tarea": texto que el motor genera para el míster
+  prescribedIssueId String? /// Hallazgo que esta tarea ayuda a corregir
+  createdAt         DateTime @default(now())
+
+  session Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  task    Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  issue   DiagnosisIssue? @relation(fields: [prescribedIssueId], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, order])
+  @@index([taskId])
+}
+
+/// Auditoría de cada ejecución del motor (robustez interna, invisible al usuario)
+model EngineRun {
+  id            String   @id @default(cuid())
+  clubId        String
+  teamId        String
+  microcycleId  String? /// Ciclo generado (null si la ejecución falló)
+  version       String /// Versión del algoritmo (ej: "v0.1-heuristic")
+  inputSnapshot Json? /// Snapshot de entradas (pulsos, issues, disponibles) para depurar
+  durationMs    Int? /// Tiempo de cómputo
+  createdAt     DateTime @default(now())
+
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId, createdAt])
+}
