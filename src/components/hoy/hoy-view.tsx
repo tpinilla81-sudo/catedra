@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { requireTenantContext } from "@/lib/session";
+import { AppNav } from "@/components/dashboard/app-nav";
 import { AcceptPlanButton } from "@/components/hoy/accept-plan-button";
 import { EnsureProposalButton } from "@/components/hoy/ensure-proposal-button";
 import { PersistActiveTeam } from "@/components/hoy/persist-active-team";
@@ -102,7 +103,7 @@ export async function HoyView() {
   const dateLabel = format(new Date(), "EEEE, d 'de' MMMM", { locale: es });
 
   return (
-    <main className="min-h-screen bg-zinc-950 pb-16">
+    <main className="min-h-screen bg-zinc-950 pb-28">
       <PersistActiveTeam teamId={team.id} />
 
       {/* ---------- Cabecera ---------- */}
@@ -113,7 +114,7 @@ export async function HoyView() {
               <Trophy className="w-6 h-6 text-emerald-400" aria-hidden />
             </div>
             <div className="min-w-0">
-              <p className="text-xs text-zinc-500 leading-tight truncate">CF Método · Fase 1</p>
+              <p className="text-xs text-zinc-500 leading-tight truncate">CF Método · Fase 2</p>
               <p className="text-lg font-bold text-zinc-50 leading-tight truncate">
                 {team.name}
               </p>
@@ -409,6 +410,8 @@ export async function HoyView() {
           )}
         </section>
       </div>
+
+      <AppNav active="today" />
     </main>
   );
 }

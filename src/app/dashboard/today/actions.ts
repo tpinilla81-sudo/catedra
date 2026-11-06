@@ -11,13 +11,17 @@
 // ============================================================================
 
 import { revalidatePath } from "next/cache";
-import { startOfWeek, subDays } from "date-fns";
 import { requireTenantContext } from "@/lib/session";
+import {
+  buildIssueDrafts,
+  collectInputs,
+  mondayOf,
+} from "@/lib/engine/diagnose";
 
 function currentWeekStart(): Date {
   // Semana ISO: comienza el lunes. (TZ del servidor UTC; precisión horaria
   // afinada en fase 2 con timezone Europe/Madrid explícita.)
-  return startOfWeek(new Date(), { weekStartsOn: 1 });
+  return mondayOf(new Date());
 }
 
 /** [✅ Aceptar Plan] — PROPOSED → ACCEPTED con un solo toque */
@@ -45,17 +49,10 @@ export async function setActiveTeam(teamId: string) {
   return { ok: true };
 }
 
-type IssueDraft = {
-  kind: "TACTICAL" | "PHYSICAL" | "MORALE";
-  phase?: "OFFENSIVE" | "DEFENSIVE" | "OFF_TRANSITION" | "DEF_TRANSITION" | "SET_PIECE";
-  subPrincipleId?: string;
-  severity: number;
-  evidence: string;
-  metric: Record<string, unknown>;
-};
-
 /**
  * Motor heurístico v0.1 — genera la propuesta semanal si no existe.
+ * Las heurísticas de diagnóstico viven en @/lib/engine/diagnose (fuente única
+ * compartida con la ingesta post-partido de la Fase 2).
  * Entradas: último pulso colectivo + eventing táctico del último partido
  *           + plantilla disponible. Salida: Microcycle PROPOSED con issues,
  *           sesiones MD+1…MD-1 y tareas prescritas con rationale.
@@ -69,88 +66,18 @@ export async function ensureWeeklyProposal() {
   });
   if (existing) return { ok: true, created: false, microcycleId: existing.id };
 
-  // ---------- 1) Datos de entrada ----------
-  const pulse = await db.teamPulse.findFirst({
-    where: { teamId: team.id },
-    orderBy: { date: "desc" },
-  });
-
-  const windowStart = subDays(weekStart, 8);
-  const recentMatches = await db.match.findMany({
-    where: {
-      teamId: team.id,
-      status: { in: ["PLAYED", "ANALYZED"] },
-      kickoffAt: { gte: windowStart },
-    },
-    orderBy: { kickoffAt: "desc" },
-    take: 2,
-    include: { report: { include: { events: true } } },
-  });
+  // ---------- 1) Datos de entrada (motor compartido) ----------
+  const inputs = await collectInputs(db, team.id, weekStart);
+  const pulse = inputs.pulse;
+  const recentMatches = inputs.matches;
 
   const availablePlayers = await db.player.count({
     where: { teamId: team.id, isActive: true, status: { in: ["AVAILABLE", "RETURNING"] } },
   });
 
-  // ---------- 2) Heurística de diagnóstico ----------
-  const drafts: IssueDraft[] = [];
-
-  if (pulse && pulse.fatigueScore >= 7) {
-    drafts.push({
-      kind: "PHYSICAL",
-      severity: 4,
-      evidence: `Fatiga grupal acumulada ${pulse.fatigueScore}/10 — controlar la carga de la semana`,
-      metric: { fatigueScore: pulse.fatigueScore },
-    });
-  }
-  if (pulse && pulse.moraleScore <= 4) {
-    drafts.push({
-      kind: "MORALE",
-      severity: 3,
-      evidence: `Inercia anímica baja (${pulse.moraleScore}/10) — priorizar tareas de éxito temprano`,
-      metric: { moraleScore: pulse.moraleScore },
-    });
-  }
-
+  // ---------- 2) Heurística de diagnóstico (motor compartido) ----------
+  const drafts = await buildIssueDrafts(db, team.id, inputs);
   const last = recentMatches[0];
-  if (last?.report) {
-    const losses = last.report.events.filter((e) => e.type === "BALL_LOSS");
-    const buildUpLosses = losses.filter((e) => e.x <= 35); // 1/3 de campo propio
-    if (buildUpLosses.length >= 6) {
-      const sp = await db.subPrinciple.findFirst({ where: { phase: "OFF_TRANSITION" } });
-      drafts.push({
-        kind: "TACTICAL",
-        phase: "OFF_TRANSITION",
-        subPrincipleId: sp?.id,
-        severity: Math.min(5, 2 + Math.floor(buildUpLosses.length / 4)),
-        evidence: `${buildUpLosses.length} pérdidas en construcción (1/3 propio) — reacción tras pérdida`,
-        metric: { totalLosses: losses.length, buildUpLosses: buildUpLosses.length },
-      });
-    }
-    const negDuels = last.report.events.filter((e) => e.type === "NEGATIVE_DUEL").length;
-    if (negDuels >= 6) {
-      const sp = await db.subPrinciple.findFirst({ where: { phase: "DEFENSIVE" } });
-      drafts.push({
-        kind: "TACTICAL",
-        phase: "DEFENSIVE",
-        subPrincipleId: sp?.id,
-        severity: 3,
-        evidence: `${negDuels} duelos perdidos — intensidad en el duelo y basculaciones`,
-        metric: { negDuels },
-      });
-    }
-  }
-
-  if (drafts.length === 0) {
-    const sp = await db.subPrinciple.findFirst({ where: { phase: "OFFENSIVE" } });
-    drafts.push({
-      kind: "TACTICAL",
-      phase: "OFFENSIVE",
-      subPrincipleId: sp?.id,
-      severity: 2,
-      evidence: "Sin señales de alarma — consolidación de estructuras ofensivas",
-      metric: {},
-    });
-  }
 
   // ---------- 3) Prescripción: mejor tarea por hallazgo ----------
   type Prescription = {

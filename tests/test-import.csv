@@ -1,0 +1,5 @@
+nombre,apellidos,dorsal,posicion,secundarias,tecnico,tactico,fisico,estado,nota
+Chema,Lloret,25,DFC,"MCD, Ld",3,4,4,disponible,Prueba import
+Kevin,Sosa,,Extremo derecho,"ED, DC",4,2,4,,
+Rubén,Feliú,33,Portero,,,,,,Por importar
+BadRow,X,99,FalsoFwd,,,,,,
