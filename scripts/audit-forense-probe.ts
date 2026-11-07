@@ -286,19 +286,19 @@ async function main() {
       include: { sessions: { include: { tasks: true } } },
     });
     if (mc0) {
-      const empty = mc0.sessions.filter((s) => s.tasks.length === 0);
-      if (empty.length > 0) {
-        finding(
-          `Motor con plantilla vacía genera ${empty.length} sesión(es) SIN tareas (${empty.map((s) => s.label).join(", ")}) — el "zero pantallas en blanco" se degrada a "sesión libre" en Hoy (UI lo cubre con texto, pero el plan del césped está vacío).`,
-        );
-      } else {
-        check("D2 sesiones con tareas incluso sin jugadores", true);
-      }
-      // ¿Se asignaron tareas de recuperación/activación a pesar de 0 disponibles?
+      // S3: con plantilla vacía la FACTIBILIDAD física manda — ninguna tarea
+      // (principal ni de apoyo MD+1/MD-1) llega al césped sin cumplir los
+      // requisitos del grupo. Las sesiones quedan vacías y la UI Hoy las
+      // cubre como "sesión libre" (regla de oro intacta: cero pantallas blanco).
       const anyTask = mc0.sessions.flatMap((s) => s.tasks);
+      check(
+        "D2 plantilla vacía → cero tareas inviables (factibilidad S3 también en MD+1/MD-1)",
+        anyTask.length === 0,
+        `${anyTask.length} tarea(s) asignadas con 0 disponibles`,
+      );
       if (anyTask.length > 0) {
         finding(
-          `Motor asigna ${anyTask.length} tarea(s) (recuperación/activación) SIN verificar factibilidad de jugadores (0 disponibles) — la factibilidad solo aplica a la prescripción por hallazgo.`,
+          `REGRESIÓN S3: el motor asignó ${anyTask.length} tarea(s) con plantilla vacía (0 disponibles) — la factibilidad física de las sesiones de apoyo MD+1/MD-1 ya no se está aplicando.`,
         );
       }
     }
@@ -336,44 +336,72 @@ async function main() {
       check("D4 findFirst determinista en esta muestra", true, `${spIds.size} id distinto`);
     }
 
-    // D5: pulso VIEJO (30 días) sigue gobernando la semana actual
+    // D5 (post-S3): un pulso VIEJO (30 días) debe ser RECHAZADO por la
+    // ventana temporal [weekStart−8d, weekStart+2d] — el motor ya no
+    // planifica la semana con datos caducados; aplica defaults seguros.
     const oldPulse = await db.teamPulse.create({
       data: { clubId: clubA.id, teamId: teamA.id, date: new Date(Date.now() - 86400_000 * 30), moraleScore: 3, fatigueScore: 9 },
     });
     const inputsOld = await collectInputs(clientA, teamA.id, weekStart);
     check(
-      "D5 collectInputs usa un pulso de hace 30 días para la semana actual",
-      inputsOld.pulse?.id === oldPulse.id,
-      inputsOld.pulse ? `pulse.date=${inputsOld.pulse.date.toISOString().slice(0, 10)}` : "sin pulso",
+      "D5 pulso de hace 30 días RECHAZADO por ventana temporal (defaults seguros)",
+      inputsOld.pulse == null,
+      inputsOld.pulse ? `pulse.date=${inputsOld.pulse.date.toISOString().slice(0, 10)} (caducado EN USO)` : "sin pulso → fatiga neutra 5/10, sin hallazgo anímico",
     );
     if (inputsOld.pulse?.id === oldPulse.id) {
       finding(
-        "PULSO CADUCADO: el motor no acota el pulso por ventana temporal — un pulso capturado hace 30 días (fatiga 9/10, ánimo 3/10) dirige la prescripción y el diagnóstico de HOY.",
+        "REGRESIÓN S3 (PULSO CADUCADO): collectInputs volvió a usar un pulso de hace 30 días (fatiga 9/10, ánimo 3/10) para la semana actual — la ventana temporal del pulso no se está aplicando.",
       );
     }
     await db.teamPulse.delete({ where: { id: oldPulse.id } });
 
     // ======================================================================
-    console.log("--- E. Fechas/TZ: mondayOf con hora límite ---");
+    console.log("--- E. Fechas/TZ: mondayOf con referencia Europe/Madrid ---");
     // ======================================================================
-    // lunes 00:30 en Madrid (UTC+1 invierno) = domingo 23:30 UTC
+    // Post-S3: mondayOf decide el lunes con el CALENDARIO DE MADRID
+    // (src/lib/utils/dates.ts) y devuelve la medianoche UTC del lunes elegido.
+    // E1: lunes 00:30 Madrid (invierno UTC+1) = domingo 23:30 UTC — el caso
+    // que con TZ del proceso (UTC) saltaba a la semana anterior.
     const madridMondayEarly = new Date("2026-11-09T00:30:00+01:00");
     const wk = mondayOf(madridMondayEarly);
     const expected = new Date("2026-11-09T00:00:00Z"); // lunes 9 nov
     check(
-      "E1 mondayOf(lunes 00:30 Madrid) cae en la semana correcta",
+      "E1 mondayOf(lunes 00:30 Madrid) → lunes 09-nov (sin salto por UTC)",
       wk.getUTCDay() === 1 && wk.getTime() === expected.getTime(),
       `resultado: ${wk.toISOString()} (esperado lunes 2026-11-09)`,
     );
-    const madridSundayLate = new Date("2026-11-09T00:30:00Z"); // domingo 23:30 Madrid
+    // E2: domingo 23:30 Madrid (invierno UTC+1) = domingo 22:30 UTC —
+    // pertenece a la semana que TERMINA (lunes 02-nov), no a la siguiente.
+    const madridSundayLate = new Date("2026-11-08T22:30:00Z");
     const wk2 = mondayOf(madridSundayLate);
-    if (wk2.getUTCDay() === 1 && wk2.toISOString().startsWith("2026-11-09")) {
+    const expected2 = new Date("2026-11-02T00:00:00Z"); // lunes 2 nov
+    check(
+      "E2 mondayOf(domingo 23:30 Madrid) → lunes 02-nov (misma semana)",
+      wk2.getUTCDay() === 1 && wk2.getTime() === expected2.getTime(),
+      `resultado: ${wk2.toISOString()} (esperado lunes 2026-11-02)`,
+    );
+    if (!(wk2.getUTCDay() === 1 && wk2.getTime() === expected2.getTime())) {
       finding(
-        "FRONTERA TZ: un partido jugado el domingo 23:30-24:00 hora Madrid se computa como LUNES UTC → weekStart salta a la semana siguiente y la ingesta refresca el microciclo equivocado (servidor UTC, usuarios Madrid).",
+        "REGRESIÓN S3 (FRONTERA TZ): mondayOf dejó de respetar el calendario de Madrid — un partido del domingo tarde Madrid se computa en la semana equivocada y la ingesta puede refrescar el microciclo equivocado.",
       );
-    } else {
-      check("E2 domingo tarde Madrid → semana correcta", true, wk2.toISOString());
     }
+    // E3/E4: horario de verano (UTC+2) — la frontera se mantiene exacta con DST.
+    const summerMondayEarly = new Date("2026-07-13T00:30:00+02:00"); // dom 22:30 UTC
+    const wk3 = mondayOf(summerMondayEarly);
+    const expected3 = new Date("2026-07-13T00:00:00Z"); // lunes 13 jul
+    check(
+      "E3 mondayOf(lunes 00:30 Madrid, verano UTC+2) → lunes 13-jul",
+      wk3.getTime() === expected3.getTime(),
+      `resultado: ${wk3.toISOString()} (esperado lunes 2026-07-13)`,
+    );
+    const summerSundayLate = new Date("2026-07-12T21:30:00Z"); // dom 23:30 Madrid
+    const wk4 = mondayOf(summerSundayLate);
+    const expected4 = new Date("2026-07-06T00:00:00Z"); // lunes 6 jul
+    check(
+      "E4 mondayOf(domingo 23:30 Madrid, verano UTC+2) → lunes 06-jul",
+      wk4.getTime() === expected4.getTime(),
+      `resultado: ${wk4.toISOString()} (esperado lunes 2026-07-06)`,
+    );
   } finally {
     // ---------- Cleanup: borrar clubes-probe (cascade) ----------
     await db.club.deleteMany({ where: { id: { in: [clubA.id, clubB.id] } } });

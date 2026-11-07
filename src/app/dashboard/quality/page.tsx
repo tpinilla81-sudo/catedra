@@ -1,10 +1,11 @@
 // ============================================================================
 // PANEL DE CONTROL DE VALIDACIÓN /dashboard/quality
 // ----------------------------------------------------------------------------
-// Integra los resultados E2E de los 4 pilares (scripts/validation-results/
-// pilar<N>.json, escritos por cada suite bun scripts/validate-pilar<N>.ts).
-// Solo lectura: muestra estado por pilar (✅/❌), totales, duración, fecha y
-// el detalle check a check. Cero JS de cliente: <details> nativo.
+// Integra los resultados E2E de los 4 pilares + el refino de Severidad 3
+// (scripts/validation-results/pilar<N>.json, escritos por cada suite bun
+// scripts/validate-pilar<N>.ts / validate-severidad3.ts). Solo lectura:
+// muestra estado por bloque (✅/❌), totales, duración, fecha y el detalle
+// check a check. Cero JS de cliente: <details> nativo.
 // Acceso: cualquier usuario autenticado (es una herramienta de calidad, la
 // lógica vive en ficheros locales; nunca expone datos de dominio de clubes).
 // ============================================================================
@@ -38,10 +39,16 @@ type ValidationReport = {
 export const dynamic = "force-dynamic";
 
 const PILARES = [
-  { n: 1, title: "Biblioteca de Sabiduría + RBAC", script: "bun scripts/validate-pilar1.ts" },
-  { n: 2, title: "Plantilla y Pulso (CSV/Excel + fatiga)", script: "bun scripts/validate-pilar2.ts" },
-  { n: 3, title: "Ingesta Post-Partido (3 pasos)", script: "bun scripts/validate-pilar3.ts" },
-  { n: 4, title: "Motor Prescriptivo + Hoy", script: "bun scripts/validate-pilar4.ts" },
+  { n: 1, label: "Pilar 1", title: "Biblioteca de Sabiduría + RBAC", script: "bun scripts/validate-pilar1.ts" },
+  { n: 2, label: "Pilar 2", title: "Plantilla y Pulso (CSV/Excel + fatiga)", script: "bun scripts/validate-pilar2.ts" },
+  { n: 3, label: "Pilar 3", title: "Ingesta Post-Partido (3 pasos)", script: "bun scripts/validate-pilar3.ts" },
+  { n: 4, label: "Pilar 4", title: "Motor Prescriptivo + Hoy", script: "bun scripts/validate-pilar4.ts" },
+  {
+    n: 5,
+    label: "Refino S3",
+    title: "Perfección técnica local (ventana de pulso · TZ Madrid · factibilidad MD+1/MD-1)",
+    script: "bun scripts/validate-severidad3.ts",
+  },
 ] as const;
 
 type LoadResult = { report: ValidationReport | null; error?: string };
@@ -107,9 +114,10 @@ export default async function QualityPage() {
 
       <div className="mx-auto max-w-5xl px-4 space-y-4 pt-5">
         <p className="text-sm text-zinc-400 leading-relaxed">
-          Los 4 pilares del método se validan de punta a punta contra la base de
-          datos real y el servidor HTTP (NextAuth + Tenant Guard). Cada suite
-          escribe aquí su resultado al terminar.
+          Los 4 pilares del método y el refino de Severidad 3 se validan de
+          punta a punta contra la base de datos real y el servidor HTTP
+          (NextAuth + Tenant Guard). Cada suite escribe aquí su resultado al
+          terminar.
         </p>
 
         {PILARES.map((p, i) => {
@@ -140,7 +148,7 @@ export default async function QualityPage() {
                   )}
                   <div className="min-w-0">
                     <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide">
-                      Pilar {p.n}
+                      {p.label}
                     </p>
                     <p className="text-base font-black text-zinc-50 truncate">{p.title}</p>
                   </div>

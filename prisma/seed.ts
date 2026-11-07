@@ -16,8 +16,8 @@ import {
   Semaphore,
   TacticalEventType,
 } from "@prisma/client";
-import { startOfWeek } from "date-fns";
 import { hashPassword } from "../src/lib/password";
+import { mondayOf } from "../src/lib/utils/dates";
 import { ensurePostgresUrl } from "../src/lib/env-guard";
 
 ensurePostgresUrl();
@@ -519,7 +519,7 @@ async function main() {
   console.log("SEED: partidos + ingesta OK (21 eventos tácticos, 5 notas)");
 
   // ---------- 6) Pulso colectivo de esta semana ----------
-  const monday = startOfWeek(now, { weekStartsOn: 1 });
+  const monday = mondayOf(now); // lunes-Madrid canónico (misma convención que el motor)
   await prisma.teamPulse.upsert({
     where: { teamId_date: { teamId: primerEquipo.id, date: monday } },
     update: { moraleScore: 6, fatigueScore: 7, resultsStreak: 2 },

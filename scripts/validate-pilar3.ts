@@ -19,7 +19,7 @@
 // Ejecutar: bun scripts/validate-pilar3.ts  (dev server en :3000, PG en :5432)
 // ============================================================================
 import { PrismaClient } from "@prisma/client";
-import { addDays, startOfWeek } from "date-fns";
+import { addDays } from "date-fns";
 import { createTenantClient } from "../src/lib/tenant";
 import { runMatchIngest, type SubmitPayload } from "../src/lib/match-ingest";
 import {
@@ -53,7 +53,7 @@ const raw = new PrismaClient({ datasources: { db: { url: PG } } });
 const clubA = await raw.club.findUniqueOrThrow({ where: { slug: "cf-metodo" } });
 const coach = await raw.user.findUniqueOrThrow({ where: { email: "mister@cfmetodo.es" } });
 const dbA = createTenantClient(clubA.id) as any;
-const mondayThisWeek = startOfWeek(new Date(), { weekStartsOn: 1 });
+const mondayThisWeek = mondayOf(new Date()); // lunes-Madrid canónico (re-exportado por diagnose)
 
 // ============================================================================
 console.log("\n══ 0) Limpieza de restos de ejecuciones interrumpidas ══");

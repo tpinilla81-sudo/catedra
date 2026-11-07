@@ -1,0 +1,155 @@
+{
+  "pilar": 5,
+  "title": "Perfección técnica local — Severidad 3 (pulso vivo · TZ Madrid · factibilidad apoyos)",
+  "total": 36,
+  "passed": 36,
+  "failed": 0,
+  "durationMs": 1836,
+  "timestamp": "2026-11-07T13:03:34.704Z",
+  "checks": [
+    {
+      "name": "E1 mondayOf(lunes 00:30 Madrid, invierno) → lunes 09-nov 00:00 UTC",
+      "ok": true
+    },
+    {
+      "name": "E2 mondayOf(domingo 23:30 Madrid, invierno) → lunes 02-nov (semana que termina)",
+      "ok": true
+    },
+    {
+      "name": "E3 mondayOf(lunes 00:30 Madrid, verano) → lunes 13-jul 00:00 UTC",
+      "ok": true
+    },
+    {
+      "name": "E4 mondayOf(domingo 23:30 Madrid, verano) → lunes 06-jul (semana que termina)",
+      "ok": true
+    },
+    {
+      "name": "E5 mondayOf(miércoles 18:00 UTC) → lunes 02-nov",
+      "ok": true
+    },
+    {
+      "name": "E6 mondayOf(domingo 01-mar) → lunes 23-feb (cruce de mes exacto)",
+      "ok": true
+    },
+    {
+      "name": "E7 mondayOf(domingo 03-ene-2027) → lunes 28-dic-2026 (cruce de año exacto)",
+      "ok": true
+    },
+    {
+      "name": "E8a pulseWindowFor: gte = weekStart − 8 días (domingo previo incluido)",
+      "ok": true
+    },
+    {
+      "name": "E8b pulseWindowFor: lte = weekStart + 2 días (miércoles de la semana)",
+      "ok": true
+    },
+    {
+      "name": "pulso de hace 30 días → RECHAZADO (pulse null)",
+      "ok": true
+    },
+    {
+      "name": "defaults seguros sin pulso vivo: solo consolidación (sin hallazgo FÍSICO ni ANÍMICO)",
+      "ok": true
+    },
+    {
+      "name": "pulso de hace 9 días (fuera por 1) → RECHAZADO",
+      "ok": true
+    },
+    {
+      "name": "pulso del domingo previo (weekStart−8d, borde gte) → INCLUIDO",
+      "ok": true
+    },
+    {
+      "name": "pulso del lunes (weekStart+1d) → INCLUIDO",
+      "ok": true
+    },
+    {
+      "name": "pulso del miércoles (weekStart+2d, borde lte) → INCLUIDO",
+      "ok": true
+    },
+    {
+      "name": "pulso del jueves (weekStart+3d, fuera por 1) → RECHAZADO",
+      "ok": true
+    },
+    {
+      "name": "coexistencia de pulsos vivos → el más reciente gobierna (fatiga 8)",
+      "ok": true
+    },
+    {
+      "name": "el pulso vivo alimenta el diagnóstico: fatiga 8/10 → hallazgo FÍSICO",
+      "ok": true
+    },
+    {
+      "name": "FA: pipeline con plantilla vacía + pulso caducado → propuesta creada",
+      "ok": true
+    },
+    {
+      "name": "FA: pulso caducado NO gobierna → solo consolidación (sin hallazgo FÍSICO por fatiga 9 caducada)",
+      "ok": true
+    },
+    {
+      "name": "FA: EngineRun inputSnapshot.pulse === null (caducado fuera de ventana)",
+      "ok": true
+    },
+    {
+      "name": "FA: issuesJson sin PHYSICAL ni MORALE (defaults seguros)",
+      "ok": true
+    },
+    {
+      "name": "FA: 0 jugadores disponibles → ninguna tarea en el césped (MD+1/MD-1 vacías por factibilidad)",
+      "ok": true
+    },
+    {
+      "name": "FB: propuesta creada (5 jugadores, fatiga 8)",
+      "ok": true
+    },
+    {
+      "name": "FB: tareas de apoyo solo intensidad LOW (fatiga alta) y playersMin ≤ 5",
+      "ok": true
+    },
+    {
+      "name": "FB: la activación MEDIUM de test NO entra en MD-1 (contraindicada por fatiga 8/10)",
+      "ok": true
+    },
+    {
+      "name": "FC: propuesta creada (5 jugadores, fatiga 4)",
+      "ok": true
+    },
+    {
+      "name": "FC: activación MEDIUM de test entra en MD-1 (factible sin fatiga alta, la más reciente del pool)",
+      "ok": true
+    },
+    {
+      "name": "FC: MD+1 mantiene techo LOW (regeneración) con playersMin ≤ 5",
+      "ok": true
+    },
+    {
+      "name": "FD: propuesta creada (1 jugador)",
+      "ok": true
+    },
+    {
+      "name": "FD: tareas de apoyo (MD+1/MD-1) nunca exceden los 1 disponible (playersMin ≤ 1)",
+      "ok": true
+    },
+    {
+      "name": "FD: las tareas de test (min 4 y min 2) NO se asignan con plantilla insuficiente",
+      "ok": true
+    },
+    {
+      "name": "login COACH_ADMIN",
+      "ok": true
+    },
+    {
+      "name": "GET /dashboard/quality 200",
+      "ok": true
+    },
+    {
+      "name": "panel de control integra el bloque Refino S3 (Severidad 3)",
+      "ok": true
+    },
+    {
+      "name": "GET /dashboard/today 200 (smoke post-refino)",
+      "ok": true
+    }
+  ]
+}

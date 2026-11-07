@@ -9,8 +9,13 @@
 //
 // Cadena: TacticalEvent + TeamPulse + Player → IssueDraft[] → DiagnosisIssue
 // ============================================================================
-import { startOfWeek, subDays } from "date-fns";
+import { subDays } from "date-fns";
 import type { Match, PrismaClient, TeamPulse } from "@prisma/client";
+import { pulseWindowFor } from "@/lib/utils/dates";
+// Semana ISO decidida por el calendario de Madrid (fuente única: utils/dates).
+// Re-exportado aquí para no romper a los consumidores históricos
+// (pipeline, today/actions, match-ingest, probes y suites E2E).
+export { mondayOf } from "@/lib/utils/dates";
 
 type EventLike = { type: string; x: number };
 
@@ -39,22 +44,25 @@ export type EngineInputs = {
   matches: MatchWithReport[];
 };
 
-/** Semana ISO (lunes) de una fecha */
-export function mondayOf(d: Date): Date {
-  return startOfWeek(d, { weekStartsOn: 1 });
-}
-
 /**
- * Recoge las entradas del motor para la semana que empieza en `weekStart`:
- * último pulso colectivo + partidos con ingesta de la ventana (weekStart-8d).
+ * Recoge las entradas del motor para la semana que empieza en `weekStart`
+ * (medianoche UTC del lunes-Madrid):
+ *   • Pulso colectivo VIVO: solo vale si está dentro de la ventana temporal
+ *     válida [weekStart−8d, weekStart+2d] (ver pulseWindowFor). Un pulso
+ *     caducado (ej. hace 30 días) o inexistente NO gobierna la semana: se
+ *     devuelve `pulse: null` y el motor aplica sus valores por defecto
+ *     seguros — fatiga neutra 5/10 (sin contraindicar intensidad alta) y
+ *     sin hallazgo anímico. El vestuario nunca se planifica con datos viejos.
+ *   • Partidos con ingesta de la ventana (weekStart−8d …).
  */
 export async function collectInputs(
   db: DiagnoseDb,
   teamId: string,
   weekStart: Date,
 ): Promise<EngineInputs> {
+  const pulseWindow = pulseWindowFor(weekStart); // gte: weekStart−8d · lte: weekStart+2d
   const pulse = await db.teamPulse.findFirst({
-    where: { teamId },
+    where: { teamId, date: { gte: pulseWindow.gte, lte: pulseWindow.lte } },
     orderBy: { date: "desc" },
   });
 

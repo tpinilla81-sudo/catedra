@@ -7,6 +7,9 @@
 //      conectadas en la receta (TaskSubPrinciple), ordenadas por relevancia.
 //   2. FACTIBILIDAD: descarta tareas inviables (jugadores disponibles
 //      insuficientes, intensidad alta contraindicada por fatiga grupal).
+//      Aplica TAMBIÉN a las sesiones de apoyo MD+1 (recuperación, solo LOW)
+//      y MD-1 (activación, LOW/MEDIUM con techo por fatiga) — ninguna tarea
+//      llega al césped sin cumplir los requisitos físicos del grupo.
 //   3. AUDITORÍA TOTAL: cada ejecución persiste un EngineRun con las entradas,
 //      los hallazgos, las tareas elegidas (con rationale) y las descartadas
 //      (con motivo) — trazabilidad "por qué este plan" de punta a punta.
@@ -451,17 +454,38 @@ export async function runWeeklyProposalPipeline(
         rationale: p.rationale,
       }));
 
-      // ---------- 4) Tareas de apoyo (MD+1 / MD-1) ----------
-      const recoveryTask = await tx.task.findFirst({
+      // ---------- 4) Tareas de apoyo (MD+1 / MD-1) CON FACTIBILIDAD FÍSICA ----------
+      // La factibilidad del grupo (jugadores disponibles + umbrales de fatiga)
+      // NO es exclusiva de la prescripción por hallazgo: las sesiones de
+      // recuperación y activación también respetan los requisitos físicos.
+      //   • MD+1 recuperación: SOLO intensidad LOW (regeneración) y
+      //     playersMin ≤ disponibles.
+      //   • MD-1 activación: LOW/MEDIUM, pero con fatiga grupal ≥ 7 se
+      //     restringe a LOW (no añadir carga pre-partido) y playersMin ≤
+      //     disponibles. Sin candidata factible → sesión sin tarea (la UI la
+      //     cubre como "sesión libre"): nunca una tarea inviable en el césped.
+      type SupportTask = { id: string; title: string; intensity: string; playersMin: number };
+      const supportSelect = { id: true, title: true, intensity: true, playersMin: true } as const;
+      const fatigueHigh = (pulse?.fatigueScore ?? 5) >= 7;
+      const recoveryPool: SupportTask[] = await tx.task.findMany({
         where: { intensity: "LOW", phases: { has: "OFFENSIVE" } },
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-        select: { id: true, title: true },
+        select: supportSelect,
       });
-      const activationTask = await tx.task.findFirst({
+      const activationPool: SupportTask[] = await tx.task.findMany({
         where: { intensity: { in: ["LOW", "MEDIUM"] }, phases: { has: "OFFENSIVE" } },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        select: { id: true, title: true },
+        select: supportSelect,
       });
+      const firstFeasibleSupport = (pool: SupportTask[], allowMedium: boolean): SupportTask | null =>
+        pool.find(
+          (t) =>
+            t.playersMin <= availablePlayers && // plantilla suficiente hoy
+            (!fatigueHigh || t.intensity === "LOW") && // techo de intensidad por fatiga
+            (allowMedium || t.intensity === "LOW"), // techo de intensidad de la sesión
+        ) ?? null;
+      const recoveryTask = firstFeasibleSupport(recoveryPool, false);
+      const activationTask = firstFeasibleSupport(activationPool, true);
 
       // ---------- 5) Construcción del microciclo ----------
       const tacticalDrafts = drafts.filter((d) => d.kind === "TACTICAL");
@@ -576,7 +600,9 @@ export async function runWeeklyProposalPipeline(
                           order: 1,
                           taskId: activationTask.id,
                           durationMin: 35,
-                          rationale: "Activación neuromuscular previa al partido.",
+                          rationale: fatigueHigh
+                            ? `Activación neuromuscular previa al partido: intensidad baja exigida por la fatiga grupal (${pulse?.fatigueScore}/10) y plantilla disponible (${availablePlayers}).`
+                            : "Activación neuromuscular previa al partido, factible con la plantilla disponible.",
                         },
                       ]
                     : [],

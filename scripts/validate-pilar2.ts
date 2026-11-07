@@ -16,7 +16,6 @@
 // ============================================================================
 import { PrismaClient } from "@prisma/client";
 import * as XLSX from "xlsx";
-import { startOfWeek } from "date-fns";
 import { createTenantClient } from "../src/lib/tenant";
 import {
   applySquadImport,
@@ -32,6 +31,7 @@ import {
   buildIssueDrafts,
   collectInputs,
   computeResultsStreak,
+  mondayOf,
 } from "../src/lib/engine/diagnose";
 import { normalizeName, normalizePosition } from "../src/lib/taxonomy";
 import { writeResults } from "./validation-output";
@@ -344,7 +344,7 @@ await raw.match.update({ where: { id: mNew.id }, data: { goalsFor: 0, goalsAgain
 check("racha: derrota lo más reciente → -1", (await computeResultsStreak(dbA as any, testTeam.id)) === -1);
 
 // La racha se cachea en el Pulso (como hace el hook real de la ingesta)
-const monday = startOfWeek(new Date(), { weekStartsOn: 1 });
+const monday = mondayOf(new Date()); // lunes-Madrid canónico (misma convención que collectInputs)
 await dbA.teamPulse.upsert({
   where: { teamId_date: { teamId: testTeam.id, date: monday } },
   update: { resultsStreak: -1 },

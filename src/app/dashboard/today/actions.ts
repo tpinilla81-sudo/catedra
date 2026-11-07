@@ -22,8 +22,10 @@ import { mondayOf } from "@/lib/engine/diagnose";
 import { runWeeklyProposalPipeline } from "@/lib/engine/pipeline";
 
 function currentWeekStart(): Date {
-  // Semana ISO: comienza el lunes. (TZ del servidor UTC; precisión horaria
-  // afinada en fase 2 con timezone Europe/Madrid explícita.)
+  // Semana ISO con referencia horaria EXPLÍCITA Europe/Madrid (mondayOf,
+  // src/lib/utils/dates.ts): el lunes lo decide el calendario del vestuario,
+  // no la TZ del proceso. Evita el salto de día por UTC en la frontera
+  // 00:00–02:00 (lunes madrugada Madrid = domingo UTC).
   return mondayOf(new Date());
 }
 

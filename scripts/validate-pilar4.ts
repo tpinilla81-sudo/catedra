@@ -14,7 +14,7 @@
 // Ejecutar: bun scripts/validate-pilar4.ts  (dev server en :3000, PG en :5432)
 // ============================================================================
 import { PrismaClient } from "@prisma/client";
-import { addDays, startOfWeek } from "date-fns";
+import { addDays } from "date-fns";
 import { createTenantClient } from "../src/lib/tenant";
 import { writeResults } from "./validation-output";
 import {
@@ -22,6 +22,7 @@ import {
   rankTaskCandidates,
   runWeeklyProposalPipeline,
   refreshProposalEvidence,
+  mondayOf,
   ENGINE_VERSION,
 } from "../src/lib/engine/pipeline";
 
@@ -50,7 +51,7 @@ const clubA = await raw.club.findUniqueOrThrow({ where: { slug: "cf-metodo" } })
 const coach = await raw.user.findUniqueOrThrow({ where: { email: "mister@cfmetodo.es" } });
 const dbA = createTenantClient(clubA.id) as unknown as PrismaClient;
 
-const mondayThisWeek = startOfWeek(new Date(), { weekStartsOn: 1 });
+const mondayThisWeek = mondayOf(new Date()); // lunes-Madrid canónico (misma convención que el motor)
 
 // ============================================================================
 console.log("\n══ 0) Limpieza de restos de ejecuciones interrumpidas ══");
@@ -223,7 +224,7 @@ await raw.teamPulse.create({
   data: {
     clubId: clubA.id,
     teamId: testTeam.id,
-    date: new Date(),
+    date: addDays(mondayThisWeek, 1), // martes: dentro de la ventana del pulso [weekStart−8d, weekStart+2d]
     moraleScore: 6,
     fatigueScore: 8,
     notes: "Test motor",
@@ -410,7 +411,7 @@ console.log("\n══ 3) Regeneración del equipo demo con el motor v0.2 ══"
 const demoTeam = await raw.team.findFirstOrThrow({
   where: { clubId: clubA.id, name: { not: "Equipo Motor TEST" } },
 });
-const demoWeek = startOfWeek(new Date(), { weekStartsOn: 1 });
+const demoWeek = mondayOf(new Date()); // lunes-Madrid canónico
 const oldDemo = await raw.microcycle.findUnique({
   where: { teamId_weekStart: { teamId: demoTeam.id, weekStart: demoWeek } },
 });

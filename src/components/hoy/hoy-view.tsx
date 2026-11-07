@@ -9,7 +9,7 @@
 // ============================================================================
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { startOfWeek } from "date-fns";
+import { mondayOf } from "@/lib/utils/dates";
 import {
   AlertTriangle,
   CalendarDays,
@@ -74,7 +74,10 @@ function gaugeColor(value: number) {
 
 export async function HoyView() {
   const { db, team, clubId, user } = await requireTenantContext();
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  // Semana ISO decidida por el calendario de Madrid (misma convención que el
+  // motor — ver src/lib/utils/dates.ts): sin esto, un servidor UTC y un
+  // usuario de Madrid pueden discrepar del lunes de la semana a primera hora.
+  const weekStart = mondayOf(new Date());
 
   const [microcycle, pulse, nextMatch, lastMatch] = await Promise.all([
     db.microcycle.findUnique({
