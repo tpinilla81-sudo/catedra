@@ -230,10 +230,13 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 export function TaskEditor({
   task,
   subprinciples,
+  platform = false,
   onClose,
 }: {
   task: TaskCard | null;
   subprinciples: SPNode[];
+  /** Modo Plataforma: la ficha se crea/edita como contenido global de la Cátedra */
+  platform?: boolean;
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState<Draft>(() => initialDraft(task));
@@ -292,7 +295,11 @@ export function TaskEditor({
       const res = await saveTask(payload);
       if (res.ok) {
         toast({
-          title: task ? "Ficha actualizada" : "Tarea creada en tu club",
+          title: task
+            ? "Ficha actualizada"
+            : platform
+              ? "Tarea creada en la Cátedra"
+              : "Tarea creada en tu club",
           description: draft.title,
           duration: 2000,
         });
@@ -312,7 +319,7 @@ export function TaskEditor({
       >
         <SheetHeader className="text-left pb-1">
           <SheetTitle className="text-xl font-black text-zinc-50">
-            {task ? "Editar tarea" : "Nueva tarea del club"}
+            {task ? "Editar tarea" : platform ? "Nueva tarea de la Cátedra" : "Nueva tarea del club"}
           </SheetTitle>
           <SheetDescription className="text-zinc-400 text-sm">
             Ficha de ingeniería: espacio, jugadores, intensidad y recetas hacia la taxonomía.

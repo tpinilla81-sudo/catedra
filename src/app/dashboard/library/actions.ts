@@ -17,11 +17,20 @@
 //      del motor: SessionTask.prescribedIssueId y el rationale del míster).
 //   4. Jerarquía máxima de 2 niveles (subprincipio → detalle) para mantener
 //      el árbol legible en tablet y evitar ciclos.
+//
+// RBAC (jerarquía de roles + propiedad del registro — utils/permissions.ts):
+//   • ANALYST        → SOLO LECTURA. Ninguna mutación, ni de club ni global.
+//   • COACH_ADMIN    → CRUD completo del contenido PROPIO del club.
+//   • PLATFORM_ADMIN → CRUD del contenido GLOBAL de la Cátedra (clubId = null)
+//     desde /dashboard/catedra. Nunca toca contenido de un club concreto.
 // ============================================================================
 
 import { revalidatePath } from "next/cache";
-import type { GamePhase } from "@prisma/client";
-import { requireTenantContext } from "@/lib/session";
+import { redirect } from "next/navigation";
+import type { GamePhase, User } from "@prisma/client";
+import { getSessionUser } from "@/lib/session";
+import { createTenantClient } from "@/lib/tenant";
+import { db } from "@/lib/db";
 
 // ---------- Tipos públicos ----------
 
@@ -60,6 +69,76 @@ export type TaskInput = {
 };
 
 export type ActionResult = { ok: true; id: string } | { ok: false; error: string };
+
+// ---------- Contexto de biblioteca (club o plataforma) ----------
+
+type LibraryContext = {
+  user: User;
+  /** null → PLATFORM_ADMIN en modo Cátedra (contenido global) */
+  clubId: string | null;
+  /** Club: cliente con Tenant Guard · Plataforma: cliente base */
+  db: ReturnType<typeof createTenantClient>;
+};
+
+const MSG_READONLY_ANALYST =
+  "Tu rol (Analista) es de solo lectura. Solicita al míster los cambios de la biblioteca.";
+const MSG_CATEDRA_READONLY =
+  "El contenido oficial de la Cátedra es de solo lectura. Duplica a tu club para personalizarlo.";
+const MSG_PLATFORM_NO_CLUB =
+  "La Cátedra gestiona contenido global: nunca edita el contenido privado de un club.";
+
+async function requireLibraryContext(): Promise<LibraryContext> {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser?.id) redirect("/");
+
+  // Plataforma: PLATFORM_ADMIN gestiona la Cátedra global (sin club).
+  if (sessionUser.role === "PLATFORM_ADMIN") {
+    const user = await db.user.findUnique({ where: { id: sessionUser.id } });
+    if (!user || user.role !== "PLATFORM_ADMIN") redirect("/");
+    return { user, clubId: null, db };
+  }
+
+  if (!sessionUser.clubId) redirect("/");
+  const dbT = createTenantClient(sessionUser.clubId);
+  const user = await dbT.user.findUnique({ where: { id: sessionUser.id } });
+  if (!user) redirect("/");
+  return { user, clubId: sessionUser.clubId, db: dbT };
+}
+
+// ---------- Guard de escritura (jerarquía de roles + propiedad) ----------
+
+function writeGuard(
+  user: User,
+  targetClubId: string | null,
+  ctxClubId: string | null,
+): string | null {
+  // 1) ANALYST: solo lectura en todo el sistema.
+  if (user.role === "ANALYST") return MSG_READONLY_ANALYST;
+  // 2) Contenido global de la Cátedra: exclusivo de PLATFORM_ADMIN.
+  if (targetClubId === null) {
+    return user.role === "PLATFORM_ADMIN"
+      ? null
+      : MSG_CATEDRA_READONLY;
+  }
+  // 3) Contenido de club: solo el COACH_ADMIN del club dueño.
+  if (user.role === "PLATFORM_ADMIN") return MSG_PLATFORM_NO_CLUB;
+  return targetClubId === ctxClubId ? null : "No puedes editar contenido de otro club.";
+}
+
+function createGuard(user: User, ctxClubId: string | null): string | null {
+  // Plataforma: crea contenido global de la Cátedra.
+  if (ctxClubId === null) return user.role === "PLATFORM_ADMIN" ? null : MSG_CATEDRA_READONLY;
+  // Club: ANALYST no escribe; COACH_ADMIN crea contenido del club.
+  if (user.role === "ANALYST") return MSG_READONLY_ANALYST;
+  return null;
+}
+
+function duplicateGuard(user: User, ctxClubId: string | null): string | null {
+  // Duplicar a mi club = crear contenido del club → COACH_ADMIN en contexto club.
+  if (ctxClubId === null) return MSG_PLATFORM_NO_CLUB;
+  if (user.role === "ANALYST") return MSG_READONLY_ANALYST;
+  return null;
+}
 
 // ---------- Validadores (mensajes claros en lenguaje de míster) ----------
 
@@ -107,6 +186,7 @@ function strList(v: unknown, maxItems: number): string[] | null {
 
 function revalidateLibrary() {
   revalidatePath("/dashboard/library");
+  revalidatePath("/dashboard/catedra");
   revalidatePath("/dashboard/today");
   revalidatePath("/dashboard/match");
 }
@@ -116,7 +196,7 @@ function revalidateLibrary() {
 // ============================================================================
 
 export async function saveSubPrinciple(input: SubPrincipleInput): Promise<ActionResult> {
-  const { db, clubId } = await requireTenantContext();
+  const { db, clubId, user } = await requireLibraryContext();
 
   const name = cleanStr(input.name, 120);
   const description = optStr(input.description, 500);
@@ -128,7 +208,8 @@ export async function saveSubPrinciple(input: SubPrincipleInput): Promise<Action
   if (!PHASES.includes(phase)) return fail("Fase del juego no válida.");
   const phaseEnum = phase as GamePhase;
 
-  // Jerarquía: el padre debe ser raíz (2 niveles máximo), de la misma fase y visible.
+  // Jerarquía: el padre debe ser raíz (2 niveles máximo), de la misma fase,
+  // visible y — en modo plataforma — también contenido global de la Cátedra.
   let parent: { id: string; phase: string; clubId: string | null; parentId: string | null } | null = null;
   if (parentId) {
     parent = await db.subPrinciple.findUnique({
@@ -138,6 +219,8 @@ export async function saveSubPrinciple(input: SubPrincipleInput): Promise<Action
     if (!parent) return fail("El subprincipio padre no existe.");
     if (parent.clubId !== null && parent.clubId !== clubId)
       return fail("No puedes anidar bajo contenido de otro club.");
+    if (clubId === null && parent.clubId !== null)
+      return fail("La Cátedra solo organiza contenido global: no puedes anidar bajo contenido de un club.");
     if (parent.phase !== phase)
       return fail("El detalle debe pertenecer a la misma fase del juego que su padre.");
     if (parent.parentId)
@@ -148,12 +231,12 @@ export async function saveSubPrinciple(input: SubPrincipleInput): Promise<Action
 
   const data = { name, description, parentId: parent ? parent.id : null };
 
-  // ---------- EDICIÓN (solo contenido propio del club) ----------
+  // ---------- EDICIÓN (RBAC: ANALYST ❌ · club solo lo propio · global solo Cátedra) ----------
   if (id) {
     const row = await db.subPrinciple.findUnique({ where: { id } });
     if (!row) return fail("El subprincipio ya no existe.");
-    if (row.clubId !== clubId)
-      return fail("El contenido oficial de la Cátedra es de solo lectura. Duplica a tu club para personalizarlo.");
+    const denied = writeGuard(user, row.clubId, clubId);
+    if (denied) return fail(denied);
     if (row.phase !== phase) return fail("La fase de un subprincipio no se puede cambiar al editar.");
 
     // Si el nodo tiene hijos, no puede convertirse en detalle de otro.
@@ -166,21 +249,26 @@ export async function saveSubPrinciple(input: SubPrincipleInput): Promise<Action
     return { ok: true, id: row.id };
   }
 
-  // ---------- CREACIÓN (siempre contenido del club) ----------
+  // ---------- CREACIÓN (RBAC: ANALYST ❌ · club → propio · plataforma → global) ----------
+  const denied = createGuard(user, clubId);
+  if (denied) return fail(denied);
+
   const created = await db.subPrinciple.create({
-    data: { ...data, phase: phaseEnum },
+    // clubId: explícito. En club, el Tenant Guard lo valida; en plataforma
+    // (cliente base sin guard) queda null = contenido global de la Cátedra.
+    data: { ...data, phase: phaseEnum, clubId },
   });
   revalidateLibrary();
   return { ok: true, id: created.id };
 }
 
 export async function deleteSubPrinciple(id: string): Promise<ActionResult> {
-  const { db, clubId } = await requireTenantContext();
+  const { db, clubId, user } = await requireLibraryContext();
 
   const row = await db.subPrinciple.findUnique({ where: { id } });
   if (!row) return fail("El subprincipio ya no existe.");
-  if (row.clubId !== clubId)
-    return fail("El contenido oficial de la Cátedra es de solo lectura y no se puede eliminar desde un club.");
+  const denied = writeGuard(user, row.clubId, clubId);
+  if (denied) return fail(denied);
 
   // Los detalles quedan como raíces (parentId SetNull) y las recetas se
   // desconectan en cascada; los DiagnosisIssue conservan su evidencia (SetNull).
@@ -191,7 +279,11 @@ export async function deleteSubPrinciple(id: string): Promise<ActionResult> {
 }
 
 export async function duplicateSubPrincipleToClub(id: string): Promise<ActionResult> {
-  const { db, clubId } = await requireTenantContext();
+  const { db, clubId, user } = await requireLibraryContext();
+
+  const denied = duplicateGuard(user, clubId);
+  if (denied) return fail(denied);
+  if (!clubId) return fail(MSG_PLATFORM_NO_CLUB);
 
   const row = await db.subPrinciple.findUnique({ where: { id } });
   if (!row) return fail("El subprincipio ya no existe.");
@@ -229,7 +321,7 @@ export async function duplicateSubPrincipleToClub(id: string): Promise<ActionRes
 // ============================================================================
 
 export async function saveTask(input: TaskInput): Promise<ActionResult> {
-  const { db, clubId, user } = await requireTenantContext();
+  const { db, clubId, user } = await requireLibraryContext();
 
   const title = cleanStr(input.title, 120);
   const objective = cleanStr(input.objective, 600);
@@ -281,6 +373,8 @@ export async function saveTask(input: TaskInput): Promise<ActionResult> {
     if (!sp) return fail("Uno de los subprincipios conectados ya no existe.");
     if (sp.clubId !== null && sp.clubId !== clubId)
       return fail("No puedes conectar la tarea a subprincipios de otro club.");
+    if (clubId === null && sp.clubId !== null)
+      return fail("Las tareas de la Cátedra solo se conectan a subprincipios globales de la Cátedra.");
     seen.add(spId);
     recipes.push({
       subPrincipleId: spId,
@@ -307,13 +401,13 @@ export async function saveTask(input: TaskInput): Promise<ActionResult> {
     diagramUrl,
   };
 
-  // ---------- EDICIÓN (solo contenido propio del club) ----------
+  // ---------- EDICIÓN (RBAC: ANALYST ❌ · club solo lo propio · global solo Cátedra) ----------
   const id = optStr(input.id, 64);
   if (id) {
     const row = await db.task.findUnique({ where: { id } });
     if (!row) return fail("La tarea ya no existe.");
-    if (row.clubId !== clubId)
-      return fail("Las tareas de la Cátedra son de solo lectura. Duplica a tu club para personalizarlas.");
+    const denied = writeGuard(user, row.clubId, clubId);
+    if (denied) return fail(denied);
 
     await db.$transaction([
       db.task.update({ where: { id: row.id }, data }),
@@ -332,10 +426,14 @@ export async function saveTask(input: TaskInput): Promise<ActionResult> {
     return { ok: true, id: row.id };
   }
 
-  // ---------- CREACIÓN (siempre contenido del club) ----------
+  // ---------- CREACIÓN (RBAC: ANALYST ❌ · club → propio · plataforma → global) ----------
+  const denied = createGuard(user, clubId);
+  if (denied) return fail(denied);
+
   const created = await db.task.create({
     data: {
       ...data,
+      clubId: clubId, // null → Cátedra global (plataforma) · string → club (guard inyecta)
       createdById: user.id,
       subPrinciples: {
         create: recipes.map((r) => ({
@@ -352,12 +450,12 @@ export async function saveTask(input: TaskInput): Promise<ActionResult> {
 }
 
 export async function deleteTask(id: string): Promise<ActionResult> {
-  const { db, clubId } = await requireTenantContext();
+  const { db, clubId, user } = await requireLibraryContext();
 
   const row = await db.task.findUnique({ where: { id } });
   if (!row) return fail("La tarea ya no existe.");
-  if (row.clubId !== clubId)
-    return fail("Las tareas de la Cátedra son de solo lectura y no se pueden eliminar desde un club.");
+  const denied = writeGuard(user, row.clubId, clubId);
+  if (denied) return fail(denied);
 
   // Trazabilidad del motor: si la tarea se prescribió en algún microciclo,
   // su historia (rationale, issue prescrito) no se destruye.
@@ -375,7 +473,11 @@ export async function deleteTask(id: string): Promise<ActionResult> {
 }
 
 export async function duplicateTaskToClub(id: string): Promise<ActionResult> {
-  const { db, clubId, user } = await requireTenantContext();
+  const { db, clubId, user } = await requireLibraryContext();
+
+  const denied = duplicateGuard(user, clubId);
+  if (denied) return fail(denied);
+  if (!clubId) return fail(MSG_PLATFORM_NO_CLUB);
 
   const row = await db.task.findUnique({
     where: { id },

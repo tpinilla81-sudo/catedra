@@ -149,10 +149,12 @@ function SPRow({
 function SPEditorSheet({
   editor,
   data,
+  platform,
   onClose,
 }: {
   editor: { node: SPNode | null; phase: string; parent: SPNode | null };
   data: LibraryData;
+  platform: boolean;
   onClose: () => void;
 }) {
   const node = editor.node;
@@ -182,7 +184,11 @@ function SPEditorSheet({
       });
       if (res.ok) {
         toast({
-          title: node ? "Subprincipio actualizado" : "Subprincipio creado en tu club",
+          title: node
+            ? "Subprincipio actualizado"
+            : platform
+              ? "Subprincipio creado en la Cátedra"
+              : "Subprincipio creado en tu club",
           description: name,
           duration: 2000,
         });
@@ -299,11 +305,17 @@ function SPEditorSheet({
 
 export function TaxonomyTab({
   data,
+  canWrite,
+  platform,
   onOpenTask,
   onEditTask,
   onNewTask,
 }: {
   data: LibraryData;
+  /** RBAC de presentación (el guard real vive en cada Server Action) */
+  canWrite: boolean;
+  /** Modo Plataforma: se edita el contenido global de la Cátedra */
+  platform: boolean;
   onOpenTask: (t: TaskCard) => void;
   onEditTask: (t: TaskCard) => void;
   onNewTask: () => void;
@@ -409,14 +421,16 @@ export function TaxonomyTab({
                   aria-hidden
                 />
               </button>
-              <button
-                onClick={() => setEditor({ node: null, phase, parent: null })}
-                className="shrink-0 min-h-[44px] min-w-[44px] rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 flex items-center justify-center hover:bg-emerald-500/20 transition"
-                aria-label={`Añadir subprincipio a ${meta.label}`}
-                title="Añadir subprincipio del club"
-              >
-                <Plus className="w-5 h-5" aria-hidden />
-              </button>
+              {canWrite && (
+                <button
+                  onClick={() => setEditor({ node: null, phase, parent: null })}
+                  className="shrink-0 min-h-[44px] min-w-[44px] rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 flex items-center justify-center hover:bg-emerald-500/20 transition"
+                  aria-label={`Añadir subprincipio a ${meta.label}`}
+                  title={platform ? "Añadir subprincipio de la Cátedra" : "Añadir subprincipio del club"}
+                >
+                  <Plus className="w-5 h-5" aria-hidden />
+                </button>
+              )}
             </div>
 
             {/* Árbol */}
@@ -595,9 +609,9 @@ export function TaxonomyTab({
                 );
               })()}
 
-              {/* Acciones */}
+              {/* Acciones (RBAC: solo roles de escritura; el alcance depende del modo) */}
               <div className="mt-5 space-y-2">
-                {detail.clubId !== null ? (
+                {canWrite && (detail.clubId !== null ? !platform : platform) && (
                   <>
                     <div className="grid grid-cols-2 gap-2">
                       <Button
@@ -628,7 +642,8 @@ export function TaxonomyTab({
                       <Trash2 className="w-4 h-4" aria-hidden /> Eliminar subprincipio
                     </Button>
                   </>
-                ) : (
+                )}
+                {canWrite && detail.clubId === null && !platform && (
                   <Button
                     onClick={() => runDuplicate(detail)}
                     disabled={busy}
@@ -644,13 +659,20 @@ export function TaxonomyTab({
                     )}
                   </Button>
                 )}
-                <Button
-                  variant="ghost"
-                  onClick={onNewTask}
-                  className="w-full min-h-[44px] rounded-2xl text-zinc-400 hover:text-zinc-200 font-bold"
-                >
-                  <BookOpen className="w-4 h-4" aria-hidden /> Crear una tarea para este objetivo
-                </Button>
+                {!canWrite && (
+                  <p className="rounded-2xl border border-zinc-800 bg-zinc-900/60 px-3.5 py-2.5 text-xs text-zinc-500 font-semibold">
+                    Solo lectura: tu rol consulta la biblioteca sin modificarla.
+                  </p>
+                )}
+                {canWrite && (
+                  <Button
+                    variant="ghost"
+                    onClick={onNewTask}
+                    className="w-full min-h-[44px] rounded-2xl text-zinc-400 hover:text-zinc-200 font-bold"
+                  >
+                    <BookOpen className="w-4 h-4" aria-hidden /> Crear una tarea para este objetivo
+                  </Button>
+                )}
               </div>
 
               <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
@@ -687,7 +709,7 @@ export function TaxonomyTab({
 
       {/* ---------- Editor ---------- */}
       {editor && (
-        <SPEditorSheet editor={editor} data={data} onClose={() => setEditor(null)} />
+        <SPEditorSheet editor={editor} data={data} platform={platform} onClose={() => setEditor(null)} />
       )}
     </div>
   );

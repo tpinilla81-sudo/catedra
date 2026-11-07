@@ -16,7 +16,7 @@ import { requireTenantContext } from "@/lib/session";
 export const dynamic = "force-dynamic";
 
 export default async function LibraryPage() {
-  const { db, team } = await requireTenantContext();
+  const { db, team, user } = await requireTenantContext();
 
   const [sps, tasks, links, openIssues] = await Promise.all([
     db.subPrinciple.findMany({
@@ -112,7 +112,8 @@ export default async function LibraryPage() {
 
   return (
     <main className="min-h-screen bg-zinc-950 pb-28">
-      <LibraryView data={data} />
+      {/* RBAC de presentación: los guards autoritativos viven en cada Server Action */}
+      <LibraryView data={data} role={user.role} />
       <AppNav active="library" />
     </main>
   );

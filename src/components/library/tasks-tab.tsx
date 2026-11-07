@@ -160,10 +160,16 @@ function TaskCardItem({
 
 export function TasksTab({
   data,
+  canWrite,
+  platform,
   onOpenTask,
   onNewTask,
 }: {
   data: LibraryData;
+  /** RBAC de presentación (el guard real vive en cada Server Action) */
+  canWrite: boolean;
+  /** Modo Plataforma: se edita el contenido global de la Cátedra */
+  platform: boolean;
   onOpenTask: (t: TaskCard) => void;
   onNewTask: () => void;
 }) {
@@ -255,16 +261,24 @@ export function TasksTab({
           <div className="col-span-full rounded-3xl border border-dashed border-zinc-800 px-6 py-10 text-center">
             <p className="text-zinc-500">
               No hay tareas con estos filtros.{" "}
-              <span className="text-zinc-400">
-                Crea una nueva con el botón «+ Tarea» de la cabecera.
-              </span>
+              {canWrite ? (
+                <span className="text-zinc-400">
+                  Crea una nueva con el botón «+ Tarea» de la cabecera.
+                </span>
+              ) : (
+                <span className="text-zinc-400">
+                  Tu rol consulta el catálogo en modo lectura.
+                </span>
+              )}
             </p>
-            <Button
-              onClick={onNewTask}
-              className="mt-4 min-h-[48px] rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black"
-            >
-              Crear la primera tarea del club
-            </Button>
+            {canWrite && (
+              <Button
+                onClick={onNewTask}
+                className="mt-4 min-h-[48px] rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black"
+              >
+                {platform ? "Crear la primera tarea de la Cátedra" : "Crear la primera tarea del club"}
+              </Button>
+            )}
           </div>
         ) : (
           filtered.map((t) => <TaskCardItem key={t.id} task={t} onOpen={onOpenTask} />)
@@ -323,10 +337,16 @@ function ChipList({ title, items, numbered }: { title: string; items: string[]; 
 
 export function TaskDetailSheet({
   task,
+  canWrite,
+  platform,
   onClose,
   onEdit,
 }: {
   task: TaskCard | null;
+  /** RBAC de presentación (el guard real vive en cada Server Action) */
+  canWrite: boolean;
+  /** Modo Plataforma: se edita el contenido global de la Cátedra */
+  platform: boolean;
   onClose: () => void;
   onEdit: (t: TaskCard) => void;
 }) {
@@ -513,7 +533,12 @@ export function TaskDetailSheet({
             ) : (
               <p className="rounded-2xl border border-dashed border-zinc-700 px-4 py-3 text-sm text-zinc-500">
                 Esta tarea no está conectada a la taxonomía. El motor solo prescribe tareas con
-                recetas — {isClub ? "edítala y añade sus subprincipios." : "duplica a tu club y conéctala."}
+                recetas —{" "}
+                {platform || isClub
+                  ? "edítala y añade sus subprincipios."
+                  : canWrite
+                    ? "duplica a tu club y conéctala."
+                    : "solicita al míster conectarla."}
               </p>
             )}
 
@@ -525,9 +550,9 @@ export function TaskDetailSheet({
               </p>
             )}
 
-            {/* Acciones */}
+            {/* Acciones (RBAC: solo roles de escritura; el alcance depende del modo) */}
             <div className="mt-5 space-y-2">
-              {isClub ? (
+              {canWrite && (isClub ? !platform : platform) && (
                 <>
                   <Button
                     onClick={() => onEdit(task)}
@@ -544,7 +569,8 @@ export function TaskDetailSheet({
                     <Trash2 className="w-4 h-4" aria-hidden /> Eliminar tarea
                   </Button>
                 </>
-              ) : (
+              )}
+              {canWrite && !isClub && !platform && (
                 <Button
                   onClick={runDuplicate}
                   disabled={busy}
@@ -559,6 +585,11 @@ export function TaskDetailSheet({
                     </>
                   )}
                 </Button>
+              )}
+              {!canWrite && (
+                <p className="rounded-2xl border border-zinc-800 bg-zinc-900/60 px-3.5 py-2.5 text-xs text-zinc-500 font-semibold">
+                  Solo lectura: tu rol consulta el catálogo sin modificarlo.
+                </p>
               )}
             </div>
 

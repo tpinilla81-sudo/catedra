@@ -31,7 +31,8 @@ export function LoginView() {
         return;
       }
       toast.success("Bienvenido al vestuario");
-      router.push("/dashboard/today");
+      // La raíz enruta por rol: club → Hoy · PLATFORM_ADMIN → Cátedra
+      router.push("/");
       router.refresh();
     });
   };

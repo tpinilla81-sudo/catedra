@@ -9,12 +9,15 @@
 // ============================================================================
 
 import { useMemo, useState } from "react";
-import { BookOpen, GitBranch, Landmark, Network, Plus, Users } from "lucide-react";
+import { BookOpen, GitBranch, Landmark, Network, Plus, ShieldCheck, Users } from "lucide-react";
 import { PHASE_ORDER } from "@/lib/taxonomy";
+import type { Role } from "@/types/auth";
+import { canWriteCatedra, canWriteClubContent } from "@/utils/permissions";
 import type { LibraryData, TaskCard } from "@/components/library/types";
 import { TaskDetailSheet, TasksTab } from "@/components/library/tasks-tab";
 import { TaxonomyTab } from "@/components/library/taxonomy-tab";
 import { TaskEditor } from "@/components/library/task-editor";
+import { UserMenu } from "@/components/hoy/user-menu";
 
 function StatCard({
   label,
@@ -41,10 +44,26 @@ function StatCard({
   );
 }
 
-export function LibraryView({ data }: { data: LibraryData }) {
+export function LibraryView({
+  data,
+  role,
+  platform = false,
+  userName,
+}: {
+  data: LibraryData;
+  /** Rol de la sesión (guard server-side autoritativo; aquí solo pinta UI) */
+  role: Role;
+  /** true → modo Plataforma: gestión del contenido GLOBAL de la Cátedra */
+  platform?: boolean;
+  /** Nombre del usuario (solo modo plataforma, para el UserMenu) */
+  userName?: string;
+}) {
   const [tab, setTab] = useState<"taxonomy" | "tasks">("taxonomy");
   const [taskDetail, setTaskDetail] = useState<TaskCard | null>(null);
   const [taskEditor, setTaskEditor] = useState<{ task: TaskCard | null } | null>(null);
+
+  // RBAC de presentación: el guard real vive en cada Server Action.
+  const canWrite = platform ? canWriteCatedra(role) : canWriteClubContent(role);
 
   const stats = useMemo(() => {
     const catedralSP = data.subprinciples.filter((s) => s.clubId === null).length;
@@ -73,15 +92,30 @@ export function LibraryView({ data }: { data: LibraryData }) {
             <p className="text-xs text-zinc-500 leading-tight truncate flex items-center gap-1.5">
               <Landmark className="w-3.5 h-3.5 text-violet-300" aria-hidden />
               Pilar 1 · Biblioteca de Sabiduría
+              {platform && (
+                <span className="inline-flex items-center gap-1 rounded-md border border-violet-500/50 bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-black text-violet-300">
+                  <ShieldCheck className="w-3 h-3" aria-hidden /> Gestión Plataforma
+                </span>
+              )}
             </p>
             <h1 className="text-2xl font-black text-zinc-50 leading-tight">La Cátedra</h1>
           </div>
-          <button
-            onClick={openNewTask}
-            className="shrink-0 min-h-[44px] px-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-sm transition flex items-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
-          >
-            <Plus className="w-4 h-4" aria-hidden /> Tarea
-          </button>
+          {canWrite ? (
+            <button
+              onClick={openNewTask}
+              className="shrink-0 min-h-[44px] px-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-sm transition flex items-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+            >
+              <Plus className="w-4 h-4" aria-hidden /> Tarea
+            </button>
+          ) : (
+            <span
+              className="shrink-0 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-[11px] font-bold text-zinc-500"
+              title="Tu rol (Analista) es de solo lectura en la biblioteca"
+            >
+              Solo lectura
+            </span>
+          )}
+          {platform && userName && <UserMenu userName={userName} role={role} />}
         </div>
       </header>
 
@@ -158,6 +192,8 @@ export function LibraryView({ data }: { data: LibraryData }) {
         {tab === "taxonomy" ? (
           <TaxonomyTab
             data={data}
+            canWrite={canWrite}
+            platform={platform}
             onOpenTask={(t) => {
               setTaskDetail(t);
             }}
@@ -167,6 +203,8 @@ export function LibraryView({ data }: { data: LibraryData }) {
         ) : (
           <TasksTab
             data={data}
+            canWrite={canWrite}
+            platform={platform}
             onOpenTask={(t) => setTaskDetail(t)}
             onNewTask={openNewTask}
           />
@@ -176,6 +214,8 @@ export function LibraryView({ data }: { data: LibraryData }) {
       {/* ---------- Hoja de detalle de tarea (compartida entre pestañas) ---------- */}
       <TaskDetailSheet
         task={taskDetail}
+        canWrite={canWrite}
+        platform={platform}
         onClose={() => setTaskDetail(null)}
         onEdit={openEditTask}
       />
@@ -185,6 +225,7 @@ export function LibraryView({ data }: { data: LibraryData }) {
         <TaskEditor
           task={taskEditor.task}
           subprinciples={data.subprinciples}
+          platform={platform}
           onClose={() => setTaskEditor(null)}
         />
       )}

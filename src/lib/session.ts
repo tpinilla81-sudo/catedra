@@ -1,8 +1,9 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import type { Team, User } from "@prisma/client";
+import type { PrismaClient, Team, User } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { createTenantClient } from "@/lib/tenant";
+import { db } from "@/lib/db";
 
 export async function getSessionUser() {
   const session = await getServerSession(authOptions);
@@ -17,6 +18,13 @@ export type TenantContext = {
   db: ReturnType<typeof createTenantClient>;
   /** Equipo activo: lastTeamId del usuario o el primero del club */
   team: Team;
+};
+
+/** Contexto de plataforma: solo PLATFORM_ADMIN gestiona la Cátedra global. */
+export type PlatformContext = {
+  user: User;
+  /** Cliente Prisma SIN guard de tenant: la Cátedra global es clubId = null */
+  db: PrismaClient;
 };
 
 /**
@@ -41,4 +49,21 @@ export async function requireTenantContext(): Promise<TenantContext> {
   if (!team) redirect("/"); // club sin equipos: onboarding en fase 2
 
   return { user, clubId: sessionUser.clubId, db, team };
+}
+
+/**
+ * Contexto de plataforma (Cátedra) para Server Components y Server Actions.
+ * - Exclusivo de PLATFORM_ADMIN (clubId = null): gestiona el contenido global.
+ * - Devuelve el cliente Prisma base SIN guard de tenant: el scope de escritura
+ *   se fuerza explícitamente a clubId = null en cada acción (nunca se confía
+ *   en el cliente).
+ */
+export async function requirePlatformContext(): Promise<PlatformContext> {
+  const sessionUser = await getSessionUser();
+  if (!sessionUser?.id || sessionUser.role !== "PLATFORM_ADMIN") redirect("/");
+
+  const user = await db.user.findUnique({ where: { id: sessionUser.id } });
+  if (!user || user.role !== "PLATFORM_ADMIN") redirect("/");
+
+  return { user, db };
 }

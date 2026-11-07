@@ -64,7 +64,21 @@ async function main() {
       clubId: club.id,
     },
   });
-  console.log("SEED: club + usuarios OK");
+
+  // PLATFORM_ADMIN (sin club): gestiona el contenido GLOBAL de la Cátedra
+  // desde /dashboard/catedra. clubId = null por diseño.
+  const plataforma = await prisma.user.upsert({
+    where: { email: "plataforma@ecosystem.es" },
+    update: {},
+    create: {
+      email: "plataforma@ecosystem.es",
+      name: "Dirección Cátedra",
+      passwordHash: hashPassword("metodo2025"),
+      role: "PLATFORM_ADMIN",
+      clubId: null,
+    },
+  });
+  console.log("SEED: club + usuarios OK (míster, analista, plataforma)");
 
   // ---------- 2) Temporada y equipos ----------
   const season = await prisma.season.upsert({
