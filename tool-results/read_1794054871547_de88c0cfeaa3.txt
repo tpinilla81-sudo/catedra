@@ -1,0 +1,851 @@
+     1→     1→// ============================================================================
+     2→     2→// MOTOR PRESCRIPTIVO v0.2 — Pipeline completo: diagnóstico → receta → plan
+     3→     3→// ----------------------------------------------------------------------------
+     4→     4→// Cierra el Pilar 4 end-to-end. Sobre el diagnóstico heurístico de
+     5→     5→// `diagnose.ts`, este módulo añade:
+     6→     6→//   1. RANKING DE CANDIDATAS: por cada hallazgo evalúa TODAS las tareas
+     7→     7→//      conectadas en la receta (TaskSubPrinciple), ordenadas por relevancia.
+     8→     8→//   2. FACTIBILIDAD: descarta tareas inviables (jugadores disponibles
+     9→     9→//      insuficientes, intensidad alta contraindicada por fatiga grupal).
+    10→    10→//   3. AUDITORÍA TOTAL: cada ejecución persiste un EngineRun con las entradas,
+    11→    11→//      los hallazgos, las tareas elegidas (con rationale) y las descartadas
+    12→    12→//      (con motivo) — trazabilidad "por qué este plan" de punta a punta.
+    13→    13→//   4. RE-PRESCRIPCIÓN EN VIVO: cuando llega evidencia nueva (ingesta) a un
+    14→    14→//      microciclo aún PROPOSED, regenera diagnóstico Y tareas de las sesiones
+    15→    15→//      principales (MD-3 / MD-2), respetando los planes ya aceptados.
+    16→    16→//
+    17→    17→// Consumidores:
+    18→    18→//   • today/actions.ts   → ensureWeeklyProposal (vista Hoy, lunes)
+    19→    19→//   • match/actions.ts   → submitMatchReport (hook de ingesta)
+    20→    20→//   • scripts/validate-pilar4.ts (validación E2E)
+    21→    21→// ============================================================================
+    22→    22→import { addDays, subDays } from "date-fns";
+    23→    23→import { Prisma, type GamePhase, type PrismaClient } from "@prisma/client";
+    24→    24→import {
+    25→    25→  buildIssueDrafts,
+    26→    26→  collectInputs,
+    27→    27→  mondayOf,
+    28→    28→  type IssueDraft,
+    29→    29→} from "./diagnose";
+    30→    30→
+    31→    31→// ---------- Tipos de dominio ----------
+    32→    32→
+    33→    33→/** Tarea elegida por el motor para un hallazgo (auditoría + rationale) */
+    34→    34→export type PrescriptionAudit = {
+    35→    35→  issueEvidence: string;
+    36→    36→  issueKind: IssueDraft["kind"];
+    37→    37→  subPrincipleId: string | null;
+    38→    38→  taskId: string;
+    39→    39→  taskTitle: string;
+    40→    40→  relevance: number | null;
+    41→    41→  sessionLabel: string;
+    42→    42→  durationMin: number;
+    43→    43→  rationale: string;
+    44→    44→};
+    45→    45→
+    46→    46→/** Candidata evaluada y descartada, con el motivo legible */
+    47→    47→export type DiscardedCandidate = {
+    48→    48→  taskId: string;
+    49→    49→  taskTitle: string;
+    50→    50→  relevance: number | null;
+    51→    51→  reason: string;
+    52→    52→};
+    53→    53→
+    54→    54→/** Delegados Prisma que consumen el diagnóstico y la prescripción (compatibles con el Tenant Guard) */
+    55→    55→export type PipelineDb = Pick<
+    56→    56→  PrismaClient,
+    57→    57→  | "teamPulse"
+    58→    58→  | "match"
+    59→    59→  | "subPrinciple"
+    60→    60→  | "microcycle"
+    61→    61→  | "diagnosisIssue"
+    62→    62→  | "taskSubPrinciple"
+    63→    63→  | "task"
+    64→    64→  | "player"
+    65→    65→  | "sessionTask"
+    66→    66→  | "session"
+    67→    67→  | "engineRun"
+    68→    68→>;
+    69→    69→
+    70→    70→/**
+    71→    71→ * Orquestador del pipeline: PipelineDb + $transaction. El TransactionClient
+    72→    72→ * que recibe el callback cumple PipelineDb (los helpers no abren tx propias).
+    73→    73→ */
+    74→    74→export type PipelineRunnerDb = PipelineDb & Pick<PrismaClient, "$transaction">;
+    75→    75→
+    76→    76→export const ENGINE_VERSION = "v0.2-prescriptive";
+    77→    77→
+    78→    78→/**
+    79→    79→ * El pipeline completo corre en UNA transacción interactiva: diagnóstico,
+    80→    80→ * prescripción, microciclo, trazabilidad y EngineRun se escriben todos o
+    81→    81→ * ninguno (sin estados intermedios si algo falla a mitad de cocina).
+    82→    82→ */
+    83→    83→const TX_OPTS = { timeout: 20_000, maxWait: 10_000 } as const;
+    84→    84→
+    85→    85→const INTENSITY_ORDER: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
+    86→    86→
+    87→    87→// ============================================================================
+    88→    88→// 1) RANKING DE CANDIDATAS (receta ponderada de la Biblioteca)
+    89→    89→// ============================================================================
+    90→    90→
+    91→    91→/**
+    92→    92→ * Devuelve todas las tareas conectadas a un subprincipio por la receta,
+    93→    93→ * ordenadas por: relevancia (3 "Núcleo" primero) → intensidad suave antes que
+    94→    94→ * alta → título (determinismo).
+    95→    95→ */
+    96→    96→export async function rankTaskCandidates(
+    97→    97→  db: PipelineDb,
+    98→    98→  subPrincipleId: string,
+    99→    99→): Promise<
+   100→   100→  Array<{
+   101→   101→    taskId: string;
+   102→   102→    taskTitle: string;
+   103→   103→    relevance: number;
+   104→   104→    intensity: string;
+   105→   105→    playersMin: number;
+   106→   106→    playersMax: number | null;
+   107→   107→    durationMin: number;
+   108→   108→    usageNote: string | null;
+   109→   109→  }>
+   110→   110→> {
+   111→   111→  const links = await db.taskSubPrinciple.findMany({
+   112→   112→    where: { subPrincipleId },
+   113→   113→    include: { task: { select: { id: true, title: true, intensity: true, playersMin: true, playersMax: true, durationMin: true } } },
+   114→   114→  });
+   115→   115→  return links
+   116→   116→    .map((l) => ({
+   117→   117→      taskId: l.task.id,
+   118→   118→      taskTitle: l.task.title,
+   119→   119→      relevance: l.relevance,
+   120→   120→      intensity: l.task.intensity as string,
+   121→   121→      playersMin: l.task.playersMin,
+   122→   122→      playersMax: l.task.playersMax,
+   123→   123→      durationMin: l.task.durationMin,
+   124→   124→      usageNote: l.usageNote,
+   125→   125→    }))
+   126→   126→    .sort(
+   127→   127→      (a, b) =>
+   128→   128→        b.relevance - a.relevance ||
+   129→   129→        (INTENSITY_ORDER[a.intensity] ?? 1) - (INTENSITY_ORDER[b.intensity] ?? 1) ||
+   130→   130→        a.taskTitle.localeCompare(b.taskTitle),
+   131→   131→    );
+   132→   132→}
+   133→   133→
+   134→   134→// ============================================================================
+   135→   135→// 2) PRESCRIPCIÓN CON FACTIBILIDAD — elegida + descartadas con motivo
+   136→   136→// ============================================================================
+   137→   137→
+   138→   138→type CandidateRow = {
+   139→   139→  taskId: string;
+   140→   140→  taskTitle: string;
+   141→   141→  relevance: number;
+   142→   142→  intensity: string;
+   143→   143→  playersMin: number;
+   144→   144→  playersMax: number | null;
+   145→   145→  durationMin: number;
+   146→   146→  usageNote: string | null;
+   147→   147→};
+   148→   148→
+   149→   149→/**
+   150→   150→ * Recorre las candidatas en orden de ranking y devuelve el índice de la
+   151→   151→ * primera FACTIBLE. Las inviables se auditan en `sink` (sin duplicados):
+   152→   152→ *   • fatiga ≥ 7 + intensidad HIGH → contraindicada (cruce con el Pilar 2)
+   153→   153→ *   • playersMin > disponibles     → inviable con la plantilla de hoy
+   154→   154→ */
+   155→   155→function feasibilityScan(
+   156→   156→  candidates: CandidateRow[],
+   157→   157→  opts: { availablePlayers: number; fatigueScore: number },
+   158→   158→  sink: DiscardedCandidate[],
+   159→   159→  seen: Set<string>,
+   160→   160→): number {
+   161→   161→  for (let c = 0; c < candidates.length; c++) {
+   162→   162→    const cand = candidates[c];
+   163→   163→    let reason: string | null = null;
+   164→   164→    if (opts.fatigueScore >= 7 && cand.intensity === "HIGH") {
+   165→   165→      reason = `Intensidad alta contraindicada con fatiga grupal ${opts.fatigueScore}/10`;
+   166→   166→    } else if (cand.playersMin > opts.availablePlayers) {
+   167→   167→      reason = `Necesita ${cand.playersMin} jugadores y solo hay ${opts.availablePlayers} disponibles`;
+   168→   168→    }
+   169→   169→    if (!reason) return c;
+   170→   170→    const key = `${cand.taskId}|${reason}`;
+   171→   171→    if (!seen.has(key)) {
+   172→   172→      seen.add(key);
+   173→   173→      sink.push({
+   174→   174→        taskId: cand.taskId,
+   175→   175→        taskTitle: cand.taskTitle,
+   176→   176→        relevance: cand.relevance,
+   177→   177→        reason,
+   178→   178→      });
+   179→   179→    }
+   180→   180→  }
+   181→   181→  return -1;
+   182→   182→}
+   183→   183→
+   184→   184→/** Orden canónico de la receta: relevancia → intensidad → título */
+   185→   185→function sortCandidates(list: CandidateRow[]): CandidateRow[] {
+   186→   186→  return list.sort(
+   187→   187→    (a, b) =>
+   188→   188→      b.relevance - a.relevance ||
+   189→   189→      (INTENSITY_ORDER[a.intensity] ?? 1) - (INTENSITY_ORDER[b.intensity] ?? 1) ||
+   190→   190→      a.taskTitle.localeCompare(b.taskTitle),
+   191→   191→  );
+   192→   192→}
+   193→   193→
+   194→   194→/**
+   195→   195→ * Candidatas de TODO el pool de la fase (todos los subprincipios visibles de
+   196→   196→ * esa fase, sin duplicar tareas). Es la red de seguridad del fallback: si el
+   197→   197→ * subprincipio exacto no tiene tarea factible, la fase sí puede tenerla.
+   198→   198→ */
+   199→   199→async function rankPhaseCandidates(
+   200→   200→  db: PipelineDb,
+   201→   201→  phase: string,
+   202→   202→): Promise<CandidateRow[]> {
+   203→   203→  const sps = await db.subPrinciple.findMany({
+   204→   204→    where: { phase: phase as GamePhase },
+   205→   205→    select: { id: true },
+   206→   206→    // Determinismo: mismo pool de subprincipios en cada ejecución
+   207→   207→    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+   208→   208→  });
+   209→   209→  if (sps.length === 0) return [];
+   210→   210→  const links = await db.taskSubPrinciple.findMany({
+   211→   211→    where: { subPrincipleId: { in: sps.map((s) => s.id) } },
+   212→   212→    // Determinismo del dedupe por tarea (a igual relevancia gana el primero)
+   213→   213→    orderBy: [{ relevance: "desc" }, { id: "asc" }],
+   214→   214→    include: {
+   215→   215→      task: {
+   216→   216→        select: { id: true, title: true, intensity: true, playersMin: true, playersMax: true, durationMin: true },
+   217→   217→      },
+   218→   218→    },
+   219→   219→  });
+   220→   220→  const byTask = new Map<string, CandidateRow>();
+   221→   221→  for (const l of links) {
+   222→   222→    const prev = byTask.get(l.task.id);
+   223→   223→    if (!prev || l.relevance > prev.relevance) {
+   224→   224→      byTask.set(l.task.id, {
+   225→   225→        taskId: l.task.id,
+   226→   226→        taskTitle: l.task.title,
+   227→   227→        relevance: l.relevance,
+   228→   228→        intensity: l.task.intensity as string,
+   229→   229→        playersMin: l.task.playersMin,
+   230→   230→        playersMax: l.task.playersMax,
+   231→   231→        durationMin: l.task.durationMin,
+   232→   232→        usageNote: l.usageNote,
+   233→   233→      });
+   234→   234→    }
+   235→   235→  }
+   236→   236→  return sortCandidates([...byTask.values()]);
+   237→   237→}
+   238→   238→
+   239→   239→/**
+   240→   240→ * Por cada hallazgo con subprincipio asociado, recorre la receta en orden de
+   241→   241→ * ranking y elige la primera tarea FACTIBLE. Si el subprincipio exacto se
+   242→   242→ * queda sin candidatas viables, amplía a la mejor tarea de la FASE completa
+   243→   243→ * (receta ampliada, auditable). El resto se audita como descartadas.
+   244→   244→ */
+   245→   245→export async function prescribeForIssues(
+   246→   246→  db: PipelineDb,
+   247→   247→  drafts: IssueDraft[],
+   248→   248→  opts: { availablePlayers: number; fatigueScore: number },
+   249→   249→): Promise<{
+   250→   250→  prescriptions: Array<{
+   251→   251→    issueIndex: number;
+   252→   252→    taskId: string;
+   253→   253→    taskTitle: string;
+   254→   254→    relevance: number;
+   255→   255→    usageNote: string | null;
+   256→   256→    durationMin: number;
+   257→   257→    rationale: string;
+   258→   258→  }>;
+   259→   259→  discarded: DiscardedCandidate[];
+   260→   260→}> {
+   261→   261→  const prescriptions: Array<{
+   262→   262→    issueIndex: number;
+   263→   263→    taskId: string;
+   264→   264→    taskTitle: string;
+   265→   265→    relevance: number;
+   266→   266→    usageNote: string | null;
+   267→   267→    durationMin: number;
+   268→   268→    rationale: string;
+   269→   269→  }> = [];
+   270→   270→  const discarded: DiscardedCandidate[] = [];
+   271→   271→  const seen = new Set<string>();
+   272→   272→  const { availablePlayers, fatigueScore } = opts;
+   273→   273→
+   274→   274→  for (let i = 0; i < drafts.length; i++) {
+   275→   275→    const draft = drafts[i];
+   276→   276→    if (!draft.subPrincipleId) continue;
+   277→   277→
+   278→   278→    let candidates = await rankTaskCandidates(db, draft.subPrincipleId);
+   279→   279→    let chosenIndex = feasibilityScan(candidates, opts, discarded, seen);
+   280→   280→    let fallbackNote = "";
+   281→   281→
+   282→   282→    // Fallback por fase: ningún subprincipio exacto tenía candidata factible
+   283→   283→    if (chosenIndex === -1 && draft.phase) {
+   284→   284→      const phaseCandidates = await rankPhaseCandidates(db, draft.phase);
+   285→   285→      chosenIndex = feasibilityScan(phaseCandidates, opts, discarded, seen);
+   286→   286→      if (chosenIndex !== -1) {
+   287→   287→        candidates = phaseCandidates;
+   288→   288→        fallbackNote = " Receta ampliada a la fase: el subprincipio exacto no tenía tarea factible.";
+   289→   289→      }
+   290→   290→    }
+   291→   291→
+   292→   292→    if (chosenIndex === -1) continue;
+   293→   293→
+   294→   294→    const chosen = candidates[chosenIndex];
+   295→   295→    // El resto de candidatas (detrás de la elegida) quedan auditadas
+   296→   296→    for (let c = chosenIndex + 1; c < candidates.length; c++) {
+   297→   297→      const cand = candidates[c];
+   298→   298→      const reason =
+   299→   299→        cand.relevance < chosen.relevance
+   300→   300→          ? `Relevancia menor en la receta (${cand.relevance} vs ${chosen.relevance})`
+   301→   301→          : "Priorizada otra candidata de mayor afinidad";
+   302→   302→      const key = `${cand.taskId}|${reason}`;
+   303→   303→      if (!seen.has(key)) {
+   304→   304→        seen.add(key);
+   305→   305→        discarded.push({
+   306→   306→          taskId: cand.taskId,
+   307→   307→          taskTitle: cand.taskTitle,
+   308→   308→          relevance: cand.relevance,
+   309→   309→          reason,
+   310→   310→        });
+   311→   311→      }
+   312→   312→    }
+   313→   313→
+   314→   314→    const intensityFit =
+   315→   315→      fatigueScore >= 7
+   316→   316→        ? "Intensidad ajustada a la fatiga del grupo."
+   317→   317→        : "";
+   318→   318→    prescriptions.push({
+   319→   319→      issueIndex: i,
+   320→   320→      taskId: chosen.taskId,
+   321→   321→      taskTitle: chosen.taskTitle,
+   322→   322→      relevance: chosen.relevance,
+   323→   323→      usageNote: chosen.usageNote,
+   324→   324→      durationMin: Math.min(chosen.durationMin, draft.kind === "PHYSICAL" ? 40 : 60),
+   325→   325→      rationale: `Entra por: ${draft.evidence}. ${chosen.usageNote ?? ""} ${intensityFit}${fallbackNote}`.trim(),
+   326→   326→    });
+   327→   327→  }
+   328→   328→
+   329→   329→  return { prescriptions, discarded };
+   330→   330→}
+   331→   331→
+   332→   332→// ============================================================================
+   333→   333→// 3) AUDITORÍA — persistencia del EngineRun de cada ejecución
+   334→   334→// ============================================================================
+   335→   335→
+   336→   336→async function recordEngineRun(
+   337→   337→  db: PipelineDb,
+   338→   338→  args: {
+   339→   339→    clubId: string;
+   340→   340→    teamId: string;
+   341→   341→    microcycleId: string | null;
+   342→   342→    trigger: "WEEKLY_PROPOSAL" | "EVIDENCE_REFRESH";
+   343→   343→    t0: number;
+   344→   344→    inputs: { pulse: { moraleScore: number; fatigueScore: number } | null; matches: Array<{ opponent: string; score: string; events: number }>; availablePlayers: number; weekStart: string };
+   345→   345→    drafts: IssueDraft[];
+   346→   346→    prescriptions: PrescriptionAudit[];
+   347→   347→    discarded: DiscardedCandidate[];
+   348→   348→  },
+   349→   349→): Promise<string> {
+   350→   350→  const run = await db.engineRun.create({
+   351→   351→    data: {
+   352→   352→      clubId: args.clubId,
+   353→   353→      teamId: args.teamId,
+   354→   354→      microcycleId: args.microcycleId,
+   355→   355→      version: ENGINE_VERSION,
+   356→   356→      trigger: args.trigger,
+   357→   357→      inputSnapshot: args.inputs as never,
+   358→   358→      issuesJson: args.drafts.map((d) => ({
+   359→   359→        kind: d.kind,
+   360→   360→        phase: d.phase ?? null,
+   361→   361→        subPrincipleId: d.subPrincipleId ?? null,
+   362→   362→        severity: d.severity,
+   363→   363→        evidence: d.evidence,
+   364→   364→      })) as never,
+   365→   365→      prescriptions: args.prescriptions as never,
+   366→   366→      discarded: args.discarded as never,
+   367→   367→      durationMs: Date.now() - args.t0,
+   368→   368→    },
+   369→   369→    select: { id: true },
+   370→   370→  });
+   371→   371→  return run.id;
+   372→   372→}
+   373→   373→
+   374→   374→// ============================================================================
+   375→   375→// 4) PIPELINE SEMANAL COMPLETO — genera la propuesta con auditoría
+   376→   376→// ============================================================================
+   377→   377→
+   378→   378→export type ProposalResult = {
+   379→   379→  created: boolean;
+   380→   380→  microcycleId: string | null;
+   381→   381→  runId: string | null;
+   382→   382→  issuesCount: number;
+   383→   383→  prescriptions: PrescriptionAudit[];
+   384→   384→  discarded: DiscardedCandidate[];
+   385→   385→  durationMs: number | null;
+   386→   386→};
+   387→   387→
+   388→   388→/**
+   389→   389→ * Cocina el microciclo PROPOSED de `weekStart` desde los datos reales y
+   390→   390→ * persiste la auditoría completa en EngineRun. Si ya existe un microciclo
+   391→   391→ * para esa semana devuelve `created: false` sin tocar nada.
+   392→   392→ *
+   393→   393→ * TODO el pipeline corre en UNA transacción interactiva: si otro request
+   394→   394→ * concurrente cocina la misma semana (carrera TOCTOU), la constraint única
+   395→   395→ * (teamId, weekStart) lanza P2002 → la transacción perdedora se revierte
+   396→   396→ * entera y se devuelve `created: false` sin error 500 al usuario.
+   397→   397→ */
+   398→   398→export async function runWeeklyProposalPipeline(
+   399→   399→  db: PipelineRunnerDb,
+   400→   400→  args: { clubId: string; teamId: string; weekStart: Date },
+   401→   401→): Promise<ProposalResult> {
+   402→   402→  const t0 = Date.now();
+   403→   403→  const { clubId, teamId, weekStart } = args;
+   404→   404→
+   405→   405→  try {
+   406→   406→    return await db.$transaction(async (tx) => {
+   407→   407→      const existing = await tx.microcycle.findUnique({
+   408→   408→        where: { teamId_weekStart: { teamId, weekStart } },
+   409→   409→        select: { id: true },
+   410→   410→      });
+   411→   411→      if (existing) {
+   412→   412→        return {
+   413→   413→          created: false,
+   414→   414→          microcycleId: existing.id,
+   415→   415→          runId: null,
+   416→   416→          issuesCount: 0,
+   417→   417→          prescriptions: [],
+   418→   418→          discarded: [],
+   419→   419→          durationMs: null,
+   420→   420→        };
+   421→   421→      }
+   422→   422→
+   423→   423→      // ---------- 1) Entradas ----------
+   424→   424→      const inputs = await collectInputs(tx, teamId, weekStart);
+   425→   425→      const pulse = inputs.pulse;
+   426→   426→      const recentMatches = inputs.matches;
+   427→   427→
+   428→   428→      const availablePlayers = await tx.player.count({
+   429→   429→        where: { teamId, isActive: true, status: { in: ["AVAILABLE", "RETURNING"] } },
+   430→   430→      });
+   431→   431→
+   432→   432→      // ---------- 2) Diagnóstico (heurística compartida) ----------
+   433→   433→      const drafts = await buildIssueDrafts(tx, teamId, inputs);
+   434→   434→      const last = recentMatches[0];
+   435→   435→
+   436→   436→      // ---------- 3) Prescripción con ranking + factibilidad ----------
+   437→   437→      const { prescriptions: rawRx, discarded } = await prescribeForIssues(tx, drafts, {
+   438→   438→        availablePlayers,
+   439→   439→        fatigueScore: pulse?.fatigueScore ?? 5,
+   440→   440→      });
+   441→   441→
+   442→   442→      const auditRx: PrescriptionAudit[] = rawRx.map((p) => ({
+   443→   443→        issueEvidence: drafts[p.issueIndex].evidence,
+   444→   444→        issueKind: drafts[p.issueIndex].kind,
+   445→   445→        subPrincipleId: drafts[p.issueIndex].subPrincipleId ?? null,
+   446→   446→        taskId: p.taskId,
+   447→   447→        taskTitle: p.taskTitle,
+   448→   448→        relevance: p.relevance,
+   449→   449→        sessionLabel: "",
+   450→   450→        durationMin: p.durationMin,
+   451→   451→        rationale: p.rationale,
+   452→   452→      }));
+   453→   453→
+   454→   454→      // ---------- 4) Tareas de apoyo (MD+1 / MD-1) ----------
+   455→   455→      const recoveryTask = await tx.task.findFirst({
+   456→   456→        where: { intensity: "LOW", phases: { has: "OFFENSIVE" } },
+   457→   457→        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+   458→   458→        select: { id: true, title: true },
+   459→   459→      });
+   460→   460→      const activationTask = await tx.task.findFirst({
+   461→   461→        where: { intensity: { in: ["LOW", "MEDIUM"] }, phases: { has: "OFFENSIVE" } },
+   462→   462→        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+   463→   463→        select: { id: true, title: true },
+   464→   464→      });
+   465→   465→
+   466→   466→      // ---------- 5) Construcción del microciclo ----------
+   467→   467→      const tacticalDrafts = drafts.filter((d) => d.kind === "TACTICAL");
+   468→   468→      const day = (offset: number) => {
+   469→   469→        const d = new Date(weekStart);
+   470→   470→        d.setDate(d.getDate() + offset);
+   471→   471→        return d;
+   472→   472→      };
+   473→   473→
+   474→   474→      const directives = tacticalDrafts.length
+   475→   475→        ? tacticalDrafts.map((d) => `Corregir: ${d.evidence}`)
+   476→   476→        : ["Consolidar la identidad de juego de la semana"];
+   477→   477→
+   478→   478→      const summary = [
+   479→   479→        `Último partido: ${last ? `${last.isHome ? "casa" : "fuera"} vs ${last.opponent} (${last.goalsFor ?? 0}-${last.goalsAgainst ?? 0})` : "sin datos"}.`,
+   480→   480→        pulse ? `Vestuario: ánimo ${pulse.moraleScore}/10 · fatiga ${pulse.fatigueScore}/10.` : "",
+   481→   481→        `${availablePlayers} jugadores disponibles.`,
+   482→   482→        `Prioridad de la semana: ${directives[0]}.`,
+   483→   483→      ]
+   484→   484→        .filter(Boolean)
+   485→   485→        .join(" ");
+   486→   486→
+   487→   487→      const tacticalRx = rawRx.filter((p) => drafts[p.issueIndex].kind === "TACTICAL");
+   488→   488→
+   489→   489→      const microcycle = await tx.microcycle.create({
+   490→   490→        data: {
+   491→   491→          clubId,
+   492→   492→          teamId,
+   493→   493→          weekStart,
+   494→   494→          status: "PROPOSED",
+   495→   495→          tacticalDirectives: directives,
+   496→   496→          methodologicalApproach: "Analítico-inductivo por proximidad, progresión a tareas globales",
+   497→   497→          diagnosisSummary: summary,
+   498→   498→          engineVersion: ENGINE_VERSION,
+   499→   499→          analyzedMatches: {
+   500→   500→            create: recentMatches.map((m) => ({ matchId: m.id })),
+   501→   501→          },
+   502→   502→          issues: {
+   503→   503→            create: drafts.map((d) => ({
+   504→   504→              subPrincipleId: d.subPrincipleId,
+   505→   505→              phase: d.phase,
+   506→   506→              kind: d.kind,
+   507→   507→              severity: d.severity,
+   508→   508→              evidence: d.evidence,
+   509→   509→              metric: d.metric as never,
+   510→   510→            })),
+   511→   511→          },
+   512→   512→          sessions: {
+   513→   513→            create: [
+   514→   514→              // MD+1 — Regeneración
+   515→   515→              {
+   516→   516→                date: day(1),
+   517→   517→                label: "MD+1",
+   518→   518→                objective: "Regeneración y asimilación del esfuerzo del partido",
+   519→   519→                durationMin: 50,
+   520→   520→                tasks: {
+   521→   521→                  create: recoveryTask
+   522→   522→                    ? [
+   523→   523→                        {
+   524→   524→                          order: 1,
+   525→   525→                          taskId: recoveryTask.id,
+   526→   526→                          durationMin: 40,
+   527→   527→                          rationale:
+   528→   528→                            (pulse?.fatigueScore ?? 5) >= 7
+   529→   529→                              ? "Fatiga alta: intensidad controlada para recuperar al grupo."
+   530→   530→                              : "Volumen bajo para asimilar el partido y mantener toque de balón.",
+   531→   531→                        },
+   532→   532→                      ]
+   533→   533→                    : [],
+   534→   534→                },
+   535→   535→              },
+   536→   536→              // MD-3 — Sesión principal (táctica)
+   537→   537→              {
+   538→   538→                date: day(2),
+   539→   539→                label: "MD-3",
+   540→   540→                objective: tacticalDrafts[0]?.evidence ?? "Trabajo táctico principal",
+   541→   541→                durationMin: 80,
+   542→   542→                tasks: {
+   543→   543→                  create: tacticalRx.slice(0, 2).map((p, idx) => ({
+   544→   544→                    order: idx + 1,
+   545→   545→                    taskId: p.taskId,
+   546→   546→                    durationMin: p.durationMin,
+   547→   547→                    rationale: p.rationale,
+   548→   548→                  })),
+   549→   549→                },
+   550→   550→              },
+   551→   551→              // MD-2 — Consolidación
+   552→   552→              {
+   553→   553→                date: day(3),
+   554→   554→                label: "MD-2",
+   555→   555→                objective: "Consolidación + preparación del plan de partido",
+   556→   556→                durationMin: 70,
+   557→   557→                tasks: {
+   558→   558→                  create: tacticalRx.slice(1, 2).map((p) => ({
+   559→   559→                    order: 1,
+   560→   560→                    taskId: p.taskId,
+   561→   561→                    durationMin: p.durationMin,
+   562→   562→                    rationale: p.rationale,
+   563→   563→                  })),
+   564→   564→                },
+   565→   565→              },
+   566→   566→              // MD-1 — Activación pre-partido
+   567→   567→              {
+   568→   568→                date: day(4),
+   569→   569→                label: "MD-1",
+   570→   570→                objective: "Activación pre-partido: velocidad y automatismos",
+   571→   571→                durationMin: 45,
+   572→   572→                tasks: {
+   573→   573→                  create: activationTask
+   574→   574→                    ? [
+   575→   575→                        {
+   576→   576→                          order: 1,
+   577→   577→                          taskId: activationTask.id,
+   578→   578→                          durationMin: 35,
+   579→   579→                          rationale: "Activación neuromuscular previa al partido.",
+   580→   580→                        },
+   581→   581→                      ]
+   582→   582→                    : [],
+   583→   583→                },
+   584→   584→              },
+   585→   585→            ],
+   586→   586→          },
+   587→   587→        },
+   588→   588→        include: { issues: true, sessions: { include: { tasks: true } } },
+   589→   589→      });
+   590→   590→
+   591→   591→      // ---------- 6) Trazabilidad hallazgo → tarea (prescribedIssueId) ----------
+   592→   592→      // La primera prescripción táctica entra en MD-3; la segunda aparece en MD-3
+   593→   593→      // (profundizar) Y en MD-2 (consolidar). Se enlaza el hallazgo en AMBAS.
+   594→   594→      const evidenceToIssue = new Map(microcycle.issues.map((iss) => [iss.evidence, iss.id]));
+   595→   595→      const md3 = microcycle.sessions.find((s) => s.label === "MD-3");
+   596→   596→      const md2 = microcycle.sessions.find((s) => s.label === "MD-2");
+   597→   597→      const sessionByLabel = { "MD-3": md3, "MD-2": md2 } as Record<string, typeof md3>;
+   598→   598→
+   599→   599→      for (const label of ["MD-3", "MD-2"] as const) {
+   600→   600→        const session = sessionByLabel[label];
+   601→   601→        if (!session) continue;
+   602→   602→        const forSession = label === "MD-3" ? tacticalRx.slice(0, 2) : tacticalRx.slice(1, 2);
+   603→   603→        for (const p of forSession) {
+   604→   604→          const draft = drafts[p.issueIndex];
+   605→   605→          const issueId = evidenceToIssue.get(draft.evidence);
+   606→   606→          const st = session.tasks.find(
+   607→   607→            (t) => t.taskId === p.taskId && t.rationale === p.rationale,
+   608→   608→          );
+   609→   609→          if (!st) continue;
+   610→   610→          await tx.sessionTask.update({
+   611→   611→            where: { id: st.id },
+   612→   612→            data: { prescribedIssueId: issueId },
+   613→   613→          });
+   614→   614→          const audit = auditRx.find(
+   615→   615→            (a) => a.taskId === p.taskId && a.issueEvidence === draft.evidence,
+   616→   616→          );
+   617→   617→          if (audit && !audit.sessionLabel) audit.sessionLabel = label;
+   618→   618→        }
+   619→   619→      }
+   620→   620→
+   621→   621→      // ---------- 7) Auditoría de la ejecución ----------
+   622→   622→      const inputSnapshot = {
+   623→   623→        weekStart: weekStart.toISOString().slice(0, 10),
+   624→   624→        pulse: pulse ? { moraleScore: pulse.moraleScore, fatigueScore: pulse.fatigueScore } : null,
+   625→   625→        matches: recentMatches.map((m) => ({
+   626→   626→          opponent: m.opponent,
+   627→   627→          score: `${m.goalsFor ?? 0}-${m.goalsAgainst ?? 0}`,
+   628→   628→          events: m.report?.events.length ?? 0,
+   629→   629→        })),
+   630→   630→        availablePlayers,
+   631→   631→      };
+   632→   632→      const runId = await recordEngineRun(tx, {
+   633→   633→        clubId,
+   634→   634→        teamId,
+   635→   635→        microcycleId: microcycle.id,
+   636→   636→        trigger: "WEEKLY_PROPOSAL",
+   637→   637→        t0,
+   638→   638→        inputs: inputSnapshot,
+   639→   639→        drafts,
+   640→   640→        prescriptions: auditRx,
+   641→   641→        discarded,
+   642→   642→      });
+   643→   643→
+   644→   644→      return {
+   645→   645→        created: true,
+   646→   646→        microcycleId: microcycle.id,
+   647→   647→        runId,
+   648→   648→        issuesCount: drafts.length,
+   649→   649→        prescriptions: auditRx,
+   650→   650→        discarded,
+   651→   651→        durationMs: Date.now() - t0,
+   652→   652→      };
+   653→   653→    }, TX_OPTS);
+   654→   654→  } catch (e) {
+   655→   655→    // Carrera TOCTOU: otro request cocinó la misma semana a la vez. La tx
+   656→   656→    // perdedora se revierte ENTERA (sin microciclo ni EngineRun parcial) y se
+   657→   657→    // responde created:false — nunca un 500 sin capturar al usuario.
+   658→   658→    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+   659→   659→      const existing = await db.microcycle.findUnique({
+   660→   660→        where: { teamId_weekStart: { teamId, weekStart } },
+   661→   661→        select: { id: true },
+   662→   662→      });
+   663→   663→      return {
+   664→   664→        created: false,
+   665→   665→        microcycleId: existing?.id ?? null,
+   666→   666→        runId: null,
+   667→   667→        issuesCount: 0,
+   668→   668→        prescriptions: [],
+   669→   669→        discarded: [],
+   670→   670→        durationMs: null,
+   671→   671→      };
+   672→   672→    }
+   673→   673→    throw e;
+   674→   674→  }
+   675→   675→}
+   676→   676→
+   677→   677→// ============================================================================
+   678→   678→// 5) RE-PRESCRIPCIÓN EN VIVO — evidencia nueva → propuesta PROPOSED actualizada
+   679→   679→// ============================================================================
+   680→   680→
+   681→   681→export type RefreshResult = {
+   682→   682→  refreshedWeeks: string[];
+   683→   683→  evidences: string[];
+   684→   684→  runs: number;
+   685→   685→};
+   686→   686→
+   687→   687→/**
+   688→   688→ * Hook de conexión (Pilar 3 → Pilar 4). Se ejecuta al guardar una ingesta.
+   689→   689→ * Para cada microciclo aún PROPOSED de la semana del partido o la siguiente:
+   690→   690→ *   1. Regenera el diagnóstico (issues + directrices + resumen).
+   691→   691→ *   2. RE-PRESCRIBE las tareas de las sesiones principales (MD-3 / MD-2)
+   692→   692→ *      con la receta fresca y la factibilidad de hoy.
+   693→   693→ *   3. Persiste un EngineRun (trigger EVIDENCE_REFRESH) con toda la auditoría.
+   694→   694→ * Los planes ACCEPTED/ADJUSTED se respetan: nunca se tocan.
+   695→   695→ *
+   696→   696→ * Cada semana se procesa en SU propia transacción: diagnóstico, tareas y
+   697→   697→ * auditoría de esa semana se escriben todos o ninguno.
+   698→   698→ */
+   699→   699→export async function refreshProposalEvidence(
+   700→   700→  db: PipelineRunnerDb,
+   701→   701→  args: { clubId: string; teamId: string; kickoffAt: Date },
+   702→   702→): Promise<RefreshResult> {
+   703→   703→  const { clubId, teamId, kickoffAt } = args;
+   704→   704→  const base = mondayOf(kickoffAt);
+   705→   705→  const candidates = [base, addDays(base, 7)]; // misma semana y semana siguiente
+   706→   706→  const refreshedWeeks: string[] = [];
+   707→   707→  const evidences: string[] = [];
+   708→   708→  let runs = 0;
+   709→   709→
+   710→   710→  for (const weekStart of candidates) {
+   711→   711→    const touched = await db.$transaction(async (tx) => {
+   712→   712→      const t0 = Date.now();
+   713→   713→      const cycle = await tx.microcycle.findUnique({
+   714→   714→        where: { teamId_weekStart: { teamId, weekStart } },
+   715→   715→        include: { sessions: { include: { tasks: true } } },
+   716→   716→      });
+   717→   717→      // Solo tocamos propuestas NO validadas por el cuerpo técnico
+   718→   718→      if (!cycle || cycle.status !== "PROPOSED") return false;
+   719→   719→
+   720→   720→      const inputs = await collectInputs(tx, teamId, weekStart);
+   721→   721→      const pulse = inputs.pulse;
+   722→   722→      const drafts = await buildIssueDrafts(tx, teamId, inputs);
+   723→   723→
+   724→   724→      const availablePlayers = await tx.player.count({
+   725→   725→        where: { teamId, isActive: true, status: { in: ["AVAILABLE", "RETURNING"] } },
+   726→   726→      });
+   727→   727→
+   728→   728→      // 1) Diagnóstico regenerado
+   729→   729→      await tx.diagnosisIssue.deleteMany({
+   730→   730→        where: { microcycleId: cycle.id, status: "OPEN" },
+   731→   731→      });
+   732→   732→      await tx.diagnosisIssue.createMany({
+   733→   733→        data: drafts.map((d) => ({
+   734→   734→          microcycleId: cycle.id,
+   735→   735→          subPrincipleId: d.subPrincipleId,
+   736→   736→          phase: d.phase,
+   737→   737→          kind: d.kind,
+   738→   738→          severity: d.severity,
+   739→   739→          evidence: d.evidence,
+   740→   740→          metric: d.metric as never,
+   741→   741→        })),
+   742→   742→      });
+   743→   743→
+   744→   744→      // 2) Re-prescripción con ranking + factibilidad
+   745→   745→      const { prescriptions: rawRx, discarded } = await prescribeForIssues(tx, drafts, {
+   746→   746→        availablePlayers,
+   747→   747→        fatigueScore: pulse?.fatigueScore ?? 5,
+   748→   748→      });
+   749→   749→      const tacticalRx = rawRx.filter((p) => drafts[p.issueIndex].kind === "TACTICAL");
+   750→   750→
+   751→   751→      // Reemplaza las tareas de MD-3 / MD-2 con la prescripción fresca
+   752→   752→      const issueRows = await tx.diagnosisIssue.findMany({
+   753→   753→        where: { microcycleId: cycle.id, status: "OPEN" },
+   754→   754→        select: { id: true, evidence: true },
+   755→   755→        // Determinismo: mapeo estable evidencia → hallazgo
+   756→   756→        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+   757→   757→      });
+   758→   758→      const evidenceToIssue = new Map(issueRows.map((r) => [r.evidence, r.id]));
+   759→   759→      const auditRx: PrescriptionAudit[] = [];
+   760→   760→
+   761→   761→      for (const label of ["MD-3", "MD-2"] as const) {
+   762→   762→        const session = cycle.sessions.find((s) => s.label === label);
+   763→   763→        if (!session) continue;
+   764→   764→        await tx.sessionTask.deleteMany({ where: { sessionId: session.id } });
+   765→   765→
+   766→   766→        const forSession = label === "MD-3" ? tacticalRx.slice(0, 2) : tacticalRx.slice(1, 2);
+   767→   767→        for (let idx = 0; idx < forSession.length; idx++) {
+   768→   768→          const p = forSession[idx];
+   769→   769→          const draft = drafts[p.issueIndex];
+   770→   770→          const issueId = evidenceToIssue.get(draft.evidence) ?? null;
+   771→   771→          await tx.sessionTask.create({
+   772→   772→            data: {
+   773→   773→              sessionId: session.id,
+   774→   774→              taskId: p.taskId,
+   775→   775→              order: idx + 1,
+   776→   776→              durationMin: p.durationMin,
+   777→   777→              rationale: p.rationale,
+   778→   778→              prescribedIssueId: issueId,
+   779→   779→            },
+   780→   780→          });
+   781→   781→          auditRx.push({
+   782→   782→            issueEvidence: draft.evidence,
+   783→   783→            issueKind: draft.kind,
+   784→   784→            subPrincipleId: draft.subPrincipleId ?? null,
+   785→   785→            taskId: p.taskId,
+   786→   786→            taskTitle: p.taskTitle,
+   787→   787→            relevance: p.relevance,
+   788→   788→            sessionLabel: label,
+   789→   789→            durationMin: p.durationMin,
+   790→   790→            rationale: p.rationale,
+   791→   791→          });
+   792→   792→        }
+   793→   793→      }
+   794→   794→
+   795→   795→      // 3) Directrices + resumen legible
+   796→   796→      const last = inputs.matches[0];
+   797→   797→      const directives = tacticalRx.length
+   798→   798→        ? tacticalRx.map((p) => `Corregir: ${drafts[p.issueIndex].evidence}`)
+   799→   799→        : ["Consolidar la identidad de juego de la semana"];
+   800→   800→      await tx.microcycle.update({
+   801→   801→        where: { id: cycle.id },
+   802→   802→        data: {
+   803→   803→          tacticalDirectives: directives,
+   804→   804→          diagnosisSummary: [
+   805→   805→            `Último partido: ${last ? `${last.isHome ? "casa" : "fuera"} vs ${last.opponent} (${last.goalsFor ?? 0}-${last.goalsAgainst ?? 0})` : "sin datos"}.`,
+   806→   806→            pulse ? `Vestuario: ánimo ${pulse.moraleScore}/10 · fatiga ${pulse.fatigueScore}/10.` : "",
+   807→   807→            `Prioridad de la semana: ${directives[0]}.`,
+   808→   808→          ]
+   809→   809→            .filter(Boolean)
+   810→   810→            .join(" "),
+   811→   811→          engineVersion: ENGINE_VERSION,
+   812→   812→        },
+   813→   813→      });
+   814→   814→
+   815→   815→      // 4) Auditoría EVIDENCE_REFRESH
+   816→   816→      await recordEngineRun(tx, {
+   817→   817→        clubId,
+   818→   818→        teamId,
+   819→   819→        microcycleId: cycle.id,
+   820→   820→        trigger: "EVIDENCE_REFRESH",
+   821→   821→        t0,
+   822→   822→        inputs: {
+   823→   823→          weekStart: weekStart.toISOString().slice(0, 10),
+   824→   824→          pulse: pulse ? { moraleScore: pulse.moraleScore, fatigueScore: pulse.fatigueScore } : null,
+   825→   825→          matches: inputs.matches.map((m) => ({
+   826→   826→            opponent: m.opponent,
+   827→   827→            score: `${m.goalsFor ?? 0}-${m.goalsAgainst ?? 0}`,
+   828→   828→            events: m.report?.events.length ?? 0,
+   829→   829→          })),
+   830→   830→          availablePlayers,
+   831→   831→        },
+   832→   832→        drafts,
+   833→   833→        prescriptions: auditRx,
+   834→   834→        discarded,
+   835→   835→      });
+   836→   836→
+   837→   837→      refreshedWeeks.push(weekStart.toISOString().slice(0, 10));
+   838→   838→      for (const d of drafts.slice(0, 3)) evidences.push(d.evidence);
+   839→   839→      return true;
+   840→   840→    }, TX_OPTS);
+   841→   841→
+   842→   842→    if (touched) runs++;
+   843→   843→  }
+   844→   844→
+   845→   845→  return { refreshedWeeks, evidences, runs };
+   846→   846→}
+   847→   847→
+   848→   848→/** Semana ISO (lunes) — re-export para consumidores del pipeline */
+   849→   849→export { mondayOf };
+   850→   850→export { subDays };
+   851→   851→
