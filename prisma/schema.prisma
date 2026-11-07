@@ -154,6 +154,7 @@ model Club {
   tasks         Task[] /// Tareas propias del club (además de la biblioteca global)
   microcycles   Microcycle[]
   engineRuns    EngineRun[]
+  opponentReports OpponentReport[] /// Scouting de rival (P4.1)
 }
 
 /// Usuario autenticado (email + contraseña, sesión JWT con NextAuth).
@@ -217,6 +218,7 @@ model Team {
   matches     Match[]
   microcycles Microcycle[]
   engineRuns  EngineRun[]
+  opponentReports OpponentReport[] /// Scouting de rival (P4.1)
   openByUsers User[]       @relation("UserLastTeam")
 
   @@unique([seasonId, name])
@@ -300,6 +302,7 @@ model Match {
   team              Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
   report            MatchReport? /// Ingesta 1:1 (única por partido)
   usedInMicrocycles MicrocycleMatch[] /// Partidos que alimentaron cada microciclo
+  opponentReport    OpponentReport?   /// Informe de scouting de este rival (1:1 opcional, P4.1)
 
   @@index([teamId, kickoffAt])
   @@index([clubId, status])
@@ -363,6 +366,71 @@ model PlayerMatchNote {
 
   @@unique([reportId, playerId]) /// Una nota por jugador y partido (editable)
   @@index([playerId])
+}
+
+// ============================================================================
+// PILAR 4.1 — SCOUTING DEL RIVAL (insumo del motor)
+// ----------------------------------------------------------------------------
+// Un informe por equipo y semana (clave teamId + weekStart, lunes-Madrid con
+// la MISMA convención de Microcycle.weekStart: medianoche UTC del lunes).
+// El motor lee el informe en collectInputs y convierte cada debilidad en un
+// hallazgo TACTICAL (source = OPPONENT_SCOUTING en la métrica de auditoría):
+// la semana no solo corrige lo propio, también entrena para EXPLOTAR al rival.
+// Los hijos cuelgan del informe (RELATION_SCOPED en el Tenant Guard).
+// ============================================================================
+
+/// Informe de scouting del rival de la semana — el que el motor cruza con el
+/// diagnóstico semanal. matchId es opcional: el informe puede existir sin
+/// partido agendado, y si el partido se borra el informe sobrevive (SetNull).
+model OpponentReport {
+  id             String   @id @default(cuid())
+  clubId         String
+  teamId         String
+  opponentName   String /// Nombre del rival estudiado
+  weekStart      DateTime @db.Date /// Lunes-Madrid de la semana (medianoche UTC)
+  matchId        String?  @unique /// Partido concreto asociado (opcional)
+  buildUpType    String /// Ej: "Salida lavolpiana, corta en corto"
+  defensiveBlock String /// Ej: "Bloque medio-bajo en 4-4-2"
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  weaknesses     OpponentWeakness[] /// Debilidades explotables (alimentan el motor)
+  scoutingEvents OpponentTacticalEvent[] /// Comportamientos observados (evidencia)
+
+  match Match? @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  team  Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  club  Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, weekStart]) /// Un informe por equipo y semana (como Microcycle)
+  @@index([clubId])
+}
+
+/// Debilidad detectada en el rival, conectada DIRECTAMENTE a la fase del
+/// juego (taxonomía GamePhase del motor): el motor la convierte en hallazgo
+/// y la prescripción elige tareas de esa fase para explotarla.
+model OpponentWeakness {
+  id               String    @id @default(cuid())
+  opponentReportId String
+  phase            GamePhase /// Fase donde el rival sufre (OFF_TRANSITION, ...)
+  description      String /// Ej: "Espacio a la espalda del lateral derecho en transición"
+  severity         Int       @default(3) /// 1-5 (5 = muy explotable)
+
+  opponentReport OpponentReport @relation(fields: [opponentReportId], references: [id], onDelete: Cascade)
+
+  @@index([opponentReportId])
+}
+
+/// Comportamiento observable del rival (zona + patrón) — materia prima del
+/// informe; hoy alimenta la evidencia del diagnóstico (conteo por informe).
+model OpponentTacticalEvent {
+  id               String @id @default(cuid())
+  opponentReportId String
+  zone             String /// Zona del campo: "banda derecha", "3/4 propio"...
+  behavior         String /// Patrón observado: "presión tras pérdida", ...
+
+  opponentReport OpponentReport @relation(fields: [opponentReportId], references: [id], onDelete: Cascade)
+
+  @@index([opponentReportId])
 }
 
 // ============================================================================

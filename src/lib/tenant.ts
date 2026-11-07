@@ -49,6 +49,7 @@ const CLUB_SCOPED = new Set([
   "Match",
   "Microcycle",
   "EngineRun",
+  "OpponentReport", /// Scouting del rival (P4.1): clubId propio + FK a team/match
 ]);
 
 /** Modelos de la Biblioteca de Sabiduría: propios del club + Cátedra global (clubId = null) */
@@ -75,6 +76,9 @@ const RELATION_SCOPES: Record<string, (clubId: string) => Row> = {
       { subPrinciple: { OR: [{ clubId: c }, { clubId: null }] } },
     ],
   }),
+  // Scouting del rival (P4.1): hijos del informe, aislados por el padre
+  OpponentWeakness: (c) => ({ opponentReport: { clubId: c } }),
+  OpponentTacticalEvent: (c) => ({ opponentReport: { clubId: c } }),
 };
 
 const WHERE_OPS = new Set([
@@ -308,6 +312,22 @@ const FK = {
       (r) => (r.match as Row | undefined)?.clubId,
     ],
   ),
+  // Scouting del rival (P4.1): el informe es CLUB_SCOPED (clubId propio);
+  // los checks sirven para validar la FK opponentReportId desde cualquier
+  // escritura anidada que apunte a un informe ajeno.
+  opponentReport: clubOwned("opponentReport", "opponentReport"),
+  opponentWeakness: viaParent(
+    "opponentWeakness",
+    "opponentWeakness.opponentReport.clubId",
+    { id: true, opponentReport: { select: { clubId: true } } },
+    [(r) => (r.opponentReport as Row | undefined)?.clubId],
+  ),
+  opponentTacticalEvent: viaParent(
+    "opponentTacticalEvent",
+    "opponentTacticalEvent.opponentReport.clubId",
+    { id: true, opponentReport: { select: { clubId: true } } },
+    [(r) => (r.opponentReport as Row | undefined)?.clubId],
+  ),
 };
 
 /** FKs escalares → check (nota: clubId se rechaza directamente en el walker) */
@@ -327,6 +347,7 @@ const FK_FIELDS: Record<string, FkCheck> = {
   capturedById: FK.user,
   acceptedById: FK.user,
   prescribedIssueId: FK.issue,
+  opponentReportId: FK.opponentReport, /// Scouting P4.1
 };
 
 /**
@@ -373,6 +394,12 @@ const RELATION_FIELDS: Record<string, FkCheck> = {
   capturedPulses: FK.teamPulse,
   pulses: FK.teamPulse,
   engineRuns: FK.engineRun,
+  // Scouting del rival (P4.1): relación al informe + back-relations en
+  // Club/Team/Match + hijos del informe (nested creates)
+  opponentReport: FK.opponentReport,
+  opponentReports: FK.opponentReport,
+  weaknesses: FK.opponentWeakness,
+  scoutingEvents: FK.opponentTacticalEvent,
 };
 
 function isNestedWrite(v: Row): boolean {

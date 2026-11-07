@@ -2,8 +2,9 @@
 // PANEL DE CONTROL DE VALIDACIÓN /dashboard/quality
 // ----------------------------------------------------------------------------
 // Integra los resultados E2E de los 4 pilares + el refino de Severidad 3
+// + el scouting del rival P4.1
 // (scripts/validation-results/pilar<N>.json, escritos por cada suite bun
-// scripts/validate-pilar<N>.ts / validate-severidad3.ts). Solo lectura:
+// scripts/validate-pilar<N>.ts / validate-severidad3.ts / validate-scouting.ts). Solo lectura:
 // muestra estado por bloque (✅/❌), totales, duración, fecha y el detalle
 // check a check. Cero JS de cliente: <details> nativo.
 // Acceso: cualquier usuario autenticado (es una herramienta de calidad, la
@@ -48,6 +49,12 @@ const PILARES = [
     label: "Refino S3",
     title: "Perfección técnica local (ventana de pulso · TZ Madrid · factibilidad MD+1/MD-1)",
     script: "bun scripts/validate-severidad3.ts",
+  },
+  {
+    n: 6,
+    label: "Scouting P4.1",
+    title: "Scouting del rival — guard multi-tenant + motor (explotar debilidades)",
+    script: "bun scripts/validate-scouting.ts",
   },
 ] as const;
 
@@ -114,10 +121,10 @@ export default async function QualityPage() {
 
       <div className="mx-auto max-w-5xl px-4 space-y-4 pt-5">
         <p className="text-sm text-zinc-400 leading-relaxed">
-          Los 4 pilares del método y el refino de Severidad 3 se validan de
-          punta a punta contra la base de datos real y el servidor HTTP
-          (NextAuth + Tenant Guard). Cada suite escribe aquí su resultado al
-          terminar.
+          Los 4 pilares del método, el refino de Severidad 3 y el scouting del
+          rival (P4.1) se validan de punta a punta contra la base de datos real
+          y el servidor HTTP (NextAuth + Tenant Guard). Cada suite escribe aquí
+          su resultado al terminar.
         </p>
 
         {PILARES.map((p, i) => {

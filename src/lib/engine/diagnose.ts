@@ -10,7 +10,14 @@
 // Cadena: TacticalEvent + TeamPulse + Player → IssueDraft[] → DiagnosisIssue
 // ============================================================================
 import { subDays } from "date-fns";
-import type { Match, PrismaClient, TeamPulse } from "@prisma/client";
+import type {
+  Match,
+  OpponentReport,
+  OpponentTacticalEvent,
+  OpponentWeakness,
+  PrismaClient,
+  TeamPulse,
+} from "@prisma/client";
 import { pulseWindowFor } from "@/lib/utils/dates";
 // Semana ISO decidida por el calendario de Madrid (fuente única: utils/dates).
 // Re-exportado aquí para no romper a los consumidores históricos
@@ -28,6 +35,8 @@ export type IssueDraft = {
   severity: number;
   evidence: string;
   metric: Record<string, unknown>;
+  /** P4.1: marcador de origen — el scouting del rival usa "OPPONENT_SCOUTING" */
+  source?: "OPPONENT_SCOUTING";
 };
 
 /**
@@ -36,12 +45,28 @@ export type IssueDraft = {
  */
 export type DiagnoseDb = Pick<
   PrismaClient,
-  "teamPulse" | "match" | "subPrinciple" | "microcycle" | "diagnosisIssue"
+  "teamPulse" | "match" | "subPrinciple" | "microcycle" | "diagnosisIssue" | "opponentReport"
 >;
+
+/**
+ * Informe de scouting del rival (P4.1) con sus debilidades ya ordenadas de
+ * forma determinista (severity desc → id asc: la prioridad de la semana es
+ * estable entre ejecuciones).
+ */
+export type OpponentWithWeaknesses = OpponentReport & {
+  weaknesses: OpponentWeakness[];
+  scoutingEvents: OpponentTacticalEvent[];
+};
 
 export type EngineInputs = {
   pulse: TeamPulse | null;
   matches: MatchWithReport[];
+  /**
+   * Informe del rival de la semana (P4.1). `null` = sin informe (el motor no
+   * genera hallazgos de scouting); `undefined` solo en entradas históricas
+   * construidas antes de P4.1 (compatibilidad con suites/probes existentes).
+   */
+  opponent?: OpponentWithWeaknesses | null;
 };
 
 /**
@@ -54,6 +79,9 @@ export type EngineInputs = {
  *     seguros — fatiga neutra 5/10 (sin contraindicar intensidad alta) y
  *     sin hallazgo anímico. El vestuario nunca se planifica con datos viejos.
  *   • Partidos con ingesta de la ventana (weekStart−8d …).
+ *   • Informe de scouting del rival (P4.1) con la MISMA clave semanal que el
+ *     microciclo (teamId + weekStart): si el analista lo sembró, cada
+ *     debilidad se convierte en hallazgo TACTICAL de la fase correspondiente.
  */
 export async function collectInputs(
   db: DiagnoseDb,
@@ -79,7 +107,17 @@ export async function collectInputs(
     include: { report: { include: { events: true } } },
   });
 
-  return { pulse, matches };
+  const opponent = await db.opponentReport.findUnique({
+    where: { teamId_weekStart: { teamId, weekStart } },
+    include: {
+      // Determinismo: la debilidad MÁS severa prioriza primero; a igualdad
+      // de severidad decide el id (orden de creación estable de los cuids).
+      weaknesses: { orderBy: [{ severity: "desc" }, { id: "asc" }] },
+      scoutingEvents: { orderBy: { id: "asc" } },
+    },
+  });
+
+  return { pulse, matches, opponent };
 }
 
 /**
@@ -96,6 +134,7 @@ export async function buildIssueDrafts(
   inputs: EngineInputs,
 ): Promise<IssueDraft[]> {
   const { pulse, matches } = inputs;
+  const opponent = inputs.opponent ?? null;
   const drafts: IssueDraft[] = [];
 
   if (pulse && pulse.fatigueScore >= 7) {
@@ -150,6 +189,36 @@ export async function buildIssueDrafts(
         severity: 3,
         evidence: `${negDuels} duelos perdidos — intensidad en el duelo y basculaciones`,
         metric: { negDuels },
+      });
+    }
+  }
+
+  // Scouting del rival (P4.1): cada debilidad del informe semanal entra como
+  // hallazgo TACTICAL de SU fase (subprincipio determinista de la biblioteca,
+  // mismo patrón que las heurísticas de partido). El clamp 1-5 blinda el
+  // dominio de severity: un informe mal editado nunca desborda la escala.
+  // La consulta ya trae las debilidades ordenadas (severity desc → id asc):
+  // la prioridad de explotación es determinista, NUNCA el orden de inserción.
+  if (opponent) {
+    for (const w of opponent.weaknesses) {
+      const sp = await db.subPrinciple.findFirst({
+        where: { phase: w.phase },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      });
+      drafts.push({
+        kind: "TACTICAL",
+        source: "OPPONENT_SCOUTING",
+        phase: w.phase,
+        subPrincipleId: sp?.id,
+        severity: Math.min(5, Math.max(1, w.severity)),
+        evidence: `Rival ${opponent.opponentName}: ${w.description}`,
+        metric: {
+          source: "OPPONENT_SCOUTING",
+          opponent: opponent.opponentName,
+          severityReportada: w.severity,
+          matchId: opponent.matchId ?? null,
+          comportamientos: opponent.scoutingEvents.length,
+        },
       });
     }
   }

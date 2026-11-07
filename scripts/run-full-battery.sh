@@ -3,9 +3,9 @@
 # BATERÍA E2E COMPLETA EN UNA SOLA SESIÓN (el sandbox mata procesos entre
 # llamadas, así que PG + dev server + suites corren y se verifican aquí)
 #   1. PostgreSQL embebido (:5432) — con reparación de dirs vacíos
-#   2. Prisma client (regenera si falta)
+#   2. Prisma client (regenera si falta) + migraciones pendientes (deploy)
 #   3. Dev server Next (:3000)
-#   4. Suites: pilar1..4 + severidad3 (192 + 36 checks)
+#   4. Suites: pilar1..4 + severidad3 + scouting (192 + 36 + 27 checks)
 # ============================================================================
 cd /home/z/my-project
 set -u
@@ -26,7 +26,22 @@ if [ "$PG_OK" != "1" ]; then echo "❌ PG no arrancó"; tail -5 pg.log; exit 1; 
 echo "✅ PG:5432 READY"
 
 echo "══ 2) Prisma client ══"
-if [ ! -d node_modules/.prisma/client ]; then bun run db:generate >/dev/null 2>&1 && echo "✅ regenerado"; else echo "✅ ya presente"; fi
+# Regenera si falta O si el schema es más nuevo que el cliente (cambios de modelo)
+if [ ! -d node_modules/.prisma/client ] || [ prisma/schema.prisma -nt node_modules/.prisma/client ]; then
+  bun run db:generate >/dev/null 2>&1 && echo "✅ regenerado"
+else
+  echo "✅ ya presente"
+fi
+
+echo "══ 2b) Migraciones pendientes ══"
+# Misma regla que src/lib/env-guard.ts: sin URL postgres (sandbox exporta
+# file:... por encima del .env) se fuerza el PG embebido — el CLI de Prisma
+# NO pasa por env-guard, así que la corrección se replica aquí.
+case "${DATABASE_URL:-}" in
+  postgres*) ;;
+  *) export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/metodo" ;;
+esac
+bun x prisma migrate deploy 2>&1 | tail -3 || bun x prisma db push --accept-data-loss 2>&1 | tail -2
 
 echo "══ 3) Dev server Next :3000 ══"
 setsid nohup bun dev > dev.log 2>&1 < /dev/null &
@@ -41,7 +56,7 @@ echo "✅ dev server READY (http:$code)"
 
 echo "══ 4) Batería E2E completa ══"
 FAIL=0
-for s in validate-pilar1 validate-pilar2 validate-pilar3 validate-pilar4 validate-severidad3; do
+for s in validate-pilar1 validate-pilar2 validate-pilar3 validate-pilar4 validate-severidad3 validate-scouting; do
   echo "──────── $s ────────"
   if ! bun "scripts/$s.ts"; then FAIL=1; echo "❌ $s terminó con error"; fi
 done

@@ -87,6 +87,16 @@ const TX_OPTS = { timeout: 20_000, maxWait: 10_000 } as const;
 
 const INTENSITY_ORDER: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
 
+/**
+ * Verbo de la directriz según el origen del hallazgo: lo ajeno del rival se
+ * EXPLOTA; lo propio fallado se CORRIGE (P4.1, trazable en la UI de Hoy).
+ */
+function directiveFor(draft: IssueDraft): string {
+  return draft.source === "OPPONENT_SCOUTING"
+    ? `Explotar: ${draft.evidence}`
+    : `Corregir: ${draft.evidence}`;
+}
+
 // ============================================================================
 // 1) RANKING DE CANDIDATAS (receta ponderada de la Biblioteca)
 // ============================================================================
@@ -344,7 +354,7 @@ async function recordEngineRun(
     microcycleId: string | null;
     trigger: "WEEKLY_PROPOSAL" | "EVIDENCE_REFRESH";
     t0: number;
-    inputs: { pulse: { moraleScore: number; fatigueScore: number } | null; matches: Array<{ opponent: string; score: string; events: number }>; availablePlayers: number; weekStart: string };
+    inputs: { pulse: { moraleScore: number; fatigueScore: number } | null; matches: Array<{ opponent: string; score: string; events: number }>; availablePlayers: number; weekStart: string; opponent: { name: string; weaknesses: number; events: number } | null; opponentIntegrated: boolean };
     drafts: IssueDraft[];
     prescriptions: PrescriptionAudit[];
     discarded: DiscardedCandidate[];
@@ -496,7 +506,7 @@ export async function runWeeklyProposalPipeline(
       };
 
       const directives = tacticalDrafts.length
-        ? tacticalDrafts.map((d) => `Corregir: ${d.evidence}`)
+        ? tacticalDrafts.map(directiveFor)
         : ["Consolidar la identidad de juego de la semana"];
 
       const summary = [
@@ -645,6 +655,13 @@ export async function runWeeklyProposalPipeline(
       }
 
       // ---------- 7) Auditoría de la ejecución ----------
+      const opponentSnapshot = inputs.opponent
+        ? {
+            name: inputs.opponent.opponentName,
+            weaknesses: inputs.opponent.weaknesses.length,
+            events: inputs.opponent.scoutingEvents.length,
+          }
+        : null;
       const inputSnapshot = {
         weekStart: weekStart.toISOString().slice(0, 10),
         pulse: pulse ? { moraleScore: pulse.moraleScore, fatigueScore: pulse.fatigueScore } : null,
@@ -654,6 +671,9 @@ export async function runWeeklyProposalPipeline(
           events: m.report?.events.length ?? 0,
         })),
         availablePlayers,
+        opponent: opponentSnapshot,
+        // true SOLO si el scouting generó hallazgos reales (informe con debilidades)
+        opponentIntegrated: drafts.some((d) => d.source === "OPPONENT_SCOUTING"),
       };
       const runId = await recordEngineRun(tx, {
         clubId,
@@ -821,7 +841,7 @@ export async function refreshProposalEvidence(
       // 3) Directrices + resumen legible
       const last = inputs.matches[0];
       const directives = tacticalRx.length
-        ? tacticalRx.map((p) => `Corregir: ${drafts[p.issueIndex].evidence}`)
+        ? tacticalRx.map((p) => directiveFor(drafts[p.issueIndex]))
         : ["Consolidar la identidad de juego de la semana"];
       await tx.microcycle.update({
         where: { id: cycle.id },
@@ -854,6 +874,14 @@ export async function refreshProposalEvidence(
             events: m.report?.events.length ?? 0,
           })),
           availablePlayers,
+          opponent: inputs.opponent
+            ? {
+                name: inputs.opponent.opponentName,
+                weaknesses: inputs.opponent.weaknesses.length,
+                events: inputs.opponent.scoutingEvents.length,
+              }
+            : null,
+          opponentIntegrated: drafts.some((d) => d.source === "OPPONENT_SCOUTING"),
         },
         drafts,
         prescriptions: auditRx,

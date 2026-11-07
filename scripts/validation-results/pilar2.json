@@ -4,8 +4,8 @@
   "total": 69,
   "passed": 69,
   "failed": 0,
-  "durationMs": 2967,
-  "timestamp": "2026-11-07T14:16:35.782Z",
+  "durationMs": 2489,
+  "timestamp": "2026-11-07T18:02:01.707Z",
   "checks": [
     {
       "name": "parseCsv: delimitador coma",

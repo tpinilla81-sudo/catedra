@@ -94,6 +94,7 @@ export type MatchIngestDb = Pick<
   | "subPrinciple"
   | "microcycle"
   | "diagnosisIssue"
+  | "opponentReport" /// P4.1: el colector de inputs también lee el scouting
   | "$transaction"
 >;
 
