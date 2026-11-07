@@ -1,0 +1,717 @@
+     1→"use client";
+     2→
+     3→// ============================================================================
+     4→// PILAR 1 — TAXONOMÍA JERÁRQUICA (pestaña "Taxonomía")
+     5→// ----------------------------------------------------------------------------
+     6→// Árbol de subprincipios organizado por las 5 fases del juego (GamePhase):
+     7→//   fase → subprincipio (raíz) → detalle (2 niveles máximo).
+     8→// Convivencia de contenidos:
+     9→//   • Cátedra global (clubId = null)  → SOLO LECTURA + "Duplicar a mi club".
+    10→//   • Contenido del club (clubId = X) → crear / editar / eliminar / anidar.
+    11→// Cada subprincipio muestra sus RECETAS: las tareas que lo resuelven,
+    12→// ordenadas por relevancia del motor (3 → 1), y si el diagnóstico semanal
+    13→// tiene un hallazgo ABIERTO que apunta aquí (⚠ falla esta semana).
+    14→// ============================================================================
+    15→
+    16→import { useState, useTransition } from "react";
+    17→import { useRouter } from "next/navigation";
+    18→import {
+    19→  AlertTriangle,
+    20→  BookOpen,
+    21→  ChevronDown,
+    22→  CopyPlus,
+    23→  CornerDownRight,
+    24→  Landmark,
+    25→  Loader2,
+    26→  PenLine,
+    27→  Plus,
+    28→  Trash2,
+    29→  Users,
+    30→} from "lucide-react";
+    31→import { Button } from "@/components/ui/button";
+    32→import { Input } from "@/components/ui/input";
+    33→import { Textarea } from "@/components/ui/textarea";
+    34→import {
+    35→  AlertDialog,
+    36→  AlertDialogAction,
+    37→  AlertDialogCancel,
+    38→  AlertDialogContent,
+    39→  AlertDialogDescription,
+    40→  AlertDialogFooter,
+    41→  AlertDialogHeader,
+    42→  AlertDialogTitle,
+    43→} from "@/components/ui/alert-dialog";
+    44→import {
+    45→  Sheet,
+    46→  SheetContent,
+    47→  SheetDescription,
+    48→  SheetHeader,
+    49→  SheetTitle,
+    50→} from "@/components/ui/sheet";
+    51→import {
+    52→  deleteSubPrinciple,
+    53→  duplicateSubPrincipleToClub,
+    54→  saveSubPrinciple,
+    55→} from "@/app/dashboard/library/actions";
+    56→import {
+    57→  INTENSITY_META,
+    58→  ORIGIN_META,
+    59→  PHASE_META,
+    60→  PHASE_ORDER,
+    61→  RELEVANCE_META,
+    62→} from "@/lib/taxonomy";
+    63→import { tasksForSubPrinciple, type LibraryData, type SPNode, type TaskCard } from "@/components/library/types";
+    64→import { useToast } from "@/hooks/use-toast";
+    65→
+    66→// ---------- Fila de subprincipio (raíz o detalle) ----------
+    67→
+    68→function SPRow({
+    69→  node,
+    70→  child,
+    71→  recipeCount,
+    72→  childCount,
+    73→  onOpen,
+    74→}: {
+    75→  node: SPNode;
+    76→  child?: boolean;
+    77→  recipeCount: number;
+    78→  childCount: number;
+    79→  onOpen: (s: SPNode) => void;
+    80→}) {
+    81→  const origin = node.clubId === null ? ORIGIN_META.cathedral : ORIGIN_META.club;
+    82→  const OriginIcon = origin.icon;
+    83→
+    84→  return (
+    85→    <button
+    86→      onClick={() => onOpen(node)}
+    87→      className={`w-full rounded-2xl border text-left transition hover:border-zinc-600 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 ${
+    88→        child
+    89→          ? "border-zinc-800/70 bg-zinc-900/60"
+    90→          : "border-zinc-800 bg-zinc-900"
+    91→      }`}
+    92→      aria-label={`Abrir subprincipio ${node.name}`}
+    93→    >
+    94→      <div className={`flex items-start gap-2 ${child ? "px-3 py-2.5" : "px-3.5 py-3"}`}>
+    95→        {child && (
+    96→          <CornerDownRight className="w-4 h-4 text-zinc-600 shrink-0 mt-0.5" aria-hidden />
+    97→        )}
+    98→        <div className="min-w-0 flex-1">
+    99→          <div className="flex items-start justify-between gap-2">
+   100→            <p className={`font-bold text-zinc-50 leading-snug ${child ? "text-sm" : "text-[15px]"}`}>
+   101→              {node.name}
+   102→            </p>
+   103→            <span
+   104→              className={`shrink-0 inline-flex items-center gap-1 rounded-lg border px-1.5 py-0.5 text-[10px] font-black ${origin.chip}`}
+   105→              title={origin.hint}
+   106→            >
+   107→              <OriginIcon className="w-3 h-3" aria-hidden />
+   108→              {origin.label}
+   109→            </span>
+   110→          </div>
+   111→          {node.description && (
+   112→            <p className="text-xs text-zinc-500 mt-0.5 line-clamp-1 leading-snug">
+   113→              {node.description}
+   114→            </p>
+   115→          )}
+   116→          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+   117→            {recipeCount > 0 ? (
+   118→              <span className="rounded-md bg-amber-500/15 border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-300 inline-flex items-center gap-1">
+   119→                <BookOpen className="w-3 h-3" aria-hidden /> {recipeCount} tarea
+   120→                {recipeCount > 1 ? "s" : ""}
+   121→              </span>
+   122→            ) : (
+   123→              <span className="rounded-md bg-zinc-800 px-1.5 py-0.5 text-[10px] font-bold text-zinc-500">
+   124→                sin recetas
+   125→              </span>
+   126→            )}
+   127→            {childCount > 0 && (
+   128→              <span className="rounded-md bg-zinc-800 px-1.5 py-0.5 text-[10px] font-bold text-zinc-400">
+   129→                {childCount} detalle{childCount > 1 ? "s" : ""}
+   130→              </span>
+   131→            )}
+   132→            {node.issue && (
+   133→              <span
+   134→                className="rounded-md bg-rose-500/15 border border-rose-500/50 px-1.5 py-0.5 text-[10px] font-black text-rose-300 inline-flex items-center gap-1"
+   135→                title={node.issue.evidence}
+   136→              >
+   137→                <AlertTriangle className="w-3 h-3" aria-hidden /> falla esta semana
+   138→              </span>
+   139→            )}
+   140→          </div>
+   141→        </div>
+   142→      </div>
+   143→    </button>
+   144→  );
+   145→}
+   146→
+   147→// ---------- Editor de subprincipio (crear / editar) ----------
+   148→
+   149→function SPEditorSheet({
+   150→  editor,
+   151→  data,
+   152→  platform,
+   153→  onClose,
+   154→}: {
+   155→  editor: { node: SPNode | null; phase: string; parent: SPNode | null };
+   156→  data: LibraryData;
+   157→  platform: boolean;
+   158→  onClose: () => void;
+   159→}) {
+   160→  const node = editor.node;
+   161→  const [name, setName] = useState(node?.name ?? "");
+   162→  const [description, setDescription] = useState(node?.description ?? "");
+   163→  const [parentId, setParentId] = useState<string | null>(editor.parent?.id ?? null);
+   164→  const [saving, startTransition] = useTransition();
+   165→  const { toast } = useToast();
+   166→  const router = useRouter();
+   167→
+   168→  const phaseMeta = PHASE_META[editor.phase] ?? PHASE_META.OFFENSIVE;
+   169→  const nodeHasChildren = node ? data.subprinciples.some((s) => s.parentId === node.id) : false;
+   170→
+   171→  // Raíces candidatas de la misma fase (excluye el propio nodo)
+   172→  const parentOptions = data.subprinciples.filter(
+   173→    (s) => s.phase === editor.phase && !s.parentId && s.id !== node?.id,
+   174→  );
+   175→
+   176→  function save() {
+   177→    startTransition(async () => {
+   178→      const res = await saveSubPrinciple({
+   179→        id: node?.id ?? "",
+   180→        phase: editor.phase,
+   181→        name,
+   182→        description: description.trim() || null,
+   183→        parentId: nodeHasChildren ? null : parentId,
+   184→      });
+   185→      if (res.ok) {
+   186→        toast({
+   187→          title: node
+   188→            ? "Subprincipio actualizado"
+   189→            : platform
+   190→              ? "Subprincipio creado en la Cátedra"
+   191→              : "Subprincipio creado en tu club",
+   192→          description: name,
+   193→          duration: 2000,
+   194→        });
+   195→        router.refresh();
+   196→        onClose();
+   197→      } else {
+   198→        toast({ title: "No se pudo guardar", description: res.error, duration: 5000 });
+   199→      }
+   200→    });
+   201→  }
+   202→
+   203→  return (
+   204→    <Sheet open onOpenChange={(o) => !o && onClose()}>
+   205→      <SheetContent
+   206→        side="bottom"
+   207→        className="bg-zinc-900 border-zinc-800 rounded-t-3xl max-h-[92vh] overflow-y-auto px-4 pb-6 pt-2"
+   208→      >
+   209→        <SheetHeader className="text-left pb-1">
+   210→          <SheetTitle className="text-xl font-black text-zinc-50">
+   211→            {node ? "Editar subprincipio" : editor.parent ? "Nuevo detalle" : "Nuevo subprincipio"}
+   212→          </SheetTitle>
+   213→          <SheetDescription className="flex items-center gap-1.5 text-sm">
+   214→            <span
+   215→              className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-black ${phaseMeta.chip}`}
+   216→            >
+   217→              {(() => {
+   218→                const Icon = phaseMeta.icon;
+   219→                return <Icon className="w-3.5 h-3.5" aria-hidden />;
+   220→              })()}
+   221→              {phaseMeta.label}
+   222→            </span>
+   223→            <span className="text-zinc-500">· la fase no se puede cambiar tras crear</span>
+   224→          </SheetDescription>
+   225→        </SheetHeader>
+   226→
+   227→        <Input
+   228→          value={name}
+   229→          onChange={(e) => setName(e.target.value)}
+   230→          placeholder="Nombre — ej. «Salida de balón desde presión rival en 3/4»"
+   231→          maxLength={120}
+   232→          className="mt-2 min-h-[48px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 font-semibold"
+   233→        />
+   234→        <Textarea
+   235→          value={description}
+   236→          onChange={(e) => setDescription(e.target.value)}
+   237→          placeholder="Descripción metodológica (opcional)"
+   238→          maxLength={500}
+   239→          rows={3}
+   240→          className="mt-2 rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-600"
+   241→        />
+   242→
+   243→        {/* Jerarquía (solo si el nodo no tiene hijos) */}
+   244→        {nodeHasChildren ? (
+   245→          <p className="mt-3 text-xs text-zinc-500">
+   246→            Este subprincipio tiene detalles propios: se mantiene como raíz de la jerarquía.
+   247→          </p>
+   248→        ) : (
+   249→          <>
+   250→            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-4 mb-2">
+   251→              Jerarquía — ¿raíz o detalle de otro subprincipio?
+   252→            </p>
+   253→            <div className="flex flex-wrap gap-2">
+   254→              <button
+   255→                type="button"
+   256→                onClick={() => setParentId(null)}
+   257→                aria-pressed={parentId === null}
+   258→                className={`min-h-[44px] px-3.5 rounded-2xl border text-sm font-bold transition ${
+   259→                  parentId === null
+   260→                    ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300"
+   261→                    : "bg-zinc-800/60 border-zinc-800 text-zinc-400"
+   262→                }`}
+   263→              >
+   264→                Raíz de la fase
+   265→              </button>
+   266→              {parentOptions.map((p) => (
+   267→                <button
+   268→                  key={p.id}
+   269→                  type="button"
+   270→                  onClick={() => setParentId(p.id)}
+   271→                  aria-pressed={parentId === p.id}
+   272→                  className={`min-h-[44px] max-w-[48%] px-3.5 rounded-2xl border text-sm font-bold transition truncate ${
+   273→                    parentId === p.id
+   274→                      ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300"
+   275→                      : "bg-zinc-800/60 border-zinc-800 text-zinc-400"
+   276→                  }`}
+   277→                >
+   278→                  {p.name}
+   279→                </button>
+   280→              ))}
+   281→            </div>
+   282→          </>
+   283→        )}
+   284→
+   285→        <Button
+   286→          onClick={save}
+   287→          disabled={saving}
+   288→          className="mt-4 w-full min-h-[56px] rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-base"
+   289→        >
+   290→          {saving ? (
+   291→            <Loader2 className="w-5 h-5 animate-spin" aria-hidden />
+   292→          ) : (
+   293→            <>
+   294→              <PenLine className="w-5 h-5" aria-hidden />
+   295→              {node ? "Guardar cambios" : "Crear"}
+   296→            </>
+   297→          )}
+   298→        </Button>
+   299→      </SheetContent>
+   300→    </Sheet>
+   301→  );
+   302→}
+   303→
+   304→// ---------- Pestaña principal ----------
+   305→
+   306→export function TaxonomyTab({
+   307→  data,
+   308→  canWrite,
+   309→  platform,
+   310→  onOpenTask,
+   311→  onEditTask,
+   312→  onNewTask,
+   313→}: {
+   314→  data: LibraryData;
+   315→  /** RBAC de presentación (el guard real vive en cada Server Action) */
+   316→  canWrite: boolean;
+   317→  /** Modo Plataforma: se edita el contenido global de la Cátedra */
+   318→  platform: boolean;
+   319→  onOpenTask: (t: TaskCard) => void;
+   320→  onEditTask: (t: TaskCard) => void;
+   321→  onNewTask: () => void;
+   322→}) {
+   323→  const [open, setOpen] = useState<Record<string, boolean>>(() =>
+   324→    Object.fromEntries(PHASE_ORDER.map((p) => [p, true])),
+   325→  );
+   326→  const [detail, setDetail] = useState<SPNode | null>(null);
+   327→  const [editor, setEditor] = useState<{
+   328→    node: SPNode | null;
+   329→    phase: string;
+   330→    parent: SPNode | null;
+   331→  } | null>(null);
+   332→  const [confirmDelete, setConfirmDelete] = useState(false);
+   333→  const [busy, startTransition] = useTransition();
+   334→  const { toast } = useToast();
+   335→  const router = useRouter();
+   336→
+   337→  const rootsOf = (phase: string) =>
+   338→    data.subprinciples
+   339→      .filter((s) => s.phase === phase && !s.parentId)
+   340→      .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+   341→  const childrenOf = (id: string) =>
+   342→    data.subprinciples.filter((s) => s.parentId === id).sort((a, b) => a.order - b.order);
+   343→  const recipeCountOf = (id: string) =>
+   344→    data.tasks.reduce((acc, t) => acc + (t.recipes.some((r) => r.subPrincipleId === id) ? 1 : 0), 0);
+   345→
+   346→  function runDuplicate(node: SPNode) {
+   347→    startTransition(async () => {
+   348→      const res = await duplicateSubPrincipleToClub(node.id);
+   349→      if (res.ok) {
+   350→        toast({
+   351→          title: "Subprincipio duplicado a tu club",
+   352→          description: "Ya puedes editarlo y anidar detalles propios.",
+   353→          duration: 2200,
+   354→        });
+   355→        router.refresh();
+   356→        setDetail(null);
+   357→      } else {
+   358→        toast({ title: "No se pudo duplicar", description: res.error, duration: 5000 });
+   359→      }
+   360→    });
+   361→  }
+   362→
+   363→  function runDelete() {
+   364→    if (!detail) return;
+   365→    const target = detail;
+   366→    startTransition(async () => {
+   367→      const res = await deleteSubPrinciple(target.id);
+   368→      if (res.ok) {
+   369→        toast({ title: "Subprincipio eliminado", description: target.name, duration: 2000 });
+   370→        router.refresh();
+   371→        setConfirmDelete(false);
+   372→        setDetail(null);
+   373→      } else {
+   374→        toast({ title: "No se pudo eliminar", description: res.error, duration: 5000 });
+   375→        setConfirmDelete(false);
+   376→      }
+   377→    });
+   378→  }
+   379→
+   380→  return (
+   381→    <div className="space-y-3">
+   382→      {PHASE_ORDER.map((phase) => {
+   383→        const meta = PHASE_META[phase];
+   384→        const Icon = meta.icon;
+   385→        const roots = rootsOf(phase);
+   386→        const phaseSPs = data.subprinciples.filter((s) => s.phase === phase);
+   387→        const hasIssue = phaseSPs.some((s) => s.issue);
+   388→        const expanded = open[phase] ?? true;
+   389→
+   390→        return (
+   391→          <section
+   392→            key={phase}
+   393→            aria-label={`Fase ${meta.label}`}
+   394→            className="rounded-3xl border border-zinc-800 bg-zinc-900/40 overflow-hidden"
+   395→          >
+   396→            {/* Cabecera de fase */}
+   397→            <div className="flex items-center gap-2 px-3 py-3">
+   398→              <button
+   399→                onClick={() => setOpen((o) => ({ ...o, [phase]: !expanded }))}
+   400→                className="flex-1 min-w-0 flex items-center gap-2.5 text-left min-h-[44px]"
+   401→                aria-expanded={expanded}
+   402→              >
+   403→                <span
+   404→                  className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${meta.chip}`}
+   405→                >
+   406→                  <Icon className="w-4.5 h-4.5" aria-hidden />
+   407→                </span>
+   408→                <span className="min-w-0">
+   409→                  <span className="block font-black text-zinc-50 text-[15px] leading-tight truncate">
+   410→                    {meta.label}
+   411→                    {hasIssue && (
+   412→                      <AlertTriangle className="w-4 h-4 text-rose-300 inline ml-1.5 -mt-0.5" aria-label="Con hallazgos abiertos esta semana" />
+   413→                    )}
+   414→                  </span>
+   415→                  <span className="block text-[11px] text-zinc-500 leading-tight truncate">
+   416→                    {roots.length} subprincipio{roots.length !== 1 ? "s" : ""} · {meta.desc}
+   417→                  </span>
+   418→                </span>
+   419→                <ChevronDown
+   420→                  className={`w-5 h-5 text-zinc-500 shrink-0 transition-transform ${expanded ? "" : "-rotate-90"}`}
+   421→                  aria-hidden
+   422→                />
+   423→              </button>
+   424→              {canWrite && (
+   425→                <button
+   426→                  onClick={() => setEditor({ node: null, phase, parent: null })}
+   427→                  className="shrink-0 min-h-[44px] min-w-[44px] rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 flex items-center justify-center hover:bg-emerald-500/20 transition"
+   428→                  aria-label={`Añadir subprincipio a ${meta.label}`}
+   429→                  title={platform ? "Añadir subprincipio de la Cátedra" : "Añadir subprincipio del club"}
+   430→                >
+   431→                  <Plus className="w-5 h-5" aria-hidden />
+   432→                </button>
+   433→              )}
+   434→            </div>
+   435→
+   436→            {/* Árbol */}
+   437→            {expanded && (
+   438→              <div className="px-3 pb-3 space-y-2">
+   439→                {roots.length === 0 && (
+   440→                  <p className="rounded-2xl border border-dashed border-zinc-800 px-4 py-4 text-center text-sm text-zinc-500">
+   441→                    Sin subprincipios en esta fase todavía.
+   442→                  </p>
+   443→                )}
+   444→                {roots.map((root) => {
+   445→                  const children = childrenOf(root.id);
+   446→                  return (
+   447→                    <div key={root.id} className="space-y-1.5">
+   448→                      <SPRow
+   449→                        node={root}
+   450→                        recipeCount={recipeCountOf(root.id)}
+   451→                        childCount={children.length}
+   452→                        onOpen={setDetail}
+   453→                      />
+   454→                      {children.map((c) => (
+   455→                        <div key={c.id} className="pl-5">
+   456→                          <SPRow
+   457→                            node={c}
+   458→                            child
+   459→                            recipeCount={recipeCountOf(c.id)}
+   460→                            childCount={0}
+   461→                            onOpen={setDetail}
+   462→                          />
+   463→                        </div>
+   464→                      ))}
+   465→                    </div>
+   466→                  );
+   467→                })}
+   468→              </div>
+   469→            )}
+   470→          </section>
+   471→        );
+   472→      })}
+   473→
+   474→      {/* ---------- Hoja de detalle del subprincipio ---------- */}
+   475→      <Sheet open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+   476→        <SheetContent
+   477→          side="bottom"
+   478→          className="bg-zinc-900 border-zinc-800 rounded-t-3xl max-h-[92vh] overflow-y-auto px-4 pb-8 pt-2"
+   479→        >
+   480→          {detail && (
+   481→            <>
+   482→              <SheetHeader className="text-left pb-1">
+   483→                <SheetTitle className="text-xl font-black text-zinc-50 leading-snug">
+   484→                  {detail.name}
+   485→                </SheetTitle>
+   486→                <SheetDescription className="flex flex-wrap items-center gap-1.5 pt-1">
+   487→                  {(() => {
+   488→                    const origin = detail.clubId === null ? ORIGIN_META.cathedral : ORIGIN_META.club;
+   489→                    const OriginIcon = origin.icon;
+   490→                    return (
+   491→                      <span
+   492→                        className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-black ${origin.chip}`}
+   493→                        title={origin.hint}
+   494→                      >
+   495→                        <OriginIcon className="w-3.5 h-3.5" aria-hidden /> {origin.label}
+   496→                      </span>
+   497→                    );
+   498→                  })()}
+   499→                  {(() => {
+   500→                    const pMeta = PHASE_META[detail.phase] ?? PHASE_META.OFFENSIVE;
+   501→                    const Icon = pMeta.icon;
+   502→                    return (
+   503→                      <span
+   504→                        className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-black ${pMeta.chip}`}
+   505→                      >
+   506→                        <Icon className="w-3.5 h-3.5" aria-hidden /> {pMeta.label}
+   507→                      </span>
+   508→                    );
+   509→                  })()}
+   510→                </SheetDescription>
+   511→              </SheetHeader>
+   512→
+   513→              {detail.description && (
+   514→                <p className="text-sm text-zinc-300 leading-relaxed mt-1">{detail.description}</p>
+   515→              )}
+   516→
+   517→              {/* Hallazgo del motor */}
+   518→              {detail.issue && (
+   519→                <div className="mt-3 rounded-2xl bg-rose-500/10 border border-rose-500/40 px-3.5 py-3 flex gap-2.5">
+   520→                  <AlertTriangle className="w-5 h-5 text-rose-300 shrink-0 mt-0.5" aria-hidden />
+   521→                  <div>
+   522→                    <p className="text-sm font-black text-rose-300">
+   523→                      Falla esta semana (severidad {detail.issue.severity}/5)
+   524→                    </p>
+   525→                    <p className="text-sm text-rose-200/90 mt-0.5 leading-snug">
+   526→                      {detail.issue.evidence}
+   527→                    </p>
+   528→                    <p className="text-[11px] text-zinc-500 mt-1">
+   529→                      Las tareas con receta núcleo hacia aquí son la primera opción del motor para
+   530→                      el lunes.
+   531→                    </p>
+   532→                  </div>
+   533→                </div>
+   534→              )}
+   535→
+   536→              {/* Detalles (hijos) */}
+   537→              {childrenOf(detail.id).length > 0 && (
+   538→                <>
+   539→                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-5 mb-2">
+   540→                    Detalles del subprincipio
+   541→                  </p>
+   542→                  <div className="space-y-1.5">
+   543→                    {childrenOf(detail.id).map((c) => (
+   544→                      <SPRow
+   545→                        key={c.id}
+   546→                        node={c}
+   547→                        child
+   548→                        recipeCount={recipeCountOf(c.id)}
+   549→                        childCount={0}
+   550→                        onOpen={setDetail}
+   551→                      />
+   552→                    ))}
+   553→                  </div>
+   554→                </>
+   555→              )}
+   556→
+   557→              {/* RECETAS: tareas que lo resuelven (motor relacional bidireccional) */}
+   558→              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-5 mb-2">
+   559→                Tareas que lo resuelven (recetas del motor)
+   560→              </p>
+   561→              {(() => {
+   562→                const links = tasksForSubPrinciple(data.tasks, detail.id);
+   563→                if (links.length === 0)
+   564→                  return (
+   565→                    <p className="rounded-2xl border border-dashed border-zinc-700 px-4 py-3 text-sm text-zinc-500">
+   566→                      Ninguna tarea conectada todavía. Abre una tarea de tu club y añade una receta
+   567→                      hacia este subprincipio — o crea una nueva.
+   568→                    </p>
+   569→                  );
+   570→                return (
+   571→                  <ul className="space-y-2">
+   572→                    {links.map(({ task, relevance, usageNote }) => {
+   573→                      const rel = RELEVANCE_META[relevance] ?? RELEVANCE_META[2];
+   574→                      const intensity = INTENSITY_META[task.intensity] ?? INTENSITY_META.MEDIUM;
+   575→                      return (
+   576→                        <li key={task.id}>
+   577→                          <button
+   578→                            onClick={() => onOpenTask(task)}
+   579→                            className="w-full rounded-2xl bg-zinc-800/50 border border-zinc-800 px-3 py-2.5 text-left hover:border-zinc-600 transition"
+   580→                            aria-label={`Abrir tarea ${task.title}`}
+   581→                          >
+   582→                            <div className="flex items-center gap-2 flex-wrap">
+   583→                              <span
+   584→                                className={`rounded-md border px-1.5 py-0.5 text-[10px] font-black ${rel.chip}`}
+   585→                                title={rel.hint}
+   586→                              >
+   587→                                {relevance} · {rel.label}
+   588→                              </span>
+   589→                              <p className="text-sm font-bold text-zinc-100 flex-1 min-w-[50%] leading-snug">
+   590→                                {task.title}
+   591→                              </p>
+   592→                              <span
+   593→                                className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold inline-flex items-center gap-1 ${intensity.chip}`}
+   594→                              >
+   595→                                <span className={`w-1.5 h-1.5 rounded-full ${intensity.dot}`} aria-hidden />
+   596→                                {intensity.label}
+   597→                              </span>
+   598→                            </div>
+   599→                            {usageNote && (
+   600→                              <p className="text-xs italic text-zinc-400 mt-1.5 leading-snug">
+   601→                                «{usageNote}»
+   602→                              </p>
+   603→                            )}
+   604→                          </button>
+   605→                        </li>
+   606→                      );
+   607→                    })}
+   608→                  </ul>
+   609→                );
+   610→              })()}
+   611→
+   612→              {/* Acciones (RBAC: solo roles de escritura; el alcance depende del modo) */}
+   613→              <div className="mt-5 space-y-2">
+   614→                {canWrite && (detail.clubId !== null ? !platform : platform) && (
+   615→                  <>
+   616→                    <div className="grid grid-cols-2 gap-2">
+   617→                      <Button
+   618→                        onClick={() =>
+   619→                          setEditor({
+   620→                            node: detail,
+   621→                            phase: detail.phase,
+   622→                            parent: null,
+   623→                          })
+   624→                        }
+   625→                        className="min-h-[52px] rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black"
+   626→                      >
+   627→                        <PenLine className="w-5 h-5" aria-hidden /> Editar
+   628→                      </Button>
+   629→                      <Button
+   630→                        onClick={() => setEditor({ node: null, phase: detail.phase, parent: detail })}
+   631→                        className="min-h-[52px] rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-black border border-zinc-700"
+   632→                      >
+   633→                        <Plus className="w-5 h-5" aria-hidden /> Detalle
+   634→                      </Button>
+   635→                    </div>
+   636→                    <Button
+   637→                      variant="outline"
+   638→                      onClick={() => setConfirmDelete(true)}
+   639→                      disabled={busy}
+   640→                      className="w-full min-h-[48px] rounded-2xl border-zinc-700 bg-zinc-950 text-rose-300 hover:bg-rose-500/10 hover:text-rose-300 font-bold"
+   641→                    >
+   642→                      <Trash2 className="w-4 h-4" aria-hidden /> Eliminar subprincipio
+   643→                    </Button>
+   644→                  </>
+   645→                )}
+   646→                {canWrite && detail.clubId === null && !platform && (
+   647→                  <Button
+   648→                    onClick={() => runDuplicate(detail)}
+   649→                    disabled={busy}
+   650→                    className="w-full min-h-[52px] rounded-2xl bg-violet-500/90 hover:bg-violet-400 text-zinc-950 font-black"
+   651→                  >
+   652→                    {busy ? (
+   653→                      <Loader2 className="w-5 h-5 animate-spin" aria-hidden />
+   654→                    ) : (
+   655→                      <>
+   656→                        <CopyPlus className="w-5 h-5" aria-hidden /> Duplicar a mi club para
+   657→                        personalizar
+   658→                      </>
+   659→                    )}
+   660→                  </Button>
+   661→                )}
+   662→                {!canWrite && (
+   663→                  <p className="rounded-2xl border border-zinc-800 bg-zinc-900/60 px-3.5 py-2.5 text-xs text-zinc-500 font-semibold">
+   664→                    Solo lectura: tu rol consulta la biblioteca sin modificarla.
+   665→                  </p>
+   666→                )}
+   667→                {canWrite && (
+   668→                  <Button
+   669→                    variant="ghost"
+   670→                    onClick={onNewTask}
+   671→                    className="w-full min-h-[44px] rounded-2xl text-zinc-400 hover:text-zinc-200 font-bold"
+   672→                  >
+   673→                    <BookOpen className="w-4 h-4" aria-hidden /> Crear una tarea para este objetivo
+   674→                  </Button>
+   675→                )}
+   676→              </div>
+   677→
+   678→              <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+   679→                <AlertDialogContent className="bg-zinc-900 border-zinc-800 rounded-3xl max-w-sm mx-auto">
+   680→                  <AlertDialogHeader>
+   681→                    <AlertDialogTitle className="text-zinc-50">
+   682→                      ¿Eliminar «{detail.name}»?
+   683→                    </AlertDialogTitle>
+   684→                    <AlertDialogDescription className="text-zinc-400">
+   685→                      Sus detalles quedarán como raíces y las recetas conectadas se desconectarán.
+   686→                      Los hallazgos históricos del motor conservan su evidencia.
+   687→                    </AlertDialogDescription>
+   688→                  </AlertDialogHeader>
+   689→                  <AlertDialogFooter className="flex-row gap-2">
+   690→                    <AlertDialogCancel className="rounded-2xl border-zinc-700 bg-zinc-950 text-zinc-200 mt-0">
+   691→                      Cancelar
+   692→                    </AlertDialogCancel>
+   693→                    <AlertDialogAction
+   694→                      onClick={(e) => {
+   695→                        e.preventDefault();
+   696→                        runDelete();
+   697→                      }}
+   698→                      className="rounded-2xl bg-rose-500 text-white hover:bg-rose-400 mt-0"
+   699→                    >
+   700→                      {busy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : "Eliminar"}
+   701→                    </AlertDialogAction>
+   702→                  </AlertDialogFooter>
+   703→                </AlertDialogContent>
+   704→              </AlertDialog>
+   705→            </>
+   706→          )}
+   707→        </SheetContent>
+   708→      </Sheet>
+   709→
+   710→      {/* ---------- Editor ---------- */}
+   711→      {editor && (
+   712→        <SPEditorSheet editor={editor} data={data} platform={platform} onClose={() => setEditor(null)} />
+   713→      )}
+   714→    </div>
+   715→  );
+   716→}
+   717→
