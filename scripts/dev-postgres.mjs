@@ -28,16 +28,26 @@ if (portOpen) {
 }
 
 try {
-  // Dirs de runtime que git no versiona (vacíos): sin ellos postmaster no arranca.
-  for (const d of [
-    "pg_notify", "pg_tblspc", "pg_replslot", "pg_twophase", "pg_commit_ts",
-    "pg_stat_tmp", "pg_dynshmem", "pg_snapshots", "pg_serial", "pg_sockets",
-    "pg_multixact/members", "pg_multixact/offsets", "pg_wal/archive_status",
-    "pg_subtrans", "pg_logical/mappings", "pg_logical/snapshots",
-  ]) {
-    fs.mkdirSync(`${DATA_DIR}/${d}`, { recursive: true });
+  // Reparar dirs de runtime SOLO si ya existe un clúster válido (PG_VERSION).
+  // Si .pgdata no existe o está vacía (sandbox reciclado), hay que dejar que el
+  // initdb de la librería inicialice de cero: crear los dirs ANTES hace que la
+  // librería crea que ya hay clúster y salta initdb → "postgresql.conf missing".
+  const hasCluster = fs.existsSync(`${DATA_DIR}/PG_VERSION`);
+  if (hasCluster) {
+    // Dirs de runtime que git no versiona (vacíos): sin ellos postmaster no arranca.
+    for (const d of [
+      "pg_notify", "pg_tblspc", "pg_replslot", "pg_twophase", "pg_commit_ts",
+      "pg_stat_tmp", "pg_dynshmem", "pg_snapshots", "pg_serial", "pg_sockets",
+      "pg_multixact/members", "pg_multixact/offsets", "pg_wal/archive_status",
+      "pg_subtrans", "pg_logical/mappings", "pg_logical/snapshots",
+    ]) {
+      fs.mkdirSync(`${DATA_DIR}/${d}`, { recursive: true });
+    }
+    fs.chmodSync(DATA_DIR, 0o700);
+  } else {
+    if (fs.existsSync(DATA_DIR)) fs.rmSync(DATA_DIR, { recursive: true, force: true });
+    console.log("PG: sin clúster previo → initdb desde cero");
   }
-  fs.chmodSync(DATA_DIR, 0o700);
 
   const pg = new EmbeddedPostgres({
     databaseDir: DATA_DIR,
@@ -46,6 +56,14 @@ try {
     port: PORT,
     persistent: true,
   });
+
+  // Sin clúster previo (PG_VERSION ausente) la librería NO auto-inicializa:
+  // hay que ejecutar initdb explícitamente antes de arrancar postmaster.
+  if (!fs.existsSync(`${DATA_DIR}/PG_VERSION`)) {
+    console.log("PG: ejecutando initdb (initialise)…");
+    await pg.initialise();
+    fs.chmodSync(DATA_DIR, 0o700);
+  }
 
   await pg.start();
   console.log("PG: servidor arrancado en :5432");
