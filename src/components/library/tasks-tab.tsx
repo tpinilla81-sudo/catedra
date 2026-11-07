@@ -1,0 +1,597 @@
+"use client";
+
+// ============================================================================
+// PILAR 1 — CATÁLOGO DE TAREAS PROFESIONALES (pestaña "Tareas")
+// ----------------------------------------------------------------------------
+// • Filtros de un toque: búsqueda libre, fase, intensidad y origen
+//   (Cátedra global vs. club).
+// • Tarjetas compactas con la metainformación clave de un vistazo.
+// • TaskDetailSheet: ficha COMPLETA (espacio, carga, reglas de provocación,
+//   co-achéo, materiales) + recetas bidireccionales + trazabilidad de uso
+//   ("prescrita N veces por el motor").
+// ============================================================================
+
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import {
+  CalendarClock,
+  Copy,
+  Clock,
+  CopyPlus,
+  Loader2,
+  Network,
+  PenLine,
+  Ruler,
+  Search,
+  Trash2,
+  Users,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  deleteTask,
+  duplicateTaskToClub,
+} from "@/app/dashboard/library/actions";
+import {
+  INTENSITY_META,
+  ORIGIN_META,
+  PHASE_META,
+  PHASE_ORDER,
+  RELEVANCE_META,
+  normalizeName,
+} from "@/lib/taxonomy";
+import type { LibraryData, TaskCard } from "@/components/library/types";
+import { useToast } from "@/hooks/use-toast";
+
+// ---------- Tarjeta compacta ----------
+
+function TaskCardItem({
+  task,
+  onOpen,
+}: {
+  task: TaskCard;
+  onOpen: (t: TaskCard) => void;
+}) {
+  const origin = task.clubId === null ? ORIGIN_META.cathedral : ORIGIN_META.club;
+  const intensity = INTENSITY_META[task.intensity] ?? INTENSITY_META.MEDIUM;
+  const topRecipes = [...task.recipes].sort((a, b) => b.relevance - a.relevance).slice(0, 2);
+
+  return (
+    <button
+      onClick={() => onOpen(task)}
+      className="w-full rounded-3xl border border-zinc-800 bg-zinc-900 p-4 text-left transition hover:border-zinc-600 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+      aria-label={`Abrir ficha de la tarea ${task.title}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-bold text-zinc-50 leading-snug">{task.title}</p>
+        <span
+          className={`shrink-0 rounded-lg border px-1.5 py-0.5 text-[10px] font-black ${origin.chip}`}
+          title={origin.hint}
+        >
+          {origin.label}
+        </span>
+      </div>
+
+      <p className="text-sm text-zinc-400 mt-1 line-clamp-2 leading-snug">{task.objective}</p>
+
+      <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+        {task.phases.map((p) => {
+          const meta = PHASE_META[p] ?? PHASE_META.OFFENSIVE;
+          return (
+            <span
+              key={p}
+              className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${meta.chip}`}
+            >
+              {meta.label}
+            </span>
+          );
+        })}
+        <span
+          className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold inline-flex items-center gap-1 ${intensity.chip}`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${intensity.dot}`} aria-hidden />
+          {intensity.label}
+        </span>
+        <span className="rounded-md bg-zinc-800 px-1.5 py-0.5 text-[10px] font-bold text-zinc-300 inline-flex items-center gap-1">
+          <Clock className="w-3 h-3" aria-hidden /> {task.durationMin}′
+        </span>
+        <span className="rounded-md bg-zinc-800 px-1.5 py-0.5 text-[10px] font-bold text-zinc-300 inline-flex items-center gap-1">
+          <Users className="w-3 h-3" aria-hidden />
+          {task.playersMin}
+          {task.playersMax ? `–${task.playersMax}` : "+"}
+        </span>
+      </div>
+
+      {task.recipes.length > 0 ? (
+        <div className="flex items-center flex-wrap gap-1.5 mt-2">
+          <Network className="w-3.5 h-3.5 text-amber-300/80" aria-hidden />
+          {topRecipes.map((r) => {
+            const rel = RELEVANCE_META[r.relevance] ?? RELEVANCE_META[2];
+            return (
+              <span
+                key={r.subPrincipleId}
+                className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold max-w-[45%] truncate ${rel.chip}`}
+                title={`${rel.label}: ${r.spName}`}
+              >
+                {r.spName}
+              </span>
+            );
+          })}
+          {task.recipes.length > topRecipes.length && (
+            <span className="text-[10px] font-bold text-zinc-500">
+              +{task.recipes.length - topRecipes.length}
+            </span>
+          )}
+        </div>
+      ) : (
+        <p className="text-[10px] text-zinc-600 mt-2 font-semibold">
+          Sin recetas — el motor no la prescribirá todavía
+        </p>
+      )}
+
+      {task.usageCount > 0 && (
+        <p className="text-[10px] text-emerald-300/80 mt-1.5 font-semibold">
+          Prescrita {task.usageCount} vez{task.usageCount > 1 ? "es" : ""} por el motor
+        </p>
+      )}
+    </button>
+  );
+}
+
+// ---------- Pestaña: catálogo + filtros ----------
+
+export function TasksTab({
+  data,
+  onOpenTask,
+  onNewTask,
+}: {
+  data: LibraryData;
+  onOpenTask: (t: TaskCard) => void;
+  onNewTask: () => void;
+}) {
+  const [q, setQ] = useState("");
+  const [phase, setPhase] = useState("ALL");
+  const [intensity, setIntensity] = useState("ALL");
+  const [origin, setOrigin] = useState<"ALL" | "cathedral" | "club">("ALL");
+
+  const filtered = useMemo(() => {
+    const query = normalizeName(q);
+    return data.tasks.filter((t) => {
+      if (phase !== "ALL" && !t.phases.includes(phase)) return false;
+      if (intensity !== "ALL" && t.intensity !== intensity) return false;
+      if (origin === "cathedral" && t.clubId !== null) return false;
+      if (origin === "club" && t.clubId === null) return false;
+      if (query && !normalizeName(`${t.title} ${t.objective}`).includes(query)) return false;
+      return true;
+    });
+  }, [data.tasks, q, phase, intensity, origin]);
+
+  const chip = (active: boolean) =>
+    `shrink-0 min-h-[44px] px-3.5 py-2 rounded-full border text-sm font-bold transition ${
+      active
+        ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300"
+        : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+    }`;
+
+  return (
+    <div className="space-y-4">
+      {/* Búsqueda */}
+      <div className="relative">
+        <Search
+          className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2"
+          aria-hidden
+        />
+        <Input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Buscar tarea u objetivo…"
+          aria-label="Buscar tareas"
+          className="min-h-[48px] pl-10 rounded-2xl bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+        />
+      </div>
+
+      {/* Filtros: fase */}
+      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <button onClick={() => setPhase("ALL")} aria-pressed={phase === "ALL"} className={chip(phase === "ALL")}>
+          Todas las fases
+        </button>
+        {PHASE_ORDER.map((p) => {
+          const meta = PHASE_META[p];
+          return (
+            <button key={p} onClick={() => setPhase(p)} aria-pressed={phase === p} className={chip(phase === p)}>
+              {meta.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Filtros: intensidad + origen */}
+      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <button onClick={() => setIntensity("ALL")} aria-pressed={intensity === "ALL"} className={chip(intensity === "ALL")}>
+          Toda intensidad
+        </button>
+        {(["LOW", "MEDIUM", "HIGH"] as const).map((i) => (
+          <button key={i} onClick={() => setIntensity(i)} aria-pressed={intensity === i} className={chip(intensity === i)}>
+            {INTENSITY_META[i].label}
+          </button>
+        ))}
+        <span className="w-px bg-zinc-800 shrink-0" aria-hidden />
+        <button
+          onClick={() => setOrigin("cathedral")}
+          aria-pressed={origin === "cathedral"}
+          className={chip(origin === "cathedral")}
+        >
+          Cátedra
+        </button>
+        <button onClick={() => setOrigin("club")} aria-pressed={origin === "club"} className={chip(origin === "club")}>
+          Mi club
+        </button>
+      </div>
+
+      {/* Catálogo */}
+      <section
+        aria-label="Catálogo de tareas"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+      >
+        {filtered.length === 0 ? (
+          <div className="col-span-full rounded-3xl border border-dashed border-zinc-800 px-6 py-10 text-center">
+            <p className="text-zinc-500">
+              No hay tareas con estos filtros.{" "}
+              <span className="text-zinc-400">
+                Crea una nueva con el botón «+ Tarea» de la cabecera.
+              </span>
+            </p>
+            <Button
+              onClick={onNewTask}
+              className="mt-4 min-h-[48px] rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black"
+            >
+              Crear la primera tarea del club
+            </Button>
+          </div>
+        ) : (
+          filtered.map((t) => <TaskCardItem key={t.id} task={t} onOpen={onOpenTask} />)
+        )}
+      </section>
+    </div>
+  );
+}
+
+// ---------- Hoja de detalle: FICHA COMPLETA ----------
+
+function MetaBox({
+  icon: Icon,
+  label,
+  value,
+  hint,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-zinc-800/50 px-3 py-2.5">
+      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
+        <Icon className="w-3.5 h-3.5" aria-hidden /> {label}
+      </p>
+      <p className="text-sm font-black text-zinc-100 mt-1">{value}</p>
+      {hint && <p className="text-[11px] text-zinc-500 mt-0.5 leading-tight">{hint}</p>}
+    </div>
+  );
+}
+
+function ChipList({ title, items, numbered }: { title: string; items: string[]; numbered?: boolean }) {
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">{title}</p>
+      <ul className="space-y-1">
+        {items.map((it, i) => (
+          <li key={it} className="flex gap-2 text-sm text-zinc-300 leading-snug">
+            {numbered ? (
+              <span className="shrink-0 w-5 h-5 rounded-md bg-zinc-800 text-[11px] font-black text-amber-300 flex items-center justify-center">
+                {i + 1}
+              </span>
+            ) : (
+              <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-emerald-400/70 mt-2" aria-hidden />
+            )}
+            {it}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function TaskDetailSheet({
+  task,
+  onClose,
+  onEdit,
+}: {
+  task: TaskCard | null;
+  onClose: () => void;
+  onEdit: (t: TaskCard) => void;
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [busy, startTransition] = useTransition();
+  const { toast } = useToast();
+  const router = useRouter();
+
+  const isClub = task ? task.clubId !== null : false;
+  const origin = task ? (isClub ? ORIGIN_META.club : ORIGIN_META.cathedral) : ORIGIN_META.cathedral;
+  const OriginIcon = origin.icon;
+
+  function runDuplicate() {
+    if (!task) return;
+    startTransition(async () => {
+      const res = await duplicateTaskToClub(task.id);
+      if (res.ok) {
+        toast({
+          title: "Tarea duplicada a tu club",
+          description: "Ya puedes editarla sin tocar la Cátedra.",
+          duration: 2200,
+        });
+        router.refresh();
+        onClose();
+      } else {
+        toast({ title: "No se pudo duplicar", description: res.error, duration: 5000 });
+      }
+    });
+  }
+
+  function runDelete() {
+    if (!task) return;
+    startTransition(async () => {
+      const res = await deleteTask(task.id);
+      if (res.ok) {
+        toast({ title: "Tarea eliminada", description: task.title, duration: 2000 });
+        router.refresh();
+        setConfirmDelete(false);
+        onClose();
+      } else {
+        toast({ title: "No se pudo eliminar", description: res.error, duration: 5000 });
+        setConfirmDelete(false);
+      }
+    });
+  }
+
+  return (
+    <Sheet open={!!task} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent
+        side="bottom"
+        className="bg-zinc-900 border-zinc-800 rounded-t-3xl max-h-[94vh] overflow-y-auto px-4 pb-8 pt-2"
+      >
+        {task && (
+          <>
+            <SheetHeader className="text-left pb-1">
+              <div className="flex items-start justify-between gap-2">
+                <SheetTitle className="text-xl font-black text-zinc-50 leading-snug">
+                  {task.title}
+                </SheetTitle>
+              </div>
+              <SheetDescription className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-black ${origin.chip}`}
+                  title={origin.hint}
+                >
+                  <OriginIcon className="w-3.5 h-3.5" aria-hidden /> {origin.label}
+                </span>
+                {task.phases.map((p) => {
+                  const meta = PHASE_META[p] ?? PHASE_META.OFFENSIVE;
+                  return (
+                    <span
+                      key={p}
+                      className={`rounded-lg border px-2 py-0.5 text-[11px] font-black ${meta.chip}`}
+                    >
+                      {meta.label}
+                    </span>
+                  );
+                })}
+                {task.createdByName && (
+                  <span className="text-xs text-zinc-500">· creada por {task.createdByName}</span>
+                )}
+              </SheetDescription>
+            </SheetHeader>
+
+            <p className="text-sm text-zinc-300 leading-relaxed mt-1">{task.objective}</p>
+
+            {/* Metadatos de ingeniería */}
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <MetaBox
+                icon={Ruler}
+                label="ESPACIO"
+                value={
+                  task.spaceLengthM
+                    ? `${task.spaceLengthM} × ${task.spaceWidthM ?? "?"} m`
+                    : "Libre"
+                }
+                hint={task.spaceNote ?? undefined}
+              />
+              <MetaBox
+                icon={Users}
+                label="JUGADORES"
+                value={`${task.playersMin}${task.playersMax ? `–${task.playersMax}` : "+"}`}
+              />
+              <MetaBox
+                icon={Clock}
+                label="DURACIÓN"
+                value={`${task.durationMin} min`}
+                hint={task.repetitions ?? undefined}
+              />
+              <MetaBox
+                icon={CalendarClock}
+                label="INTENSIDAD"
+                value={INTENSITY_META[task.intensity]?.label ?? task.intensity}
+                hint={
+                  task.intensity === "LOW"
+                    ? "Ideal con fatiga alta"
+                    : task.intensity === "HIGH"
+                      ? "El motor la evita si hay fatiga ≥ 7"
+                      : undefined
+                }
+              />
+            </div>
+
+            {/* Conocimiento entrenable */}
+            <div className="space-y-4 mt-5 rounded-3xl bg-zinc-800/30 border border-zinc-800 p-4">
+              <ChipList title="Reglas de provocación" items={task.rulesOfProvocation} numbered />
+              <ChipList title="Puntos de co-achéo" items={task.coachingPoints} />
+              <ChipList title="Materiales" items={task.materials} />
+              {task.diagramUrl && (
+                <p className="text-xs">
+                  <a
+                    href={task.diagramUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-emerald-300 underline underline-offset-2 break-all"
+                  >
+                    Ver diagrama de la tarea ↗
+                  </a>
+                </p>
+              )}
+            </div>
+
+            {/* Recetas: conexión bidireccional con la taxonomía */}
+            <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mt-5 mb-2">
+              Recetas — subprincipios que aborda
+            </p>
+            {task.recipes.length > 0 ? (
+              <ul className="space-y-2">
+                {[...task.recipes]
+                  .sort((a, b) => b.relevance - a.relevance)
+                  .map((r) => {
+                    const rel = RELEVANCE_META[r.relevance] ?? RELEVANCE_META[2];
+                    const pMeta = PHASE_META[r.spPhase] ?? PHASE_META.OFFENSIVE;
+                    return (
+                      <li
+                        key={r.subPrincipleId}
+                        className="rounded-2xl bg-zinc-800/50 border border-zinc-800 px-3 py-2.5"
+                      >
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`rounded-md border px-1.5 py-0.5 text-[10px] font-black ${rel.chip}`}
+                            title={rel.hint}
+                          >
+                            {r.relevance} · {rel.label}
+                          </span>
+                          <p className="text-sm font-bold text-zinc-100 flex-1 min-w-[50%]">
+                            {r.spName}
+                          </p>
+                          <span
+                            className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${pMeta.chip}`}
+                          >
+                            {pMeta.label}
+                          </span>
+                        </div>
+                        {r.usageNote && (
+                          <p className="text-xs italic text-zinc-400 mt-1.5 leading-snug">
+                            «{r.usageNote}»
+                          </p>
+                        )}
+                      </li>
+                    );
+                  })}
+              </ul>
+            ) : (
+              <p className="rounded-2xl border border-dashed border-zinc-700 px-4 py-3 text-sm text-zinc-500">
+                Esta tarea no está conectada a la taxonomía. El motor solo prescribe tareas con
+                recetas — {isClub ? "edítala y añade sus subprincipios." : "duplica a tu club y conéctala."}
+              </p>
+            )}
+
+            {/* Trazabilidad */}
+            {task.usageCount > 0 && (
+              <p className="text-xs text-emerald-300/80 mt-3 font-semibold">
+                ✓ Prescrita {task.usageCount} vez{task.usageCount > 1 ? "es" : ""} en microciclos del
+                motor (trazabilidad completa).
+              </p>
+            )}
+
+            {/* Acciones */}
+            <div className="mt-5 space-y-2">
+              {isClub ? (
+                <>
+                  <Button
+                    onClick={() => onEdit(task)}
+                    className="w-full min-h-[52px] rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black"
+                  >
+                    <PenLine className="w-5 h-5" aria-hidden /> Editar ficha
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setConfirmDelete(true)}
+                    disabled={busy}
+                    className="w-full min-h-[48px] rounded-2xl border-zinc-700 bg-zinc-950 text-rose-300 hover:bg-rose-500/10 hover:text-rose-300 font-bold"
+                  >
+                    <Trash2 className="w-4 h-4" aria-hidden /> Eliminar tarea
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  onClick={runDuplicate}
+                  disabled={busy}
+                  className="w-full min-h-[52px] rounded-2xl bg-violet-500/90 hover:bg-violet-400 text-zinc-950 font-black"
+                >
+                  {busy ? (
+                    <Loader2 className="w-5 h-5 animate-spin" aria-hidden />
+                  ) : (
+                    <>
+                      <CopyPlus className="w-5 h-5" aria-hidden /> Duplicar a mi club para
+                      personalizar
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+
+            <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+              <AlertDialogContent className="bg-zinc-900 border-zinc-800 rounded-3xl max-w-sm mx-auto">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-zinc-50">
+                    ¿Eliminar «{task.title}»?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="text-zinc-400">
+                    Se desconectarán sus recetas. Si el motor la prescribió en algún microciclo,
+                    el histórico se conserva y la eliminación quedará bloqueada.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="flex-row gap-2">
+                  <AlertDialogCancel className="rounded-2xl border-zinc-700 bg-zinc-950 text-zinc-200 mt-0">
+                    Cancelar
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(e) => {
+                      e.preventDefault();
+                      runDelete();
+                    }}
+                    className="rounded-2xl bg-rose-500 text-white hover:bg-rose-400 mt-0"
+                  >
+                    {busy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : "Eliminar"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}

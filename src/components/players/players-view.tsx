@@ -12,6 +12,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Loader2, Minus, Plus, UserCog } from "lucide-react";
+import type { PlayerStatus } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -188,7 +189,7 @@ export function PlayersView({
       ),
     );
     const patch = {
-      status: draft.status,
+      status: draft.status as PlayerStatus,
       technicalRating: draft.technicalRating,
       tacticalRating: draft.tacticalRating,
       physicalRating: draft.physicalRating,

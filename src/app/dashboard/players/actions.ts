@@ -11,7 +11,7 @@
 
 import { revalidatePath } from "next/cache";
 import * as XLSX from "xlsx";
-import type { PlayerStatus } from "@prisma/client";
+import type { PlayerStatus, Position } from "@prisma/client";
 import { requireTenantContext } from "@/lib/session";
 import { normalizeName, normalizePosition } from "@/lib/taxonomy";
 
@@ -311,8 +311,8 @@ export async function importSquadFile(
             firstName,
             lastName,
             ...(shirtNumber !== null ? { shirtNumber } : {}),
-            mainPosition,
-            secondaryPositions: secondary,
+            mainPosition: mainPosition as Position,
+            secondaryPositions: secondary as Position[],
             ...(technical !== null ? { technicalRating: technical } : {}),
             ...(tactical !== null ? { tacticalRating: tactical } : {}),
             ...(physical !== null ? { physicalRating: physical } : {}),
@@ -330,8 +330,8 @@ export async function importSquadFile(
             firstName,
             lastName,
             shirtNumber,
-            mainPosition,
-            secondaryPositions: secondary,
+            mainPosition: mainPosition as Position,
+            secondaryPositions: secondary as Position[],
             technicalRating: technical,
             tacticalRating: tactical,
             physicalRating: physical,

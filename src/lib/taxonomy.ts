@@ -8,13 +8,17 @@
 import {
   Cloud,
   Crosshair,
+  FastForward,
+  Flag,
   Goal,
   Hand,
   HeartPulse,
+  Landmark,
   Shield,
   ShieldAlert,
   Swords,
   TrendingDown,
+  Users,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -199,3 +203,122 @@ export function normalizeName(s: string): string {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 }
+
+// ============================================================================
+// PILAR 1 — BIBLIOTECA DE SABIDURÍA (CÁTEDRA)
+// ============================================================================
+
+/** Orden canónico de las 5 fases del juego en toda la biblioteca */
+export const PHASE_ORDER: string[] = [
+  "OFFENSIVE",
+  "DEFENSIVE",
+  "OFF_TRANSITION",
+  "DEF_TRANSITION",
+  "SET_PIECE",
+];
+
+export const PHASE_META: Record<
+  string,
+  { label: string; icon: LucideIcon; chip: string; solid: string; desc: string }
+> = {
+  OFFENSIVE: {
+    label: "Organización Ofensiva",
+    icon: Swords,
+    chip: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+    solid: "text-emerald-300",
+    desc: "Ataque posicional: creación y ocupación de espacios con el balón.",
+  },
+  DEFENSIVE: {
+    label: "Organización Defensiva",
+    icon: Shield,
+    chip: "bg-sky-500/15 text-sky-300 border-sky-500/40",
+    solid: "text-sky-300",
+    desc: "Bloque coordinado: compactación, coberturas y presión.",
+  },
+  OFF_TRANSITION: {
+    label: "Transición Ofensiva",
+    icon: Zap,
+    chip: "bg-amber-500/15 text-amber-300 border-amber-500/40",
+    solid: "text-amber-300",
+    desc: "Pérdida → reacción inmediata: verticalidad en los 5 segundos.",
+  },
+  DEF_TRANSITION: {
+    label: "Transición Defensiva",
+    icon: FastForward,
+    chip: "bg-violet-500/15 text-violet-300 border-violet-500/40",
+    solid: "text-violet-300",
+    desc: "Recuperación → progresión: counter-pressing y repliegue organizado.",
+  },
+  SET_PIECE: {
+    label: "Balón Parado (ABP)",
+    icon: Flag,
+    chip: "bg-zinc-500/15 text-zinc-300 border-zinc-500/40",
+    solid: "text-zinc-300",
+    desc: "Córners, tiros libres y saques: rutinas de ataque y defensa.",
+  },
+};
+
+/** Relevancia de la "receta" (TaskSubPrinciple): ponderación 1-3 del motor */
+export const RELEVANCE_META: Record<
+  number,
+  { label: string; hint: string; chip: string; btn: string }
+> = {
+  3: {
+    label: "Núcleo",
+    hint: "La corrige de forma directa — primera opción del motor",
+    chip: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+    btn: "bg-emerald-500/20 border-emerald-500/60 text-emerald-200",
+  },
+  2: {
+    label: "Refuerza",
+    hint: "Trabaja el objetivo de forma secundaria",
+    chip: "bg-amber-500/15 text-amber-300 border-amber-500/40",
+    btn: "bg-amber-500/20 border-amber-500/60 text-amber-200",
+  },
+  1: {
+    label: "Apoyo",
+    hint: "Conexión periférica / calentamiento",
+    chip: "bg-zinc-500/15 text-zinc-300 border-zinc-600",
+    btn: "bg-zinc-700/40 border-zinc-500/60 text-zinc-200",
+  },
+};
+
+export const INTENSITY_META: Record<
+  string,
+  { label: string; chip: string; dot: string }
+> = {
+  LOW: {
+    label: "Suave",
+    chip: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+    dot: "bg-emerald-400",
+  },
+  MEDIUM: {
+    label: "Media",
+    chip: "bg-amber-500/15 text-amber-300 border-amber-500/40",
+    dot: "bg-amber-400",
+  },
+  HIGH: {
+    label: "Alta",
+    chip: "bg-rose-500/15 text-rose-300 border-rose-500/40",
+    dot: "bg-rose-400",
+  },
+};
+
+/** Origen del contenido de la biblioteca: Cátedra global vs. club */
+export const ORIGIN_META: Record<
+  "cathedral" | "club",
+  { label: string; hint: string; chip: string; icon: LucideIcon }
+> = {
+  cathedral: {
+    label: "Cátedra",
+    hint: "Contenido oficial de la plataforma — solo lectura · duplica para personalizar",
+    chip: "bg-violet-500/15 text-violet-300 border-violet-500/40",
+    icon: Landmark,
+  },
+  club: {
+    label: "Mi club",
+    hint: "Contenido propio del club — editable por el cuerpo técnico",
+    chip: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+    icon: Users,
+  },
+};

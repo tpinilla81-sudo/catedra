@@ -5,11 +5,12 @@
 // pendiente" en Partidos. Server Component: el badge se calcula en el servidor.
 // ============================================================================
 import Link from "next/link";
-import { CalendarDays, Home, Users } from "lucide-react";
+import { BookOpen, CalendarDays, Home, Users } from "lucide-react";
 import { requireTenantContext } from "@/lib/session";
 
 const ITEMS = [
   { key: "today", href: "/dashboard/today", label: "Hoy", icon: Home },
+  { key: "library", href: "/dashboard/library", label: "Biblioteca", icon: BookOpen },
   { key: "players", href: "/dashboard/players", label: "Plantilla", icon: Users },
   { key: "matches", href: "/dashboard/matches", label: "Partidos", icon: CalendarDays },
 ] as const;
@@ -33,7 +34,7 @@ export async function AppNav({ active }: { active: AppNavKey }) {
       aria-label="Navegación principal"
       className="fixed bottom-0 inset-x-0 z-30 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/80 pb-[env(safe-area-inset-bottom)]"
     >
-      <div className="mx-auto max-w-5xl grid grid-cols-3">
+      <div className="mx-auto max-w-5xl grid grid-cols-4">
         {ITEMS.map((item) => {
           const Icon = item.icon;
           const isActive = item.key === active;

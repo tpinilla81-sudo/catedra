@@ -30,7 +30,6 @@ const CLUB_SCOPED = new Set([
   "TeamPulse",
   "Match",
   "Microcycle",
-  "DiagnosisIssue",
   "EngineRun",
 ]);
 
@@ -44,6 +43,8 @@ const RELATION_SCOPES: Record<string, (clubId: string) => Row> = {
   PlayerMatchNote: (c) => ({ report: { match: { clubId: c } } }),
   Session: (c) => ({ microcycle: { clubId: c } }),
   SessionTask: (c) => ({ session: { microcycle: { clubId: c } } }),
+  // DiagnosisIssue no lleva clubId propio: cuelga de Microcycle (del tenant)
+  DiagnosisIssue: (c) => ({ microcycle: { clubId: c } }),
   MicrocycleMatch: (c) => ({
     OR: [{ microcycle: { clubId: c } }, { match: { clubId: c } }],
   }),

@@ -10,7 +10,7 @@
 // Cadena: TacticalEvent + TeamPulse + Player → IssueDraft[] → DiagnosisIssue
 // ============================================================================
 import { addDays, startOfWeek, subDays } from "date-fns";
-import type { Match, TeamPulse } from "@prisma/client";
+import type { Match, PrismaClient, TeamPulse } from "@prisma/client";
 
 type EventLike = { type: string; x: number };
 
@@ -25,17 +25,14 @@ export type IssueDraft = {
   metric: Record<string, unknown>;
 };
 
-type DiagnoseDb = {
-  teamPulse: {
-    findFirst: (args: Record<string, unknown>) => Promise<TeamPulse | null>;
-  };
-  match: {
-    findMany: (args: Record<string, unknown>) => Promise<MatchWithReport[]>;
-  };
-  subPrinciple: {
-    findFirst: (args: Record<string, unknown>) => Promise<{ id: string } | null>;
-  };
-};
+/**
+ * Delegados Prisma que consume el motor. Usar Pick<> sobre PrismaClient hace
+ * que el cliente real (con o sin Tenant Guard) sea asignable estructuralmente.
+ */
+export type DiagnoseDb = Pick<
+  PrismaClient,
+  "teamPulse" | "match" | "subPrinciple" | "microcycle" | "diagnosisIssue"
+>;
 
 export type EngineInputs = {
   pulse: TeamPulse | null;
@@ -163,19 +160,7 @@ export async function buildIssueDrafts(
  * refleje lo ocurrido en el campo. Los planes ACCEPTED/ADJUSTED se respetan.
  */
 export async function refreshProposalsWithNewEvidence(
-  db: DiagnoseDb & {
-    microcycle: {
-      findUnique: (args: Record<string, unknown>) => Promise<
-        | (Record<string, unknown> & { id: string; status: string; weekStart: Date })
-        | null
-      >;
-      update: (args: Record<string, unknown>) => Promise<unknown>;
-    };
-    diagnosisIssue: {
-      deleteMany: (args: Record<string, unknown>) => Promise<unknown>;
-      createMany: (args: Record<string, unknown>) => Promise<unknown>;
-    };
-  },
+  db: DiagnoseDb,
   teamId: string,
   kickoffAt: Date,
 ): Promise<{ refreshedWeeks: string[]; evidences: string[] }> {
@@ -245,7 +230,7 @@ export async function refreshProposalsWithNewEvidence(
  * Se recalcula al guardar cada ingesta para que el Pulso esté vivo.
  */
 export async function computeResultsStreak(
-  db: { match: { findMany: (args: Record<string, unknown>) => Promise<Match[]> } },
+  db: Pick<PrismaClient, "match">,
   teamId: string,
 ): Promise<number> {
   const matches = await db.match.findMany({
