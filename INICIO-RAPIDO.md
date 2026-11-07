@@ -56,6 +56,7 @@ Copia `.env.example` a `.env` si quieres personalizar algo:
 | Síntoma | Solución |
 |---|---|
 | `Can't reach database server at localhost:5432` | Lanza `npm run local:up` y revisa `pg.log`. El primer arranque puede tardar unos segundos |
+| `Failed to load external module @prisma/client-…` | Caché de Turbopack apuntando a un cliente Prisma regenerado: `rm -rf .next` y repite `npm run dev` |
 | Puerto 5432 ocupado por otro Postgres | Cambia el `port` en `scripts/dev-postgres.mjs` y tu `DATABASE_URL` al mismo puerto |
 | La app pide regenerar el cliente Prisma | `npm run db:generate` |
 | Reset total de la base | para PG y borra la carpeta `.pgdata/`; vuelve a lanzar `npm run dev` + `db:push` + `db:seed` |
