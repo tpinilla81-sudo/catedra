@@ -10,9 +10,13 @@
 //                       y persiste la auditoría completa en EngineRun.
 // setActiveTeam       → persistencia del último equipo activo (fricción cero).
 // Regla de oro: cero pantallas en blanco — el lunes SIEMPRE hay propuesta.
+// Resiliencia (auditoría forense): el pipeline corre en UNA transacción y el
+// P2002 de una carrera TOCTOU (dos dispositivos cocinando a la vez) se captura
+// aquí y en el propio pipeline: se responde created:false, nunca un 500.
 // ============================================================================
 
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { requireTenantContext } from "@/lib/session";
 import { mondayOf } from "@/lib/engine/diagnose";
 import { runWeeklyProposalPipeline } from "@/lib/engine/pipeline";
@@ -56,21 +60,53 @@ export async function setActiveTeam(teamId: string) {
  */
 export async function ensureWeeklyProposal() {
   const { db, team } = await requireTenantContext();
+  const weekStart = currentWeekStart();
 
-  const result = await runWeeklyProposalPipeline(db, {
-    clubId: team.clubId,
-    teamId: team.id,
-    weekStart: currentWeekStart(),
-  });
+  try {
+    const result = await runWeeklyProposalPipeline(db, {
+      clubId: team.clubId,
+      teamId: team.id,
+      weekStart,
+    });
 
-  revalidatePath("/dashboard/today");
-  revalidatePath("/");
-  return {
-    ok: true,
-    created: result.created,
-    microcycleId: result.microcycleId,
-    runId: result.runId,
-    prescriptions: result.prescriptions.length,
-    discarded: result.discarded.length,
-  };
+    revalidatePath("/dashboard/today");
+    revalidatePath("/");
+    return {
+      ok: true,
+      created: result.created,
+      microcycleId: result.microcycleId,
+      runId: result.runId,
+      prescriptions: result.prescriptions.length,
+      discarded: result.discarded.length,
+    };
+  } catch (e) {
+    // Red de seguridad adicional: el pipeline ya convierte la carrera P2002
+    // en created:false; si por cualquier otra vía escapara un P2002 (o llegara
+    // otro error), se degrada a una respuesta controlada — sin 500 sin capturar.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      const existing = await db.microcycle.findUnique({
+        where: { teamId_weekStart: { teamId: team.id, weekStart } },
+        select: { id: true },
+      });
+      revalidatePath("/dashboard/today");
+      return {
+        ok: true,
+        created: false,
+        microcycleId: existing?.id ?? null,
+        runId: null,
+        prescriptions: 0,
+        discarded: 0,
+      };
+    }
+    console.error("[ensureWeeklyProposal] fallo del motor:", e);
+    return {
+      ok: false,
+      created: false,
+      microcycleId: null,
+      runId: null,
+      prescriptions: 0,
+      discarded: 0,
+      error: e instanceof Error ? e.message.slice(0, 140) : "Error del motor.",
+    };
+  }
 }

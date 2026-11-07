@@ -310,7 +310,10 @@ model Match {
 model MatchReport {
   id                 String    @id @default(cuid())
   matchId            String    @unique
-  createdById        String
+  /// Autor de la ingesta. Opcional + SetNull: si se borra el usuario (o el
+  /// club en cascada), el informe y su eventing sobreviven sin bloquear la
+  /// FK (auditoría forense: RESTRICT impedía cualquier purga de usuarios).
+  createdById        String?
   sensation          Semaphore /// Semáforo global: cómo quedó el grupo (1 toque)
   perceivedLoad      Int /// Slider 1-10: carga percibida del grupo
   collectiveAttitude Int /// Slider 1-10: actitud y compromiso colectivo
@@ -320,7 +323,7 @@ model MatchReport {
   createdAt          DateTime  @default(now())
 
   match       Match             @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  createdBy   User              @relation("ReportAuthor", fields: [createdById], references: [id])
+  createdBy   User?             @relation("ReportAuthor", fields: [createdById], references: [id], onDelete: SetNull)
   events      TacticalEvent[] /// Eventing táctico (pizarra de campo interactiva)
   playerNotes PlayerMatchNote[] /// Cuaderno de notas individual
 

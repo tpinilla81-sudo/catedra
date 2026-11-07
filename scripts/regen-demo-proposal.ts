@@ -3,11 +3,11 @@
 import { PrismaClient } from "@prisma/client";
 import { startOfWeek } from "date-fns";
 import { createTenantClient } from "../src/lib/tenant";
-import { runWeeklyProposalPipeline, type PipelineDb } from "../src/lib/engine/pipeline";
+import { runWeeklyProposalPipeline } from "../src/lib/engine/pipeline";
 
 const raw = new PrismaClient({ datasources: { db: { url: "postgresql://postgres:postgres@localhost:5432/metodo" } } });
 const clubA = await raw.club.findUniqueOrThrow({ where: { slug: "cf-metodo" } });
-const dbA = createTenantClient(clubA.id) as unknown as PipelineDb;
+const dbA = createTenantClient(clubA.id) as unknown as PrismaClient;
 
 const team = await raw.team.findUniqueOrThrow({ where: { id: "cmw638dvj0008vc5j50ojth19" } }); // Primer Equipo
 const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });

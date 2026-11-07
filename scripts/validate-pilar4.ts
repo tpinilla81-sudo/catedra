@@ -23,7 +23,6 @@ import {
   runWeeklyProposalPipeline,
   refreshProposalEvidence,
   ENGINE_VERSION,
-  type PipelineDb,
 } from "../src/lib/engine/pipeline";
 
 const PG = "postgresql://postgres:postgres@localhost:5432/metodo";
@@ -49,7 +48,7 @@ const raw = new PrismaClient({ datasources: { db: { url: PG } } });
 // ---------- Contexto ----------
 const clubA = await raw.club.findUniqueOrThrow({ where: { slug: "cf-metodo" } });
 const coach = await raw.user.findUniqueOrThrow({ where: { email: "mister@cfmetodo.es" } });
-const dbA = createTenantClient(clubA.id) as unknown as PipelineDb;
+const dbA = createTenantClient(clubA.id) as unknown as PrismaClient;
 
 const mondayThisWeek = startOfWeek(new Date(), { weekStartsOn: 1 });
 

@@ -20,7 +20,7 @@
 //   • scripts/validate-pilar4.ts (validación E2E)
 // ============================================================================
 import { addDays, subDays } from "date-fns";
-import type { GamePhase, PrismaClient } from "@prisma/client";
+import { Prisma, type GamePhase, type PrismaClient } from "@prisma/client";
 import {
   buildIssueDrafts,
   collectInputs,
@@ -51,7 +51,7 @@ export type DiscardedCandidate = {
   reason: string;
 };
 
-/** Delegados Prisma que consume el pipeline (compatibles con el Tenant Guard) */
+/** Delegados Prisma que consumen el diagnóstico y la prescripción (compatibles con el Tenant Guard) */
 export type PipelineDb = Pick<
   PrismaClient,
   | "teamPulse"
@@ -67,7 +67,20 @@ export type PipelineDb = Pick<
   | "engineRun"
 >;
 
+/**
+ * Orquestador del pipeline: PipelineDb + $transaction. El TransactionClient
+ * que recibe el callback cumple PipelineDb (los helpers no abren tx propias).
+ */
+export type PipelineRunnerDb = PipelineDb & Pick<PrismaClient, "$transaction">;
+
 export const ENGINE_VERSION = "v0.2-prescriptive";
+
+/**
+ * El pipeline completo corre en UNA transacción interactiva: diagnóstico,
+ * prescripción, microciclo, trazabilidad y EngineRun se escriben todos o
+ * ninguno (sin estados intermedios si algo falla a mitad de cocina).
+ */
+const TX_OPTS = { timeout: 20_000, maxWait: 10_000 } as const;
 
 const INTENSITY_ORDER: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
 
@@ -187,10 +200,17 @@ async function rankPhaseCandidates(
   db: PipelineDb,
   phase: string,
 ): Promise<CandidateRow[]> {
-  const sps = await db.subPrinciple.findMany({ where: { phase: phase as GamePhase }, select: { id: true } });
+  const sps = await db.subPrinciple.findMany({
+    where: { phase: phase as GamePhase },
+    select: { id: true },
+    // Determinismo: mismo pool de subprincipios en cada ejecución
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  });
   if (sps.length === 0) return [];
   const links = await db.taskSubPrinciple.findMany({
     where: { subPrincipleId: { in: sps.map((s) => s.id) } },
+    // Determinismo del dedupe por tarea (a igual relevancia gana el primero)
+    orderBy: [{ relevance: "desc" }, { id: "asc" }],
     include: {
       task: {
         select: { id: true, title: true, intensity: true, playersMin: true, playersMax: true, durationMin: true },
@@ -369,260 +389,289 @@ export type ProposalResult = {
  * Cocina el microciclo PROPOSED de `weekStart` desde los datos reales y
  * persiste la auditoría completa en EngineRun. Si ya existe un microciclo
  * para esa semana devuelve `created: false` sin tocar nada.
+ *
+ * TODO el pipeline corre en UNA transacción interactiva: si otro request
+ * concurrente cocina la misma semana (carrera TOCTOU), la constraint única
+ * (teamId, weekStart) lanza P2002 → la transacción perdedora se revierte
+ * entera y se devuelve `created: false` sin error 500 al usuario.
  */
 export async function runWeeklyProposalPipeline(
-  db: PipelineDb,
+  db: PipelineRunnerDb,
   args: { clubId: string; teamId: string; weekStart: Date },
 ): Promise<ProposalResult> {
   const t0 = Date.now();
   const { clubId, teamId, weekStart } = args;
 
-  const existing = await db.microcycle.findUnique({
-    where: { teamId_weekStart: { teamId, weekStart } },
-    select: { id: true },
-  });
-  if (existing) {
-    return {
-      created: false,
-      microcycleId: existing.id,
-      runId: null,
-      issuesCount: 0,
-      prescriptions: [],
-      discarded: [],
-      durationMs: null,
-    };
-  }
-
-  // ---------- 1) Entradas ----------
-  const inputs = await collectInputs(db, teamId, weekStart);
-  const pulse = inputs.pulse;
-  const recentMatches = inputs.matches;
-
-  const availablePlayers = await db.player.count({
-    where: { teamId, isActive: true, status: { in: ["AVAILABLE", "RETURNING"] } },
-  });
-
-  // ---------- 2) Diagnóstico (heurística compartida) ----------
-  const drafts = await buildIssueDrafts(db, teamId, inputs);
-  const last = recentMatches[0];
-
-  // ---------- 3) Prescripción con ranking + factibilidad ----------
-  const { prescriptions: rawRx, discarded } = await prescribeForIssues(db, drafts, {
-    availablePlayers,
-    fatigueScore: pulse?.fatigueScore ?? 5,
-  });
-
-  const auditRx: PrescriptionAudit[] = rawRx.map((p) => ({
-    issueEvidence: drafts[p.issueIndex].evidence,
-    issueKind: drafts[p.issueIndex].kind,
-    subPrincipleId: drafts[p.issueIndex].subPrincipleId ?? null,
-    taskId: p.taskId,
-    taskTitle: p.taskTitle,
-    relevance: p.relevance,
-    sessionLabel: "",
-    durationMin: p.durationMin,
-    rationale: p.rationale,
-  }));
-
-  // ---------- 4) Tareas de apoyo (MD+1 / MD-1) ----------
-  const recoveryTask = await db.task.findFirst({
-    where: { intensity: "LOW", phases: { has: "OFFENSIVE" } },
-    orderBy: { createdAt: "asc" },
-    select: { id: true, title: true },
-  });
-  const activationTask = await db.task.findFirst({
-    where: { intensity: { in: ["LOW", "MEDIUM"] }, phases: { has: "OFFENSIVE" } },
-    orderBy: { createdAt: "desc" },
-    select: { id: true, title: true },
-  });
-
-  // ---------- 5) Construcción del microciclo ----------
-  const tacticalDrafts = drafts.filter((d) => d.kind === "TACTICAL");
-  const day = (offset: number) => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + offset);
-    return d;
-  };
-
-  const directives = tacticalDrafts.length
-    ? tacticalDrafts.map((d) => `Corregir: ${d.evidence}`)
-    : ["Consolidar la identidad de juego de la semana"];
-
-  const summary = [
-    `Último partido: ${last ? `${last.isHome ? "casa" : "fuera"} vs ${last.opponent} (${last.goalsFor ?? 0}-${last.goalsAgainst ?? 0})` : "sin datos"}.`,
-    pulse ? `Vestuario: ánimo ${pulse.moraleScore}/10 · fatiga ${pulse.fatigueScore}/10.` : "",
-    `${availablePlayers} jugadores disponibles.`,
-    `Prioridad de la semana: ${directives[0]}.`,
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  const tacticalRx = rawRx.filter((p) => drafts[p.issueIndex].kind === "TACTICAL");
-
-  const microcycle = await db.microcycle.create({
-    data: {
-      clubId,
-      teamId,
-      weekStart,
-      status: "PROPOSED",
-      tacticalDirectives: directives,
-      methodologicalApproach: "Analítico-inductivo por proximidad, progresión a tareas globales",
-      diagnosisSummary: summary,
-      engineVersion: ENGINE_VERSION,
-      analyzedMatches: {
-        create: recentMatches.map((m) => ({ matchId: m.id })),
-      },
-      issues: {
-        create: drafts.map((d) => ({
-          subPrincipleId: d.subPrincipleId,
-          phase: d.phase,
-          kind: d.kind,
-          severity: d.severity,
-          evidence: d.evidence,
-          metric: d.metric as never,
-        })),
-      },
-      sessions: {
-        create: [
-          // MD+1 — Regeneración
-          {
-            date: day(1),
-            label: "MD+1",
-            objective: "Regeneración y asimilación del esfuerzo del partido",
-            durationMin: 50,
-            tasks: {
-              create: recoveryTask
-                ? [
-                    {
-                      order: 1,
-                      taskId: recoveryTask.id,
-                      durationMin: 40,
-                      rationale:
-                        (pulse?.fatigueScore ?? 5) >= 7
-                          ? "Fatiga alta: intensidad controlada para recuperar al grupo."
-                          : "Volumen bajo para asimilar el partido y mantener toque de balón.",
-                    },
-                  ]
-                : [],
-            },
-          },
-          // MD-3 — Sesión principal (táctica)
-          {
-            date: day(2),
-            label: "MD-3",
-            objective: tacticalDrafts[0]?.evidence ?? "Trabajo táctico principal",
-            durationMin: 80,
-            tasks: {
-              create: tacticalRx.slice(0, 2).map((p, idx) => ({
-                order: idx + 1,
-                taskId: p.taskId,
-                durationMin: p.durationMin,
-                rationale: p.rationale,
-              })),
-            },
-          },
-          // MD-2 — Consolidación
-          {
-            date: day(3),
-            label: "MD-2",
-            objective: "Consolidación + preparación del plan de partido",
-            durationMin: 70,
-            tasks: {
-              create: tacticalRx.slice(1, 2).map((p) => ({
-                order: 1,
-                taskId: p.taskId,
-                durationMin: p.durationMin,
-                rationale: p.rationale,
-              })),
-            },
-          },
-          // MD-1 — Activación pre-partido
-          {
-            date: day(4),
-            label: "MD-1",
-            objective: "Activación pre-partido: velocidad y automatismos",
-            durationMin: 45,
-            tasks: {
-              create: activationTask
-                ? [
-                    {
-                      order: 1,
-                      taskId: activationTask.id,
-                      durationMin: 35,
-                      rationale: "Activación neuromuscular previa al partido.",
-                    },
-                  ]
-                : [],
-            },
-          },
-        ],
-      },
-    },
-    include: { issues: true, sessions: { include: { tasks: true } } },
-  });
-
-  // ---------- 6) Trazabilidad hallazgo → tarea (prescribedIssueId) ----------
-  // La primera prescripción táctica entra en MD-3; la segunda aparece en MD-3
-  // (profundizar) Y en MD-2 (consolidar). Se enlaza el hallazgo en AMBAS.
-  const evidenceToIssue = new Map(microcycle.issues.map((iss) => [iss.evidence, iss.id]));
-  const md3 = microcycle.sessions.find((s) => s.label === "MD-3");
-  const md2 = microcycle.sessions.find((s) => s.label === "MD-2");
-  const sessionByLabel = { "MD-3": md3, "MD-2": md2 } as Record<string, typeof md3>;
-
-  for (const label of ["MD-3", "MD-2"] as const) {
-    const session = sessionByLabel[label];
-    if (!session) continue;
-    const forSession = label === "MD-3" ? tacticalRx.slice(0, 2) : tacticalRx.slice(1, 2);
-    for (const p of forSession) {
-      const draft = drafts[p.issueIndex];
-      const issueId = evidenceToIssue.get(draft.evidence);
-      const st = session.tasks.find(
-        (t) => t.taskId === p.taskId && t.rationale === p.rationale,
-      );
-      if (!st) continue;
-      await db.sessionTask.update({
-        where: { id: st.id },
-        data: { prescribedIssueId: issueId },
+  try {
+    return await db.$transaction(async (tx) => {
+      const existing = await tx.microcycle.findUnique({
+        where: { teamId_weekStart: { teamId, weekStart } },
+        select: { id: true },
       });
-      const audit = auditRx.find(
-        (a) => a.taskId === p.taskId && a.issueEvidence === draft.evidence,
-      );
-      if (audit && !audit.sessionLabel) audit.sessionLabel = label;
+      if (existing) {
+        return {
+          created: false,
+          microcycleId: existing.id,
+          runId: null,
+          issuesCount: 0,
+          prescriptions: [],
+          discarded: [],
+          durationMs: null,
+        };
+      }
+
+      // ---------- 1) Entradas ----------
+      const inputs = await collectInputs(tx, teamId, weekStart);
+      const pulse = inputs.pulse;
+      const recentMatches = inputs.matches;
+
+      const availablePlayers = await tx.player.count({
+        where: { teamId, isActive: true, status: { in: ["AVAILABLE", "RETURNING"] } },
+      });
+
+      // ---------- 2) Diagnóstico (heurística compartida) ----------
+      const drafts = await buildIssueDrafts(tx, teamId, inputs);
+      const last = recentMatches[0];
+
+      // ---------- 3) Prescripción con ranking + factibilidad ----------
+      const { prescriptions: rawRx, discarded } = await prescribeForIssues(tx, drafts, {
+        availablePlayers,
+        fatigueScore: pulse?.fatigueScore ?? 5,
+      });
+
+      const auditRx: PrescriptionAudit[] = rawRx.map((p) => ({
+        issueEvidence: drafts[p.issueIndex].evidence,
+        issueKind: drafts[p.issueIndex].kind,
+        subPrincipleId: drafts[p.issueIndex].subPrincipleId ?? null,
+        taskId: p.taskId,
+        taskTitle: p.taskTitle,
+        relevance: p.relevance,
+        sessionLabel: "",
+        durationMin: p.durationMin,
+        rationale: p.rationale,
+      }));
+
+      // ---------- 4) Tareas de apoyo (MD+1 / MD-1) ----------
+      const recoveryTask = await tx.task.findFirst({
+        where: { intensity: "LOW", phases: { has: "OFFENSIVE" } },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        select: { id: true, title: true },
+      });
+      const activationTask = await tx.task.findFirst({
+        where: { intensity: { in: ["LOW", "MEDIUM"] }, phases: { has: "OFFENSIVE" } },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: { id: true, title: true },
+      });
+
+      // ---------- 5) Construcción del microciclo ----------
+      const tacticalDrafts = drafts.filter((d) => d.kind === "TACTICAL");
+      const day = (offset: number) => {
+        const d = new Date(weekStart);
+        d.setDate(d.getDate() + offset);
+        return d;
+      };
+
+      const directives = tacticalDrafts.length
+        ? tacticalDrafts.map((d) => `Corregir: ${d.evidence}`)
+        : ["Consolidar la identidad de juego de la semana"];
+
+      const summary = [
+        `Último partido: ${last ? `${last.isHome ? "casa" : "fuera"} vs ${last.opponent} (${last.goalsFor ?? 0}-${last.goalsAgainst ?? 0})` : "sin datos"}.`,
+        pulse ? `Vestuario: ánimo ${pulse.moraleScore}/10 · fatiga ${pulse.fatigueScore}/10.` : "",
+        `${availablePlayers} jugadores disponibles.`,
+        `Prioridad de la semana: ${directives[0]}.`,
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      const tacticalRx = rawRx.filter((p) => drafts[p.issueIndex].kind === "TACTICAL");
+
+      const microcycle = await tx.microcycle.create({
+        data: {
+          clubId,
+          teamId,
+          weekStart,
+          status: "PROPOSED",
+          tacticalDirectives: directives,
+          methodologicalApproach: "Analítico-inductivo por proximidad, progresión a tareas globales",
+          diagnosisSummary: summary,
+          engineVersion: ENGINE_VERSION,
+          analyzedMatches: {
+            create: recentMatches.map((m) => ({ matchId: m.id })),
+          },
+          issues: {
+            create: drafts.map((d) => ({
+              subPrincipleId: d.subPrincipleId,
+              phase: d.phase,
+              kind: d.kind,
+              severity: d.severity,
+              evidence: d.evidence,
+              metric: d.metric as never,
+            })),
+          },
+          sessions: {
+            create: [
+              // MD+1 — Regeneración
+              {
+                date: day(1),
+                label: "MD+1",
+                objective: "Regeneración y asimilación del esfuerzo del partido",
+                durationMin: 50,
+                tasks: {
+                  create: recoveryTask
+                    ? [
+                        {
+                          order: 1,
+                          taskId: recoveryTask.id,
+                          durationMin: 40,
+                          rationale:
+                            (pulse?.fatigueScore ?? 5) >= 7
+                              ? "Fatiga alta: intensidad controlada para recuperar al grupo."
+                              : "Volumen bajo para asimilar el partido y mantener toque de balón.",
+                        },
+                      ]
+                    : [],
+                },
+              },
+              // MD-3 — Sesión principal (táctica)
+              {
+                date: day(2),
+                label: "MD-3",
+                objective: tacticalDrafts[0]?.evidence ?? "Trabajo táctico principal",
+                durationMin: 80,
+                tasks: {
+                  create: tacticalRx.slice(0, 2).map((p, idx) => ({
+                    order: idx + 1,
+                    taskId: p.taskId,
+                    durationMin: p.durationMin,
+                    rationale: p.rationale,
+                  })),
+                },
+              },
+              // MD-2 — Consolidación
+              {
+                date: day(3),
+                label: "MD-2",
+                objective: "Consolidación + preparación del plan de partido",
+                durationMin: 70,
+                tasks: {
+                  create: tacticalRx.slice(1, 2).map((p) => ({
+                    order: 1,
+                    taskId: p.taskId,
+                    durationMin: p.durationMin,
+                    rationale: p.rationale,
+                  })),
+                },
+              },
+              // MD-1 — Activación pre-partido
+              {
+                date: day(4),
+                label: "MD-1",
+                objective: "Activación pre-partido: velocidad y automatismos",
+                durationMin: 45,
+                tasks: {
+                  create: activationTask
+                    ? [
+                        {
+                          order: 1,
+                          taskId: activationTask.id,
+                          durationMin: 35,
+                          rationale: "Activación neuromuscular previa al partido.",
+                        },
+                      ]
+                    : [],
+                },
+              },
+            ],
+          },
+        },
+        include: { issues: true, sessions: { include: { tasks: true } } },
+      });
+
+      // ---------- 6) Trazabilidad hallazgo → tarea (prescribedIssueId) ----------
+      // La primera prescripción táctica entra en MD-3; la segunda aparece en MD-3
+      // (profundizar) Y en MD-2 (consolidar). Se enlaza el hallazgo en AMBAS.
+      const evidenceToIssue = new Map(microcycle.issues.map((iss) => [iss.evidence, iss.id]));
+      const md3 = microcycle.sessions.find((s) => s.label === "MD-3");
+      const md2 = microcycle.sessions.find((s) => s.label === "MD-2");
+      const sessionByLabel = { "MD-3": md3, "MD-2": md2 } as Record<string, typeof md3>;
+
+      for (const label of ["MD-3", "MD-2"] as const) {
+        const session = sessionByLabel[label];
+        if (!session) continue;
+        const forSession = label === "MD-3" ? tacticalRx.slice(0, 2) : tacticalRx.slice(1, 2);
+        for (const p of forSession) {
+          const draft = drafts[p.issueIndex];
+          const issueId = evidenceToIssue.get(draft.evidence);
+          const st = session.tasks.find(
+            (t) => t.taskId === p.taskId && t.rationale === p.rationale,
+          );
+          if (!st) continue;
+          await tx.sessionTask.update({
+            where: { id: st.id },
+            data: { prescribedIssueId: issueId },
+          });
+          const audit = auditRx.find(
+            (a) => a.taskId === p.taskId && a.issueEvidence === draft.evidence,
+          );
+          if (audit && !audit.sessionLabel) audit.sessionLabel = label;
+        }
+      }
+
+      // ---------- 7) Auditoría de la ejecución ----------
+      const inputSnapshot = {
+        weekStart: weekStart.toISOString().slice(0, 10),
+        pulse: pulse ? { moraleScore: pulse.moraleScore, fatigueScore: pulse.fatigueScore } : null,
+        matches: recentMatches.map((m) => ({
+          opponent: m.opponent,
+          score: `${m.goalsFor ?? 0}-${m.goalsAgainst ?? 0}`,
+          events: m.report?.events.length ?? 0,
+        })),
+        availablePlayers,
+      };
+      const runId = await recordEngineRun(tx, {
+        clubId,
+        teamId,
+        microcycleId: microcycle.id,
+        trigger: "WEEKLY_PROPOSAL",
+        t0,
+        inputs: inputSnapshot,
+        drafts,
+        prescriptions: auditRx,
+        discarded,
+      });
+
+      return {
+        created: true,
+        microcycleId: microcycle.id,
+        runId,
+        issuesCount: drafts.length,
+        prescriptions: auditRx,
+        discarded,
+        durationMs: Date.now() - t0,
+      };
+    }, TX_OPTS);
+  } catch (e) {
+    // Carrera TOCTOU: otro request cocinó la misma semana a la vez. La tx
+    // perdedora se revierte ENTERA (sin microciclo ni EngineRun parcial) y se
+    // responde created:false — nunca un 500 sin capturar al usuario.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      const existing = await db.microcycle.findUnique({
+        where: { teamId_weekStart: { teamId, weekStart } },
+        select: { id: true },
+      });
+      return {
+        created: false,
+        microcycleId: existing?.id ?? null,
+        runId: null,
+        issuesCount: 0,
+        prescriptions: [],
+        discarded: [],
+        durationMs: null,
+      };
     }
+    throw e;
   }
-
-  // ---------- 7) Auditoría de la ejecución ----------
-  const inputSnapshot = {
-    weekStart: weekStart.toISOString().slice(0, 10),
-    pulse: pulse ? { moraleScore: pulse.moraleScore, fatigueScore: pulse.fatigueScore } : null,
-    matches: recentMatches.map((m) => ({
-      opponent: m.opponent,
-      score: `${m.goalsFor ?? 0}-${m.goalsAgainst ?? 0}`,
-      events: m.report?.events.length ?? 0,
-    })),
-    availablePlayers,
-  };
-  const runId = await recordEngineRun(db, {
-    clubId,
-    teamId,
-    microcycleId: microcycle.id,
-    trigger: "WEEKLY_PROPOSAL",
-    t0,
-    inputs: inputSnapshot,
-    drafts,
-    prescriptions: auditRx,
-    discarded,
-  });
-
-  return {
-    created: true,
-    microcycleId: microcycle.id,
-    runId,
-    issuesCount: drafts.length,
-    prescriptions: auditRx,
-    discarded,
-    durationMs: Date.now() - t0,
-  };
 }
 
 // ============================================================================
@@ -643,9 +692,12 @@ export type RefreshResult = {
  *      con la receta fresca y la factibilidad de hoy.
  *   3. Persiste un EngineRun (trigger EVIDENCE_REFRESH) con toda la auditoría.
  * Los planes ACCEPTED/ADJUSTED se respetan: nunca se tocan.
+ *
+ * Cada semana se procesa en SU propia transacción: diagnóstico, tareas y
+ * auditoría de esa semana se escriben todos o ninguno.
  */
 export async function refreshProposalEvidence(
-  db: PipelineDb,
+  db: PipelineRunnerDb,
   args: { clubId: string; teamId: string; kickoffAt: Date },
 ): Promise<RefreshResult> {
   const { clubId, teamId, kickoffAt } = args;
@@ -656,132 +708,138 @@ export async function refreshProposalEvidence(
   let runs = 0;
 
   for (const weekStart of candidates) {
-    const t0 = Date.now();
-    const cycle = await db.microcycle.findUnique({
-      where: { teamId_weekStart: { teamId, weekStart } },
-      include: { sessions: { include: { tasks: true } } },
-    });
-    // Solo tocamos propuestas NO validadas por el cuerpo técnico
-    if (!cycle || cycle.status !== "PROPOSED") continue;
+    const touched = await db.$transaction(async (tx) => {
+      const t0 = Date.now();
+      const cycle = await tx.microcycle.findUnique({
+        where: { teamId_weekStart: { teamId, weekStart } },
+        include: { sessions: { include: { tasks: true } } },
+      });
+      // Solo tocamos propuestas NO validadas por el cuerpo técnico
+      if (!cycle || cycle.status !== "PROPOSED") return false;
 
-    const inputs = await collectInputs(db, teamId, weekStart);
-    const pulse = inputs.pulse;
-    const drafts = await buildIssueDrafts(db, teamId, inputs);
+      const inputs = await collectInputs(tx, teamId, weekStart);
+      const pulse = inputs.pulse;
+      const drafts = await buildIssueDrafts(tx, teamId, inputs);
 
-    const availablePlayers = await db.player.count({
-      where: { teamId, isActive: true, status: { in: ["AVAILABLE", "RETURNING"] } },
-    });
+      const availablePlayers = await tx.player.count({
+        where: { teamId, isActive: true, status: { in: ["AVAILABLE", "RETURNING"] } },
+      });
 
-    // 1) Diagnóstico regenerado
-    await db.diagnosisIssue.deleteMany({
-      where: { microcycleId: cycle.id, status: "OPEN" },
-    });
-    await db.diagnosisIssue.createMany({
-      data: drafts.map((d) => ({
-        microcycleId: cycle.id,
-        subPrincipleId: d.subPrincipleId,
-        phase: d.phase,
-        kind: d.kind,
-        severity: d.severity,
-        evidence: d.evidence,
-        metric: d.metric as never,
-      })),
-    });
+      // 1) Diagnóstico regenerado
+      await tx.diagnosisIssue.deleteMany({
+        where: { microcycleId: cycle.id, status: "OPEN" },
+      });
+      await tx.diagnosisIssue.createMany({
+        data: drafts.map((d) => ({
+          microcycleId: cycle.id,
+          subPrincipleId: d.subPrincipleId,
+          phase: d.phase,
+          kind: d.kind,
+          severity: d.severity,
+          evidence: d.evidence,
+          metric: d.metric as never,
+        })),
+      });
 
-    // 2) Re-prescripción con ranking + factibilidad
-    const { prescriptions: rawRx, discarded } = await prescribeForIssues(db, drafts, {
-      availablePlayers,
-      fatigueScore: pulse?.fatigueScore ?? 5,
-    });
-    const tacticalRx = rawRx.filter((p) => drafts[p.issueIndex].kind === "TACTICAL");
+      // 2) Re-prescripción con ranking + factibilidad
+      const { prescriptions: rawRx, discarded } = await prescribeForIssues(tx, drafts, {
+        availablePlayers,
+        fatigueScore: pulse?.fatigueScore ?? 5,
+      });
+      const tacticalRx = rawRx.filter((p) => drafts[p.issueIndex].kind === "TACTICAL");
 
-    // Reemplaza las tareas de MD-3 / MD-2 con la prescripción fresca
-    const issueRows = await db.diagnosisIssue.findMany({
-      where: { microcycleId: cycle.id, status: "OPEN" },
-      select: { id: true, evidence: true },
-    });
-    const evidenceToIssue = new Map(issueRows.map((r) => [r.evidence, r.id]));
-    const auditRx: PrescriptionAudit[] = [];
+      // Reemplaza las tareas de MD-3 / MD-2 con la prescripción fresca
+      const issueRows = await tx.diagnosisIssue.findMany({
+        where: { microcycleId: cycle.id, status: "OPEN" },
+        select: { id: true, evidence: true },
+        // Determinismo: mapeo estable evidencia → hallazgo
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      });
+      const evidenceToIssue = new Map(issueRows.map((r) => [r.evidence, r.id]));
+      const auditRx: PrescriptionAudit[] = [];
 
-    for (const label of ["MD-3", "MD-2"] as const) {
-      const session = cycle.sessions.find((s) => s.label === label);
-      if (!session) continue;
-      await db.sessionTask.deleteMany({ where: { sessionId: session.id } });
+      for (const label of ["MD-3", "MD-2"] as const) {
+        const session = cycle.sessions.find((s) => s.label === label);
+        if (!session) continue;
+        await tx.sessionTask.deleteMany({ where: { sessionId: session.id } });
 
-      const forSession = label === "MD-3" ? tacticalRx.slice(0, 2) : tacticalRx.slice(1, 2);
-      for (let idx = 0; idx < forSession.length; idx++) {
-        const p = forSession[idx];
-        const draft = drafts[p.issueIndex];
-        const issueId = evidenceToIssue.get(draft.evidence) ?? null;
-        await db.sessionTask.create({
-          data: {
-            sessionId: session.id,
+        const forSession = label === "MD-3" ? tacticalRx.slice(0, 2) : tacticalRx.slice(1, 2);
+        for (let idx = 0; idx < forSession.length; idx++) {
+          const p = forSession[idx];
+          const draft = drafts[p.issueIndex];
+          const issueId = evidenceToIssue.get(draft.evidence) ?? null;
+          await tx.sessionTask.create({
+            data: {
+              sessionId: session.id,
+              taskId: p.taskId,
+              order: idx + 1,
+              durationMin: p.durationMin,
+              rationale: p.rationale,
+              prescribedIssueId: issueId,
+            },
+          });
+          auditRx.push({
+            issueEvidence: draft.evidence,
+            issueKind: draft.kind,
+            subPrincipleId: draft.subPrincipleId ?? null,
             taskId: p.taskId,
-            order: idx + 1,
+            taskTitle: p.taskTitle,
+            relevance: p.relevance,
+            sessionLabel: label,
             durationMin: p.durationMin,
             rationale: p.rationale,
-            prescribedIssueId: issueId,
-          },
-        });
-        auditRx.push({
-          issueEvidence: draft.evidence,
-          issueKind: draft.kind,
-          subPrincipleId: draft.subPrincipleId ?? null,
-          taskId: p.taskId,
-          taskTitle: p.taskTitle,
-          relevance: p.relevance,
-          sessionLabel: label,
-          durationMin: p.durationMin,
-          rationale: p.rationale,
-        });
+          });
+        }
       }
-    }
 
-    // 3) Directrices + resumen legible
-    const last = inputs.matches[0];
-    const directives = tacticalRx.length
-      ? tacticalRx.map((p) => `Corregir: ${drafts[p.issueIndex].evidence}`)
-      : ["Consolidar la identidad de juego de la semana"];
-    await db.microcycle.update({
-      where: { id: cycle.id },
-      data: {
-        tacticalDirectives: directives,
-        diagnosisSummary: [
-          `Último partido: ${last ? `${last.isHome ? "casa" : "fuera"} vs ${last.opponent} (${last.goalsFor ?? 0}-${last.goalsAgainst ?? 0})` : "sin datos"}.`,
-          pulse ? `Vestuario: ánimo ${pulse.moraleScore}/10 · fatiga ${pulse.fatigueScore}/10.` : "",
-          `Prioridad de la semana: ${directives[0]}.`,
-        ]
-          .filter(Boolean)
-          .join(" "),
-        engineVersion: ENGINE_VERSION,
-      },
-    });
+      // 3) Directrices + resumen legible
+      const last = inputs.matches[0];
+      const directives = tacticalRx.length
+        ? tacticalRx.map((p) => `Corregir: ${drafts[p.issueIndex].evidence}`)
+        : ["Consolidar la identidad de juego de la semana"];
+      await tx.microcycle.update({
+        where: { id: cycle.id },
+        data: {
+          tacticalDirectives: directives,
+          diagnosisSummary: [
+            `Último partido: ${last ? `${last.isHome ? "casa" : "fuera"} vs ${last.opponent} (${last.goalsFor ?? 0}-${last.goalsAgainst ?? 0})` : "sin datos"}.`,
+            pulse ? `Vestuario: ánimo ${pulse.moraleScore}/10 · fatiga ${pulse.fatigueScore}/10.` : "",
+            `Prioridad de la semana: ${directives[0]}.`,
+          ]
+            .filter(Boolean)
+            .join(" "),
+          engineVersion: ENGINE_VERSION,
+        },
+      });
 
-    // 4) Auditoría EVIDENCE_REFRESH
-    await recordEngineRun(db, {
-      clubId,
-      teamId,
-      microcycleId: cycle.id,
-      trigger: "EVIDENCE_REFRESH",
-      t0,
-      inputs: {
-        weekStart: weekStart.toISOString().slice(0, 10),
-        pulse: pulse ? { moraleScore: pulse.moraleScore, fatigueScore: pulse.fatigueScore } : null,
-        matches: inputs.matches.map((m) => ({
-          opponent: m.opponent,
-          score: `${m.goalsFor ?? 0}-${m.goalsAgainst ?? 0}`,
-          events: m.report?.events.length ?? 0,
-        })),
-        availablePlayers,
-      },
-      drafts,
-      prescriptions: auditRx,
-      discarded,
-    });
+      // 4) Auditoría EVIDENCE_REFRESH
+      await recordEngineRun(tx, {
+        clubId,
+        teamId,
+        microcycleId: cycle.id,
+        trigger: "EVIDENCE_REFRESH",
+        t0,
+        inputs: {
+          weekStart: weekStart.toISOString().slice(0, 10),
+          pulse: pulse ? { moraleScore: pulse.moraleScore, fatigueScore: pulse.fatigueScore } : null,
+          matches: inputs.matches.map((m) => ({
+            opponent: m.opponent,
+            score: `${m.goalsFor ?? 0}-${m.goalsAgainst ?? 0}`,
+            events: m.report?.events.length ?? 0,
+          })),
+          availablePlayers,
+        },
+        drafts,
+        prescriptions: auditRx,
+        discarded,
+      });
 
-    runs++;
-    refreshedWeeks.push(weekStart.toISOString().slice(0, 10));
-    for (const d of drafts.slice(0, 3)) evidences.push(d.evidence);
+      refreshedWeeks.push(weekStart.toISOString().slice(0, 10));
+      for (const d of drafts.slice(0, 3)) evidences.push(d.evidence);
+      return true;
+    }, TX_OPTS);
+
+    if (touched) runs++;
   }
 
   return { refreshedWeeks, evidences, runs };

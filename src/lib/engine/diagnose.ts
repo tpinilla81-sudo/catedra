@@ -65,7 +65,8 @@ export async function collectInputs(
       status: { in: ["PLAYED", "ANALYZED"] },
       kickoffAt: { gte: windowStart },
     },
-    orderBy: { kickoffAt: "desc" },
+    // Determinismo: desempate estable si dos partidos comparten kickoff
+    orderBy: [{ kickoffAt: "desc" }, { id: "asc" }],
     take: 2,
     include: { report: { include: { events: true } } },
   });
@@ -111,7 +112,12 @@ export async function buildIssueDrafts(
     const losses = last.report.events.filter((e) => e.type === "BALL_LOSS");
     const buildUpLosses = losses.filter((e) => e.x <= 35); // 1/3 de campo propio
     if (buildUpLosses.length >= 6) {
-      const sp = await db.subPrinciple.findFirst({ where: { phase: "OFF_TRANSITION" } });
+      // Determinismo: a igualdad de datos, SIEMPRE el mismo subprincipio
+      // (sin orderBy Postgres devuelve un orden arbitrario entre empates)
+      const sp = await db.subPrinciple.findFirst({
+        where: { phase: "OFF_TRANSITION" },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      });
       drafts.push({
         kind: "TACTICAL",
         phase: "OFF_TRANSITION",
@@ -125,7 +131,10 @@ export async function buildIssueDrafts(
       (e) => e.type === "NEGATIVE_DUEL",
     ).length;
     if (negDuels >= 6) {
-      const sp = await db.subPrinciple.findFirst({ where: { phase: "DEFENSIVE" } });
+      const sp = await db.subPrinciple.findFirst({
+        where: { phase: "DEFENSIVE" },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      });
       drafts.push({
         kind: "TACTICAL",
         phase: "DEFENSIVE",
@@ -138,7 +147,10 @@ export async function buildIssueDrafts(
   }
 
   if (drafts.length === 0) {
-    const sp = await db.subPrinciple.findFirst({ where: { phase: "OFFENSIVE" } });
+    const sp = await db.subPrinciple.findFirst({
+      where: { phase: "OFFENSIVE" },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
     drafts.push({
       kind: "TACTICAL",
       phase: "OFFENSIVE",
@@ -168,7 +180,7 @@ export async function computeResultsStreak(
       goalsFor: { not: null },
       goalsAgainst: { not: null },
     },
-    orderBy: { kickoffAt: "desc" },
+    orderBy: [{ kickoffAt: "desc" }, { id: "asc" }],
     take: 20,
   });
   if (matches.length === 0) return 0;

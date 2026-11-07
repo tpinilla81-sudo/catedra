@@ -174,6 +174,16 @@ export function PlayersView({
   function saveEditor() {
     if (!editing || !draft) return;
     const target = editing;
+    // Snapshot para el rollback: si la Server Action falla (red, guard,
+    // validación), la tarjeta vuelve a su estado REAL pre-optimista.
+    const snapshot = players.find((p) => p.id === target.id);
+    const patch = {
+      status: draft.status as PlayerStatus,
+      technicalRating: draft.technicalRating,
+      tacticalRating: draft.tacticalRating,
+      physicalRating: draft.physicalRating,
+      statusNote: draft.statusNote.trim() || null,
+    };
     setPlayers((prev) =>
       prev.map((p) =>
         p.id === target.id
@@ -188,21 +198,29 @@ export function PlayersView({
           : p,
       ),
     );
-    const patch = {
-      status: draft.status as PlayerStatus,
-      technicalRating: draft.technicalRating,
-      tacticalRating: draft.tacticalRating,
-      physicalRating: draft.physicalRating,
-      statusNote: draft.statusNote.trim() || null,
-    };
     startTransition(async () => {
-      await updatePlayerQuick(target.id, patch);
-      toast({
-        title: "Ficha actualizada",
-        description: `${target.firstName} ${target.lastName}`,
-        duration: 1800,
-      });
-      setEditing(null);
+      try {
+        await updatePlayerQuick(target.id, patch);
+        toast({
+          title: "Ficha actualizada",
+          description: `${target.firstName} ${target.lastName}`,
+          duration: 1800,
+        });
+        setEditing(null);
+      } catch {
+        // Rollback del estado optimista + aviso claro: nada queda a medias.
+        if (snapshot) {
+          setPlayers((prev) =>
+            prev.map((p) => (p.id === snapshot.id ? snapshot : p)),
+          );
+        }
+        toast({
+          title: "No se pudo guardar la ficha",
+          description: `Los cambios de ${target.firstName} se han restaurado. Revisa tu conexión e inténtalo de nuevo.`,
+          variant: "destructive",
+          duration: 5000,
+        });
+      }
     });
   }
 
