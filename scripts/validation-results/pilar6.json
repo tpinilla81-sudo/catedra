@@ -4,8 +4,8 @@
   "total": 33,
   "passed": 33,
   "failed": 0,
-  "durationMs": 709,
-  "timestamp": "2026-11-07T18:02:08.075Z",
+  "durationMs": 975,
+  "timestamp": "2026-11-07T18:02:58.152Z",
   "checks": [
     {
       "name": "G1 create sin clubId → clubId del tenant INYECTADO (+ hijos anidados)",
