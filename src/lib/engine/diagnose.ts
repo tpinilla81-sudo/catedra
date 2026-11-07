@@ -9,7 +9,7 @@
 //
 // Cadena: TacticalEvent + TeamPulse + Player → IssueDraft[] → DiagnosisIssue
 // ============================================================================
-import { addDays, startOfWeek, subDays } from "date-fns";
+import { startOfWeek, subDays } from "date-fns";
 import type { Match, PrismaClient, TeamPulse } from "@prisma/client";
 
 type EventLike = { type: string; x: number };
@@ -150,78 +150,6 @@ export async function buildIssueDrafts(
   }
 
   return drafts;
-}
-
-/**
- * HOOK DE CONEXIÓN (Pilar 3 → Pilar 4):
- * Se ejecuta al guardar una ingesta. Si el microciclo de la semana del partido
- * (o el de la semana siguiente) aún está PROPOSED —no aceptado por el míster—,
- * se regenera su diagnóstico con los datos frescos para que la propuesta
- * refleje lo ocurrido en el campo. Los planes ACCEPTED/ADJUSTED se respetan.
- */
-export async function refreshProposalsWithNewEvidence(
-  db: DiagnoseDb,
-  teamId: string,
-  kickoffAt: Date,
-): Promise<{ refreshedWeeks: string[]; evidences: string[] }> {
-  const base = mondayOf(kickoffAt);
-  const candidates = [base, addDays(base, 7)]; // misma semana y semana siguiente
-  const refreshedWeeks: string[] = [];
-  const evidences: string[] = [];
-
-  for (const weekStart of candidates) {
-    const cycle = await db.microcycle.findUnique({
-      where: { teamId_weekStart: { teamId, weekStart } },
-    });
-    // Solo tocamos propuestas NO validadas por el cuerpo técnico
-    if (!cycle || cycle.status !== "PROPOSED") continue;
-
-    const inputs = await collectInputs(db, teamId, weekStart);
-    const drafts = await buildIssueDrafts(db, teamId, inputs);
-
-    await db.diagnosisIssue.deleteMany({
-      where: { microcycleId: cycle.id, status: "OPEN" },
-    });
-    await db.diagnosisIssue.createMany({
-      data: drafts.map((d) => ({
-        microcycleId: cycle.id,
-        subPrincipleId: d.subPrincipleId,
-        phase: d.phase,
-        kind: d.kind,
-        severity: d.severity,
-        evidence: d.evidence,
-        metric: d.metric as never,
-      })),
-    });
-
-    const last = inputs.matches[0];
-    const directives = drafts
-      .filter((d) => d.kind === "TACTICAL")
-      .map((d) => `Corregir: ${d.evidence}`);
-    await db.microcycle.update({
-      where: { id: cycle.id },
-      data: {
-        tacticalDirectives: directives.length
-          ? directives
-          : ["Consolidar la identidad de juego de la semana"],
-        diagnosisSummary: [
-          `Último partido: ${last ? `${last.isHome ? "casa" : "fuera"} vs ${last.opponent} (${last.goalsFor ?? 0}-${last.goalsAgainst ?? 0})` : "sin datos"}.`,
-          inputs.pulse
-            ? `Vestuario: ánimo ${inputs.pulse.moraleScore}/10 · fatiga ${inputs.pulse.fatigueScore}/10.`
-            : "",
-          `Prioridad de la semana: ${drafts[0]?.evidence ?? "consolidar estructuras"}.`,
-        ]
-          .filter(Boolean)
-          .join(" "),
-        engineVersion: "v0.1-heuristic",
-      },
-    });
-
-    refreshedWeeks.push(weekStart.toISOString().slice(0, 10));
-    for (const d of drafts.slice(0, 3)) evidences.push(d.evidence);
-  }
-
-  return { refreshedWeeks, evidences };
 }
 
 /**

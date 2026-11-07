@@ -32,6 +32,7 @@ import { AcceptPlanButton } from "@/components/hoy/accept-plan-button";
 import { EnsureProposalButton } from "@/components/hoy/ensure-proposal-button";
 import { PersistActiveTeam } from "@/components/hoy/persist-active-team";
 import { UserMenu } from "@/components/hoy/user-menu";
+import type { DiscardedCandidate, PrescriptionAudit } from "@/lib/engine/pipeline";
 
 const STATUS_CHIP: Record<string, { label: string; cls: string }> = {
   PROPOSED: { label: "Propuesta lista — pendiente de tu visto bueno", cls: "bg-amber-400/15 text-amber-300 border-amber-400/40" },
@@ -44,6 +45,11 @@ const KIND_CHIP: Record<string, { label: string; cls: string; icon: React.Elemen
   TACTICAL: { label: "Táctico", cls: "bg-rose-500/15 text-rose-300 border-rose-500/40", icon: Shield },
   PHYSICAL: { label: "Físico", cls: "bg-amber-500/15 text-amber-300 border-amber-500/40", icon: Dumbbell },
   MORALE: { label: "Ánimo", cls: "bg-violet-500/15 text-violet-300 border-violet-500/40", icon: HeartPulse },
+};
+
+const TRIGGER_LABEL: Record<string, string> = {
+  WEEKLY_PROPOSAL: "Cocinado el lunes",
+  EVIDENCE_REFRESH: "Actualizado con la última ingesta",
 };
 
 const INTENSITY_CHIP: Record<string, string> = {
@@ -99,6 +105,20 @@ export async function HoyView() {
       orderBy: { kickoffAt: "desc" },
     }),
   ]);
+
+  // ---------- Auditoría del motor (transparencia del plan) ----------
+  const latestRun = microcycle
+    ? await db.engineRun.findFirst({
+        where: { microcycleId: microcycle.id },
+        orderBy: { createdAt: "desc" },
+      })
+    : null;
+  const runPrescriptions: PrescriptionAudit[] = Array.isArray(latestRun?.prescriptions)
+    ? (latestRun!.prescriptions as unknown as PrescriptionAudit[])
+    : [];
+  const runDiscarded: DiscardedCandidate[] = Array.isArray(latestRun?.discarded)
+    ? (latestRun!.discarded as unknown as DiscardedCandidate[])
+    : [];
 
   const dateLabel = format(new Date(), "EEEE, d 'de' MMMM", { locale: es });
 
@@ -391,6 +411,79 @@ export async function HoyView() {
                   </CardContent>
                 </Card>
               ))}
+
+              {/* ---------- Transparencia del motor (revisión del rationale) ---------- */}
+              {latestRun && (
+                <Card className="bg-zinc-900 border-zinc-800 rounded-3xl">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <CardTitle className="text-lg font-black text-zinc-50 flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-amber-300" aria-hidden />
+                        Por qué este plan
+                      </CardTitle>
+                      <Badge variant="outline" className="rounded-full text-xs bg-zinc-800 text-zinc-400 border-zinc-700">
+                        motor {latestRun.version}
+                        {latestRun.durationMs != null && ` · ${latestRun.durationMs} ms`}
+                      </Badge>
+                    </div>
+                    {latestRun.trigger && (
+                      <p className="text-xs text-zinc-500 flex items-center gap-1.5 pt-1">
+                        <TrendingUp className="w-3.5 h-3.5" aria-hidden />
+                        {TRIGGER_LABEL[latestRun.trigger] ?? latestRun.trigger}
+                      </p>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {runPrescriptions.length > 0 ? (
+                      <div className="space-y-2">
+                        {runPrescriptions.map((p, i) => (
+                          <div key={i} className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 flex items-start gap-3">
+                            <span className="w-6 h-6 rounded-full bg-emerald-500/15 text-emerald-300 text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
+                              {i + 1}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-zinc-100">
+                                {p.taskTitle}
+                                {p.sessionLabel && (
+                                  <span className="ml-2 text-xs font-semibold text-emerald-300">{p.sessionLabel}</span>
+                                )}
+                              </p>
+                              <p className="text-xs text-zinc-400 mt-0.5">{p.rationale}</p>
+                              {p.relevance != null && (
+                                <p className="text-xs text-zinc-500 mt-1">
+                                  Relevancia en la receta: {p.relevance === 3 ? "Núcleo" : p.relevance === 2 ? "Refuerza" : "Apoyo"}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-zinc-500">
+                        El motor no encontró tareas conectadas en la receta para los hallazgos de esta semana.
+                      </p>
+                    )}
+
+                    {runDiscarded.length > 0 && (
+                      <details className="group rounded-2xl border border-zinc-800 bg-zinc-950/60 overflow-hidden">
+                        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-zinc-400 flex items-center justify-between hover:text-zinc-200">
+                          Candidatas evaluadas y descartadas ({runDiscarded.length})
+                          <span className="text-xs text-zinc-600 group-open:hidden">ver</span>
+                          <span className="hidden text-xs text-zinc-600 group-open:inline">ocultar</span>
+                        </summary>
+                        <div className="px-4 pb-4 space-y-2">
+                          {runDiscarded.map((d, i) => (
+                            <div key={i} className="rounded-xl bg-zinc-900/80 px-3 py-2 flex items-start justify-between gap-3">
+                              <p className="text-sm text-zinc-300 min-w-0">{d.taskTitle}</p>
+                              <p className="text-xs text-zinc-500 text-right shrink-0">{d.reason}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               {/* ---------- CTA: decisión con un toque ---------- */}
               {microcycle.status === "PROPOSED" ? (

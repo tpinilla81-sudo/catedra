@@ -549,8 +549,12 @@ model EngineRun {
   clubId        String
   teamId        String
   microcycleId  String? /// Ciclo generado (null si la ejecución falló)
-  version       String /// Versión del algoritmo (ej: "v0.1-heuristic")
-  inputSnapshot Json? /// Snapshot de entradas (pulsos, issues, disponibles) para depurar
+  version       String /// Versión del algoritmo (ej: "v0.2-prescriptive")
+  trigger       String   @default("WEEKLY_PROPOSAL") /// WEEKLY_PROPOSAL | EVIDENCE_REFRESH
+  inputSnapshot Json? /// Snapshot de entradas (pulsos, partidos, disponibles) para depurar
+  issuesJson    Json? /// Hallazgos diagnosticados en esta ejecución (con evidencia y severidad)
+  prescriptions Json? /// Tareas elegidas: [{issueEvidence, subPrincipleId, taskId, taskTitle, relevance, sessionLabel, durationMin, rationale}]
+  discarded     Json? /// Candidatas evaluadas y descartadas: [{taskId, taskTitle, relevance, reason}]
   durationMs    Int? /// Tiempo de cómputo
   createdAt     DateTime @default(now())
 
@@ -558,4 +562,5 @@ model EngineRun {
   team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@index([teamId, createdAt])
+  @@index([microcycleId])
 }

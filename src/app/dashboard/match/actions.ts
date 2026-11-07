@@ -21,8 +21,8 @@ import {
   collectInputs,
   computeResultsStreak,
   mondayOf,
-  refreshProposalsWithNewEvidence,
 } from "@/lib/engine/diagnose";
+import { refreshProposalEvidence } from "@/lib/engine/pipeline";
 
 // ---------- Tipos ----------
 
@@ -211,11 +211,11 @@ export async function submitMatchReport(
 
     // 2) Microciclos aún PROPOSED de esta semana y la siguiente → diagnóstico
     //    regenerado con la evidencia recién guardada.
-    const refresh = await refreshProposalsWithNewEvidence(
-      db,
-      team.id,
-      match.kickoffAt,
-    );
+    const refresh = await refreshProposalEvidence(db, {
+      clubId: team.clubId,
+      teamId: team.id,
+      kickoffAt: match.kickoffAt,
+    });
 
     // 3) Evidencia para feedback inmediato en la UI
     const inputs = await collectInputs(db, team.id, mondayOf(new Date()));
