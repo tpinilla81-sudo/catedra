@@ -38,9 +38,11 @@ Abre **http://localhost:3000** y entra con:
 ## 3) Qué trae sembrado el club demo
 
 - **Pilar 1 — Biblioteca de Sabiduría**: Principios → SubPrincipios (Cátedra global) + Tareas conectadas por relevancia (la receta ponderada del motor).
-- **Pilar 2 — Roster + TeamPulse**: plantilla del CF Método, pulsos del vestuario.
-- **Pilar 3 — Ingesta**: partidos con reporte y pizarra de eventos tácticos.
+- **Pilar 2 — Roster + TeamPulse**: plantilla del CF Método (16 jugadores) + pulsos del vestuario. Para cargar tus datos: **Plantilla → Importar** (CSV/Excel, con plantilla descargable) o edita cada ficha con un toque.
+- **Pilar 3 — Ingesta**: partidos con reporte y **pizarra táctica sobre el campo** (Paso 2 de la ingesta). Para añadir un partido nuevo: **Partidos → + Nuevo partido**; al crear salta directo a la ingesta de 3 pasos (semáforo → pizarra → vestuario).
 - **Pilar 4 — Motor Prescriptivo + Hoy**: microciclos propuestos con sesiones MD+1/MD-3/MD-2/MD-1 y auditoría EngineRun (`/dashboard/quality` = panel de control E2E).
+
+> La navegación vive en la **barra inferior fija**: Hoy · Biblioteca · Plantilla · Partidos.
 
 ## 4) Variables de entorno (opcional)
 

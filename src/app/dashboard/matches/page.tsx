@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AppNav } from "@/components/dashboard/app-nav";
+import { NewMatchDialog } from "@/components/match/new-match-dialog";
 import { SEMAPHORE_META } from "@/lib/taxonomy";
 import { requireTenantContext } from "@/lib/session";
 
@@ -46,9 +47,12 @@ export default async function MatchesPage() {
   return (
     <main className="min-h-screen bg-zinc-950 pb-28">
       <header className="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
-        <div className="mx-auto max-w-5xl px-4 py-4">
-          <p className="text-xs text-zinc-500 leading-tight truncate">Pilar 3 · {team.name}</p>
-          <h1 className="text-2xl font-black text-zinc-50 leading-tight">Partidos</h1>
+        <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs text-zinc-500 leading-tight truncate">Pilar 3 · {team.name}</p>
+            <h1 className="text-2xl font-black text-zinc-50 leading-tight">Partidos</h1>
+          </div>
+          <NewMatchDialog />
         </div>
       </header>
 

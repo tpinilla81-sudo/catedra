@@ -1,0 +1,697 @@
+     1→// ============================================================================
+     2→// SEED — Dataset demo de Fase 1 (idempotente: se puede ejecutar varias veces)
+     3→// ----------------------------------------------------------------------------
+     4→// Crea: club demo + usuarios por rol + biblioteca global de la Cátedra
+     5→// (subprincipios y tareas conectados por "recetas") + plantilla + partidos con
+     6→// ingesta (eventing táctico) + pulso colectivo + microciclo PROPOSED de la
+     7→// semana actual → cero pantallas en blanco desde el primer arranque.
+     8→// Ejecutar: bun prisma/seed.ts   (o `bunx prisma db seed`)
+     9→// ============================================================================
+    10→import {
+    11→  PrismaClient,
+    12→  GamePhase,
+    13→  Position,
+    14→  PlayerStatus,
+    15→  Intensity,
+    16→  Semaphore,
+    17→  TacticalEventType,
+    18→} from "@prisma/client";
+    19→import { hashPassword } from "../src/lib/password";
+    20→import { mondayOf } from "../src/lib/utils/dates";
+    21→import { ensurePostgresUrl } from "../src/lib/env-guard";
+    22→
+    23→ensurePostgresUrl();
+    24→
+    25→const prisma = new PrismaClient();
+    26→
+    27→// ---------- Helpers de fechas (siempre relativas a HOY) ----------
+    28→function at(base: Date, h: number, m = 0): Date {
+    29→  const d = new Date(base);
+    30→  d.setHours(h, m, 0, 0);
+    31→  return d;
+    32→}
+    33→
+    34→async function main() {
+    35→  console.log("SEED: iniciando…");
+    36→
+    37→  // ---------- 1) Club y usuarios ----------
+    38→  const club = await prisma.club.upsert({
+    39→    where: { slug: "cf-metodo" },
+    40→    update: {},
+    41→    create: { name: "Club Fútbol Método", slug: "cf-metodo" },
+    42→  });
+    43→
+    44→  const mister = await prisma.user.upsert({
+    45→    where: { email: "mister@cfmetodo.es" },
+    46→    update: {},
+    47→    create: {
+    48→      email: "mister@cfmetodo.es",
+    49→      name: "Míster García",
+    50→      passwordHash: hashPassword("metodo2025"),
+    51→      role: "COACH_ADMIN",
+    52→      clubId: club.id,
+    53→    },
+    54→  });
+    55→
+    56→  const analista = await prisma.user.upsert({
+    57→    where: { email: "analista@cfmetodo.es" },
+    58→    update: {},
+    59→    create: {
+    60→      email: "analista@cfmetodo.es",
+    61→      name: "Laura Ruiz · Analista",
+    62→      passwordHash: hashPassword("metodo2025"),
+    63→      role: "ANALYST",
+    64→      clubId: club.id,
+    65→    },
+    66→  });
+    67→
+    68→  // PLATFORM_ADMIN (sin club): gestiona el contenido GLOBAL de la Cátedra
+    69→  // desde /dashboard/catedra. clubId = null por diseño.
+    70→  const plataforma = await prisma.user.upsert({
+    71→    where: { email: "plataforma@ecosystem.es" },
+    72→    update: {},
+    73→    create: {
+    74→      email: "plataforma@ecosystem.es",
+    75→      name: "Dirección Cátedra",
+    76→      passwordHash: hashPassword("metodo2025"),
+    77→      role: "PLATFORM_ADMIN",
+    78→      clubId: null,
+    79→    },
+    80→  });
+    81→  console.log("SEED: club + usuarios OK (míster, analista, plataforma)");
+    82→
+    83→  // ---------- 2) Temporada y equipos ----------
+    84→  const season = await prisma.season.upsert({
+    85→    where: { clubId_name: { clubId: club.id, name: "2025/26" } },
+    86→    update: {},
+    87→    create: {
+    88→      clubId: club.id,
+    89→      name: "2025/26",
+    90→      startDate: new Date("2025-07-01"),
+    91→      endDate: new Date("2026-06-30"),
+    92→      isActive: true,
+    93→    },
+    94→  });
+    95→
+    96→  const primerEquipo = await prisma.team.upsert({
+    97→    where: { seasonId_name: { seasonId: season.id, name: "Primer Equipo" } },
+    98→    update: {},
+    99→    create: { clubId: club.id, seasonId: season.id, name: "Primer Equipo", category: "Senior · 3ª División" },
+   100→  });
+   101→
+   102→  const juvenilA = await prisma.team.upsert({
+   103→    where: { seasonId_name: { seasonId: season.id, name: "Juvenil A" } },
+   104→    update: {},
+   105→    create: { clubId: club.id, seasonId: season.id, name: "Juvenil A", category: "Juvenil Preferente" },
+   106→  });
+   107→  console.log("SEED: temporada + equipos OK");
+   108→
+   109→  // ---------- 3) Plantilla (Pilar 2) ----------
+   110→  const playersPrimerEquipo: Array<{
+   111→    shirt: number; first: string; last: string; pos: Position;
+   112→    poly: Position[]; tec: number; tac: number; fis: number;
+   113→    status?: PlayerStatus; note?: string;
+   114→  }> = [
+   115→    { shirt: 1, first: "Iker", last: "Sanz", pos: "GK", poly: [], tec: 4, tac: 3, fis: 4 },
+   116→    { shirt: 13, first: "Adrián", last: "Fuster", pos: "GK", poly: [], tec: 3, tac: 3, fis: 3 },
+   117→    { shirt: 4, first: "Mario", last: "Domínguez", pos: "CB", poly: ["DM"], tec: 3, tac: 4, fis: 4 },
+   118→    { shirt: 5, first: "Hugo", last: "Beltrán", pos: "CB", poly: ["LB"], tec: 3, tac: 4, fis: 3, status: "INJURED", note: "molestias isquios izq." },
+   119→    { shirt: 3, first: "Pablo", last: "Ferrer", pos: "LB", poly: ["LWB", "CM"], tec: 3, tac: 3, fis: 4 },
+   120→    { shirt: 2, first: "Raúl", last: "Ortega", pos: "RB", poly: ["RWB"], tec: 3, tac: 3, fis: 4 },
+   121→    { shirt: 6, first: "Jorge", last: "Palencia", pos: "DM", poly: ["CM", "CB"], tec: 4, tac: 5, fis: 3 },
+   122→    { shirt: 8, first: "Dani", last: "Sevilla", pos: "CM", poly: ["AM", "DM"], tec: 4, tac: 4, fis: 4 },
+   123→    { shirt: 10, first: "Iván", last: "Carrión", pos: "AM", poly: ["SS", "LW"], tec: 5, tac: 4, fis: 3 },
+   124→    { shirt: 7, first: "Nico", last: "Alcázar", pos: "RM", poly: ["RW", "CM"], tec: 4, tac: 3, fis: 4 },
+   125→    { shirt: 11, first: "Luis", last: "Bermejo", pos: "LM", poly: ["LW", "LB"], tec: 3, tac: 3, fis: 5 },
+   126→    { shirt: 20, first: "Carlos", last: "Mínguez", pos: "LW", poly: ["SS", "RM"], tec: 4, tac: 3, fis: 4 },
+   127→    { shirt: 17, first: "Álvaro", last: "Cuesta", pos: "RW", poly: ["LM", "CF"], tec: 4, tac: 3, fis: 4 },
+   128→    { shirt: 9, first: "Sergio", last: "Vidal", pos: "CF", poly: ["SS"], tec: 4, tac: 4, fis: 4, status: "RETURNING", note: "reposición tras rotura fibular" },
+   129→    { shirt: 19, first: "Jony", last: "Aguirre", pos: "SS", poly: ["AM", "LW"], tec: 4, tac: 3, fis: 3 },
+   130→    { shirt: 21, first: "Óscar", last: "Prats", pos: "CM", poly: ["DM", "LB"], tec: 3, tac: 4, fis: 3 },
+   131→  ];
+   132→
+   133→  for (const p of playersPrimerEquipo) {
+   134→    await prisma.player.upsert({
+   135→      where: { teamId_shirtNumber: { teamId: primerEquipo.id, shirtNumber: p.shirt } },
+   136→      update: {},
+   137→      create: {
+   138→        clubId: club.id,
+   139→        teamId: primerEquipo.id,
+   140→        firstName: p.first,
+   141→        lastName: p.last,
+   142→        shirtNumber: p.shirt,
+   143→        mainPosition: p.pos,
+   144→        secondaryPositions: p.poly,
+   145→        technicalRating: p.tec,
+   146→        tacticalRating: p.tac,
+   147→        physicalRating: p.fis,
+   148→        status: p.status ?? "AVAILABLE",
+   149→        statusNote: p.note,
+   150→      },
+   151→    });
+   152→  }
+   153→
+   154→  const playersJuvenil = [
+   155→    { shirt: 1, first: "Marc", last: "Aliaga", pos: "GK" as Position },
+   156→    { shirt: 2, first: "Eric", last: "Valls", pos: "CB" as Position },
+   157→    { shirt: 5, first: "Pol", last: "Rueda", pos: "DM" as Position },
+   158→    { shirt: 7, first: "Aitor", last: "Cano", pos: "RM" as Position },
+   159→    { shirt: 9, first: "Ibrahim", last: "Diallo", pos: "CF" as Position },
+   160→    { shirt: 10, first: "Joel", last: "Matas", pos: "AM" as Position },
+   161→    { shirt: 6, first: "Adri", last: "Gil", pos: "CM" as Position },
+   162→    { shirt: 3, first: "Jan", last: "Torres", pos: "LB" as Position },
+   163→  ];
+   164→  for (const p of playersJuvenil) {
+   165→    await prisma.player.upsert({
+   166→      where: { teamId_shirtNumber: { teamId: juvenilA.id, shirtNumber: p.shirt } },
+   167→      update: {},
+   168→      create: {
+   169→        clubId: club.id,
+   170→        teamId: juvenilA.id,
+   171→        firstName: p.first,
+   172→        lastName: p.last,
+   173→        shirtNumber: p.shirt,
+   174→        mainPosition: p.pos,
+   175→        secondaryPositions: [],
+   176→      },
+   177→    });
+   178→  }
+   179→  console.log("SEED: plantillas OK");
+   180→
+   181→  // ---------- 4) Biblioteca de la Cátedra (Pilar 1) — contenido global ----------
+   182→  type SPSeed = { key: string; phase: GamePhase; name: string; desc: string };
+   183→  const subPrinciples: SPSeed[] = [
+   184→    { key: "salida-portero", phase: "OFFENSIVE", name: "Salida de balón desde el portero", desc: "Construcción 4+3 superando la presión rival en el primer tercio." },
+   185→    { key: "progresion-carril", phase: "OFFENSIVE", name: "Progresión por el carril interior", desc: "Atacar entre líneas para llegar en condiciones superiores." },
+   186→    { key: "entre-lineas", phase: "OFFENSIVE", name: "Ocupación de espacios entre líneas", desc: "Movilidad de interiores y extremos para recibir entre líneas." },
+   187→    { key: "presion-alta", phase: "DEFENSIVE", name: "Presión alta sincronizada", desc: "Presión coordinada al rival tras pase atrás o control flawed." },
+   188→    { key: "bloque-medio", phase: "DEFENSIVE", name: "Bloque medio: basculaciones", desc: "Compactación 12-25 m con basculaciones al lado del balón." },
+   189→    { key: "area-centros", phase: "DEFENSIVE", name: "Defensa del área: centros laterales", desc: "Gestión de espacios de área ante centros desde el carril." },
+   190→    { key: "reaccion-perdida", phase: "OFF_TRANSITION", name: "Reacción tras pérdida en 3/4", desc: "Presión inmediata al portador en los 5 primeros segundos." },
+   191→    { key: "verticalidad-5s", phase: "OFF_TRANSITION", name: "Verticalidad en 5 segundos", desc: "Primer pase de progresión tras recuperación en campo propio." },
+   192→    { key: "counterpressing", phase: "DEF_TRANSITION", name: "Counter-pressing: cierre inmediato", desc: "Cierre de espacios de ataque directo tras perder en zona avanzada." },
+   193→    { key: "retraso-10s", phase: "DEF_TRANSITION", name: "Retraso y organización en 10 segundos", desc: "Vuelta a estructura defensiva si no hay counter-press posible." },
+   194→    { key: "esquina-zonal", phase: "SET_PIECE", name: "Defensa de córner zonal", desc: "Cobertura de zonas con asignación mixta en el área pequeña." },
+   195→    { key: "corner-ataque", phase: "SET_PIECE", name: "Ataque de córner: bloque especial", desc: "Movimientos de bloqueo y llegada por sorpresa al primer palo." },
+   196→  ];
+   197→
+   198→  const spId: Record<string, string> = {};
+   199→  for (const sp of subPrinciples) {
+   200→    const existing = await prisma.subPrinciple.findFirst({
+   201→      where: { clubId: null, name: sp.name, phase: sp.phase },
+   202→    });
+   203→    const row =
+   204→      existing ??
+   205→      (await prisma.subPrinciple.create({
+   206→        data: { clubId: null, phase: sp.phase, name: sp.name, description: sp.desc, order: subPrinciples.indexOf(sp) },
+   207→      }));
+   208→    spId[sp.key] = row.id;
+   209→  }
+   210→
+   211→  type TaskSeed = {
+   212→    title: string; objective: string; phases: GamePhase[];
+   213→    len: number; wid: number; pMin: number; pMax?: number; dur: number; reps: string;
+   214→    intensity: Intensity; rules: string[]; points: string[]; mats: string[];
+   215→    links: Array<{ sp: string; rel: number; note: string }>;
+   216→  };
+   217→
+   218→  const tasks: TaskSeed[] = [
+   219→    {
+   220→      title: "Rondo 6v2 con salida tras 8 pases",
+   221→      objective: "Consolidar circulación rápida bajo presión y reacción al cambio de rol.",
+   222→      phases: ["OFFENSIVE", "OFF_TRANSITION"], len: 14, wid: 14, pMin: 8, dur: 20, reps: "4 series x 4'",
+   223→      intensity: "MEDIUM",
+   224→      rules: ["Al robar, entra quien dio el pase perdido", "8 pases seguidos = punto + cambio de defensores"],
+   225→      points: ["Ángulos de pase superiores a 45°", "Primer toque orientado", "Presión agresiva al balón"],
+   226→      mats: ["Conos", "4 petos rojos"],
+   227→      links: [{ sp: "reaccion-perdida", rel: 3, note: "Uso general: reacción al cambio de rol en espacio pequeño." }, { sp: "salida-portero", rel: 1, note: "Calentamiento previo a tareas de construcción." }],
+   228→    },
+   229→    {
+   230→      title: "Salida de balón 4+3 desde el portero bajo presión media",
+   231→      objective: "Superar la presión rival en el primer tercio y progresar en menos de 3 pases.",
+   232→      phases: ["OFFENSIVE", "OFF_TRANSITION"], len: 45, wid: 32, pMin: 11, dur: 30, reps: "3 bloques x 8'",
+   233→      intensity: "MEDIUM",
+   234→      rules: ["Rival presiona con bloque medio-bajo", "Pase al interior = doble punto", "El portero siempre es opción de apoyo"],
+   235→      points: ["Anchura máxima del carril de CB", "Interiores caen entre líneas", "Tercer hombre para romper línea"],
+   236→      mats: ["Conos", "Petos", "2 mini-porterías"],
+   237→      links: [{ sp: "salida-portero", rel: 3, note: "Tarea núcleo para corregir pérdidas en construcción." }, { sp: "progresion-carril", rel: 2, note: "Progresión posterior tras superar la primera línea." }],
+   238→    },
+   239→    {
+   240→      title: "Posesión 6v6+3 con zonas de progresión",
+   241→      objective: "Progresar entre zonas con posesión de calidad y ocupación posicional.",
+   242→      phases: ["OFFENSIVE"], len: 60, wid: 45, pMin: 15, dur: 25, reps: "3 bloques x 7'",
+   243→      intensity: "MEDIUM",
+   244→      rules: ["3 comodines siempre con el equipo en posesión", "Cruzar zona = 1 punto, remate = 3"],
+   245→      points: ["Duplicar posiciones en banda de pase", "Cambios de orientación rápidos", "Pase interior entre líneas"],
+   246→      mats: ["Conos", "Petos 3 colores"],
+   247→      links: [{ sp: "entre-lineas", rel: 3, note: "Recepción entre líneas como criterio de progresión." }, { sp: "progresion-carril", rel: 2, note: "" }],
+   248→    },
+   249→    {
+   250→      title: "Partido 8v8 con reacción tras pérdida de 5 segundos",
+   251→      objective: "Instalar la reacción coordinada tras pérdida en formato global.",
+   252→      phases: ["OFF_TRANSITION", "DEFENSIVE"], len: 68, wid: 50, pMin: 16, dur: 30, reps: "4 x 6'",
+   253→      intensity: "HIGH",
+   254→      rules: ["Tras pérdida: presión inmediata 5s para robar", "Robo en 5s = gol vale doble", "Si no se roba, replegar a bloque"],
+   255→      points: ["Primer perseguidor al portador", "Cobertura de pase interior", "Comunicación del portero"],
+   256→      mats: ["Petos 2 colores", "Conos"],
+   257→      links: [{ sp: "reaccion-perdida", rel: 3, note: "Tarea global para instalar el automatismo del 5s." }, { sp: "counterpressing", rel: 2, note: "" }],
+   258→    },
+   259→    {
+   260→      title: "Transiciones 4v4+2: reacción de 5 segundos",
+   261→      objective: "Tras perder, presionar en 5s; tras robar, atacar la verticalidad.",
+   262→      phases: ["OFF_TRANSITION", "DEF_TRANSITION"], len: 40, wid: 30, pMin: 10, dur: 24, reps: "4 series x 5'",
+   263→      intensity: "HIGH",
+   264→      rules: ["Dos miniporterías por equipo", "Gol tras robo en menos de 8s = doble"],
+   265→      points: ["Cambiar mentalidad de poseedor a defensor", "Primer pase de contra hacia el frente"],
+   266→      mats: ["Miniporterías", "Petos"],
+   267→      links: [{ sp: "reaccion-perdida", rel: 3, note: "Formato reducido: máxima repetición del gesto." }, { sp: "verticalidad-5s", rel: 2, note: "" }],
+   268→    },
+   269→    {
+   270→      title: "Presión alta sincronizada 7v7",
+   271→      objective: "Presionar el primer tercio rival con sincronización de líneas.",
+   272→      phases: ["DEFENSIVE", "DEF_TRANSITION"], len: 60, wid: 45, pMin: 14, dur: 28, reps: "3 x 8'",
+   273→      intensity: "HIGH",
+   274→      rules: ["Rival saca desde portero obligado", "Robo alto = gol vale doble", "Fuera de juego activo"],
+   275→      points: ["Gatillo de presión: pase atrás o control defectuoso", "Cubrir el pase diagonal", "Línea defensiva alta y agresiva"],
+   276→      mats: ["Petos 2 colores", "Conos"],
+   277→      links: [{ sp: "presion-alta", rel: 3, note: "Tarea núcleo de presión alta." }, { sp: "retraso-10s", rel: 1, note: "" }],
+   278→    },
+   279→    {
+   280→      title: "Bloque medio 6v6 con basculaciones",
+   281→      objective: "Compactar el bloque y bascular al lado del balón sin desorden.",
+   282→      phases: ["DEFENSIVE"], len: 55, wid: 40, pMin: 12, dur: 25, reps: "3 x 7'",
+   283→      intensity: "MEDIUM",
+   284→      rules: ["Rival circula sin rematar (progresión: remate libre)", "Intercepción = punto"],
+   285→      points: ["Distancias 10-12 m entre líneas", "Sombras al lado del balón", "Comunicación constante del pivote"],
+   286→      mats: ["Conos", "Petos"],
+   287→      links: [{ sp: "bloque-medio", rel: 3, note: "" }, { sp: "area-centros", rel: 1, note: "" }],
+   288→    },
+   289→    {
+   290→      title: "Retraso y reorganización defensiva 8v8+P en 10 segundos",
+   291→      objective: "Volver a estructura defensiva organizada cuando no es posible el counter-press.",
+   292→      phases: ["DEF_TRANSITION", "DEFENSIVE"], len: 70, wid: 52, pMin: 17, dur: 28, reps: "4 x 6'",
+   293→      intensity: "MEDIUM",
+   294→      rules: ["Ataque directo del rival tras perder", "Organizar en 10s = punto defensivo"],
+   295→      points: ["Corrida de retorno del más cercano", "Pivote ocupa la línea de pase central", "Porterordena líneas"],
+   296→      mats: ["Petos 2 colores", "Conos"],
+   297→      links: [{ sp: "retraso-10s", rel: 3, note: "" }, { sp: "bloque-medio", rel: 2, note: "Conexión retraso→bloque." }],
+   298→    },
+   299→    {
+   300→      title: "Regeneración: rondos suaves + movilidad",
+   301→      objective: "Recuperar al grupo tras el esfuerzo del partido con intensidad controlada.",
+   302→      phases: ["OFFENSIVE"], len: 16, wid: 16, pMin: 8, dur: 40, reps: "Bloque único",
+   303→      intensity: "LOW",
+   304→      rules: ["Sin contacto", "Máximo 2 toques en rondos"],
+   305→      points: ["Toque orientado relajado", "Movilidad articular entre series"],
+   306→      mats: ["Conos", "Pelotas"],
+   307→      links: [{ sp: "reaccion-perdida", rel: 1, note: "Volumen técnico suave, sin objetivo táctico." }],
+   308→    },
+   309→    {
+   310→      title: "Activación pre-partido: velocidad de pies + posesión 5v2",
+   311→      objective: "Activación neuromuscular y automatismos de posesión antes del partido.",
+   312→      phases: ["OFFENSIVE"], len: 20, wid: 20, pMin: 7, dur: 35, reps: "Circuito + 3 rondos",
+   313→      intensity: "LOW",
+   314→      rules: ["Dosis cortas y máxima calidad"],
+   315→      points: ["Escalera de velocidad", "Rondo al primer toque"],
+   316→      mats: ["Escalera", "Conos", "Petos"],
+   317→      links: [{ sp: "entre-lineas", rel: 1, note: "Toque y ángulo, sin carga táctica." }],
+   318→    },
+   319→    {
+   320→      title: "Ataque de córner: bloque especial 8v8",
+   321→      objective: "Instalar movimientos de bloqueo y llegadas por sorpresa en córner ofensivo.",
+   322→      phases: ["SET_PIECE"], len: 40, wid: 30, pMin: 16, dur: 25, reps: "12 lanzamientos",
+   323→      intensity: "MEDIUM",
+   324→      rules: ["2 variantes: primer palo y golpe de toque al segundo"],
+   325→      points: ["Bloqueo legal", "Timing de llegadas", "Cobertura defensiva tras pérdida"],
+   326→      mats: ["Conos", "Petos 2 colores"],
+   327→      links: [{ sp: "corner-ataque", rel: 3, note: "" }],
+   328→    },
+   329→    {
+   330→      title: "Defensa del área: centros laterales 6v6",
+   331→      objective: "Gestionar centros desde el carril: despejes, primer palo y segundo poste.",
+   332→      phases: ["DEFENSIVE", "SET_PIECE"], len: 35, wid: 30, pMin: 12, dur: 22, reps: "3 x 6'",
+   333→      intensity: "MEDIUM",
+   334→      rules: ["Centro desde zona designada", "Despeje fuera del área = punto"],
+   335→      points: ["Marcaje al frente del atacante", "Duelo aéreo agresivo en primer palo"],
+   336→      mats: ["Conos", "Petos"],
+   337→      links: [{ sp: "area-centros", rel: 3, note: "" }, { sp: "esquina-zonal", rel: 2, note: "" }],
+   338→    },
+   339→  ];
+   340→
+   341→  const taskIdByTitle: Record<string, string> = {};
+   342→  for (const t of tasks) {
+   343→    const existing = await prisma.task.findFirst({ where: { clubId: null, title: t.title } });
+   344→    const row =
+   345→      existing ??
+   346→      (await prisma.task.create({
+   347→        data: {
+   348→          clubId: null,
+   349→          title: t.title,
+   350→          objective: t.objective,
+   351→          phases: t.phases,
+   352→          spaceLengthM: t.len,
+   353→          spaceWidthM: t.wid,
+   354→          playersMin: t.pMin,
+   355→          playersMax: t.pMax,
+   356→          durationMin: t.dur,
+   357→          repetitions: t.reps,
+   358→          intensity: t.intensity,
+   359→          rulesOfProvocation: t.rules,
+   360→          coachingPoints: t.points,
+   361→          materials: t.mats,
+   362→          createdById: mister.id,
+   363→        },
+   364→      }));
+   365→    taskIdByTitle[t.title] = row.id;
+   366→    for (const link of t.links) {
+   367→      await prisma.taskSubPrinciple.upsert({
+   368→        where: { taskId_subPrincipleId: { taskId: row.id, subPrincipleId: spId[link.sp] } },
+   369→        update: { relevance: link.rel, usageNote: link.note },
+   370→        create: { taskId: row.id, subPrincipleId: spId[link.sp], relevance: link.rel, usageNote: link.note },
+   371→      });
+   372→    }
+   373→  }
+   374→  console.log("SEED: biblioteca Cátedra OK (12 subprincipios, 12 tareas)");
+   375→
+   376→  // ---------- 5) Partidos e ingesta (Pilar 3) ----------
+   377→  const now = new Date();
+   378→  const daysSinceLastSat = ((now.getDay() - 6 + 7) % 7) || 7;
+   379→  const lastSat = new Date(now);
+   380→  lastSat.setDate(now.getDate() - daysSinceLastSat);
+   381→  const twoWeeksAgo = new Date(lastSat);
+   382→  twoWeeksAgo.setDate(lastSat.getDate() - 7);
+   383→  const nextSat = new Date(lastSat);
+   384→  nextSat.setDate(lastSat.getDate() + 7);
+   385→
+   386→  const matchLast = await prisma.match.upsert({
+   387→    where: { id: `${primerEquipo.id}:jornada10` },
+   388→    update: { status: "ANALYZED", goalsFor: 2, goalsAgainst: 1 },
+   389→    create: {
+   390→      id: `${primerEquipo.id}:jornada10`,
+   391→      clubId: club.id,
+   392→      teamId: primerEquipo.id,
+   393→      opponent: "CD Almansa",
+   394→      competition: "Liga · Jornada 10",
+   395→      isHome: true,
+   396→      kickoffAt: at(lastSat, 17),
+   397→      goalsFor: 2,
+   398→      goalsAgainst: 1,
+   399→      status: "ANALYZED",
+   400→    },
+   401→  });
+   402→
+   403→  const matchPrev = await prisma.match.upsert({
+   404→    where: { id: `${primerEquipo.id}:jornada9` },
+   405→    update: { status: "PLAYED", goalsFor: 3, goalsAgainst: 0 },
+   406→    create: {
+   407→      id: `${primerEquipo.id}:jornada9`,
+   408→      clubId: club.id,
+   409→      teamId: primerEquipo.id,
+   410→      opponent: "UD Caudete",
+   411→      competition: "Liga · Jornada 9",
+   412→      isHome: false,
+   413→      kickoffAt: at(twoWeeksAgo, 18),
+   414→      goalsFor: 3,
+   415→      goalsAgainst: 0,
+   416→      status: "PLAYED",
+   417→    },
+   418→  });
+   419→
+   420→  await prisma.match.upsert({
+   421→    where: { id: `${primerEquipo.id}:jornada11` },
+   422→    update: {},
+   423→    create: {
+   424→      id: `${primerEquipo.id}:jornada11`,
+   425→      clubId: club.id,
+   426→      teamId: primerEquipo.id,
+   427→      opponent: "Atlético Torrent",
+   428→      competition: "Liga · Jornada 11",
+   429→      isHome: true,
+   430→      kickoffAt: at(nextSat, 17, 30),
+   431→      status: "SCHEDULED",
+   432→    },
+   433→  });
+   434→
+   435→  // Ingesta del último partido (1:1)
+   436→  const report = await prisma.matchReport.upsert({
+   437→    where: { matchId: matchLast.id },
+   438→    update: {},
+   439→    create: {
+   440→      matchId: matchLast.id,
+   441→      createdById: analista.id,
+   442→      sensation: "AMBER",
+   443→      perceivedLoad: 7,
+   444→      collectiveAttitude: 6,
+   445→      tacticalExecution: 4,
+   446→      notes: "Buen minuto final tras ir perdiendo. Salidas de atrás sufridas todo el partido.",
+   447→    },
+   448→  });
+   449→
+   450→  const playersPE = await prisma.player.findMany({ where: { teamId: primerEquipo.id } });
+   451→  const byNumber = (n: number) => playersPE.find((p) => p.shirtNumber === n)!;
+   452→
+   453→  // Eventing táctico: pérdidas en construcción (lado izquierdo) → evidencia del motor
+   454→  const losses = [
+   455→    [18, 22, 12, "CB"], [26, 15, 21, "LB"], [31, 30, 19, "DM"],
+   456→    [22, 38, 34, "LB"], [15, 42, 27, "GK"], [29, 26, 41, "CM"],
+   457→    [24, 33, 55, "LB"], [33, 19, 63, "CB"],
+   458→  ];
+   459→  const eventsData: Array<{
+   460→    playerId: string | null; minute: number | null; x: number; y: number; type: TacticalEventType;
+   461→  }> = [
+   462→    ...losses.map(([minute, x, y, posChar]) => ({
+   463→      playerId: posChar === "GK" ? byNumber(1).id : posChar === "CB" ? byNumber(4).id : posChar === "LB" ? byNumber(3).id : posChar === "DM" ? byNumber(6).id : byNumber(8).id,
+   464→      minute: minute as number,
+   465→      x: x as number,
+   466→      y: y as number,
+   467→      type: "BALL_LOSS" as TacticalEventType,
+   468→    })),
+   469→    { playerId: byNumber(6).id, minute: 8, x: 45, y: 50, type: "BALL_RECOVERY" },
+   470→    { playerId: byNumber(11).id, minute: 22, x: 58, y: 32, type: "BALL_RECOVERY" },
+   471→    { playerId: byNumber(7).id, minute: 47, x: 62, y: 68, type: "BALL_RECOVERY" },
+   472→    { playerId: byNumber(17).id, minute: 31, x: 71, y: 74, type: "GOAL_FOR" },
+   473→    { playerId: byNumber(9).id, minute: 89, x: 76, y: 46, type: "GOAL_FOR" },
+   474→    { playerId: null, minute: 12, x: 88, y: 40, type: "GOAL_AGAINST" },
+   475→    { playerId: byNumber(3).id, minute: 15, x: 55, y: 20, type: "POSITIVE_DUEL" },
+   476→    { playerId: byNumber(4).id, minute: 28, x: 48, y: 18, type: "POSITIVE_DUEL" },
+   477→    { playerId: byNumber(2).id, minute: 36, x: 52, y: 82, type: "POSITIVE_DUEL" },
+   478→    { playerId: byNumber(3).id, minute: 24, x: 61, y: 24, type: "NEGATIVE_DUEL" },
+   479→    { playerId: byNumber(21).id, minute: 33, x: 44, y: 55, type: "NEGATIVE_DUEL" },
+   480→    { playerId: byNumber(11).id, minute: 40, x: 66, y: 20, type: "NEGATIVE_DUEL" },
+   481→    { playerId: byNumber(2).id, minute: 52, x: 59, y: 78, type: "NEGATIVE_DUEL" },
+   482→    { playerId: byNumber(8).id, minute: 58, x: 38, y: 48, type: "NEGATIVE_DUEL" },
+   483→    { playerId: byNumber(20).id, minute: 61, x: 30, y: 62, type: "NEGATIVE_DUEL" },
+   484→    { playerId: byNumber(19).id, minute: 66, x: 52, y: 40, type: "NEGATIVE_DUEL" },
+   485→    { playerId: byNumber(9).id, minute: 85, x: 80, y: 45, type: "ATTEMPTED_SHOT" },
+   486→    { playerId: null, minute: 74, x: 84, y: 55, type: "OPPONENT_CHANCE" },
+   487→    { playerId: byNumber(5).id, minute: 0, x: 0, y: 0, type: "CUSTOM" }, // nota: lesión
+   488→  ];
+   489→
+   490→  const existingEvents = await prisma.tacticalEvent.count({ where: { reportId: report.id } });
+   491→  if (existingEvents === 0) {
+   492→    await prisma.tacticalEvent.createMany({
+   493→      data: eventsData.map((e) => ({
+   494→        reportId: report.id,
+   495→        playerId: e.type === "CUSTOM" ? null : e.playerId,
+   496→        minute: e.minute,
+   497→        x: e.x,
+   498→        y: e.y,
+   499→        type: e.type,
+   500→      })),
+   501→    });
+   502→  }
+   503→
+   504→  // Cuaderno de notas individual
+   505→  const notesSeed = [
+   506→    { shirt: 3, flag: "GREEN" as Semaphore, note: "Gran intensidad al press y llegadas al área." },
+   507→    { shirt: 6, flag: "AMBER" as Semaphore, note: "Frenó mejor en el segundo tiempo." },
+   508→    { shirt: 9, flag: "GREEN" as Semaphore, note: "Primer partido tras lesión: 20 minutos con gol." },
+   509→    { shirt: 8, flag: "RED" as Semaphore, note: "Desconectado en salida; dos pérdidas evitables." },
+   510→    { shirt: 1, flag: "AMBER" as Semaphore, note: "Dudó con los pies ante presión. Trabajar salida." },
+   511→  ];
+   512→  for (const n of notesSeed) {
+   513→    await prisma.playerMatchNote.upsert({
+   514→      where: { reportId_playerId: { reportId: report.id, playerId: byNumber(n.shirt).id } },
+   515→      update: {},
+   516→      create: { reportId: report.id, playerId: byNumber(n.shirt).id, flag: n.flag, note: n.note },
+   517→    });
+   518→  }
+   519→  console.log("SEED: partidos + ingesta OK (21 eventos tácticos, 5 notas)");
+   520→
+   521→  // ---------- 6) Pulso colectivo de esta semana ----------
+   522→  const monday = mondayOf(now); // lunes-Madrid canónico (misma convención que el motor)
+   523→  await prisma.teamPulse.upsert({
+   524→    where: { teamId_date: { teamId: primerEquipo.id, date: monday } },
+   525→    update: { moraleScore: 6, fatigueScore: 7, resultsStreak: 2 },
+   526→    create: {
+   527→      clubId: club.id,
+   528→      teamId: primerEquipo.id,
+   529→      date: monday,
+   530→      moraleScore: 6,
+   531→      fatigueScore: 7,
+   532→      resultsStreak: 2,
+   533→      notes: "Grupo respondedor tras dos victorias, pero con carga acumulada de la semana doble.",
+   534→      capturedById: mister.id,
+   535→    },
+   536→  });
+   537→  console.log("SEED: pulso colectivo OK");
+   538→
+   539→  // ---------- 7) Microciclo PROPOSED de esta semana (cero pantallas en blanco) ----------
+   540→  const existingCycle = await prisma.microcycle.findUnique({
+   541→    where: { teamId_weekStart: { teamId: primerEquipo.id, weekStart: monday } },
+   542→    include: { issues: true },
+   543→  });
+   544→
+   545→  if (existingCycle) {
+   546→    console.log("SEED: microciclo de esta semana ya existe — no se toca");
+   547→  } else {
+   548→    const sessionDate = (offset: number) => {
+   549→      const d = new Date(monday);
+   550→      d.setDate(d.getDate() + offset);
+   551→      return at(d, 10, 30);
+   552→    };
+   553→
+   554→    // 7.1) Microciclo
+   555→    const cycle = await prisma.microcycle.create({
+   556→      data: {
+   557→        clubId: club.id,
+   558→        teamId: primerEquipo.id,
+   559→        weekStart: monday,
+   560→        status: "PROPOSED",
+   561→        tacticalDirectives: [
+   562→          "Salida de balón limpia desde atrás bajo presión media",
+   563→          "Reacción tras pérdida: cierre en 5 segundos",
+   564→        ],
+   565→        methodologicalApproach: "Analítico-inductivo por proximidad, progresión a tareas globales",
+   566→        diagnosisSummary:
+   567→          "El sábado sufrimos en construcción (8 pérdidas en el 1/3 propio, mayoría por la izquierda) y el grupo llega con fatiga 7/10 tras la semana doble. Prioridad: limpiar la salida con intensidad controlada y reactivar la reacción tras pérdida.",
+   568→        engineVersion: "v0.1-heuristic",
+   569→        analyzedMatches: { create: [{ matchId: matchLast.id }] },
+   570→      },
+   571→    });
+   572→
+   573→    // 7.2) Diagnóstico estructurado
+   574→    const issueTactical = await prisma.diagnosisIssue.create({
+   575→      data: {
+   576→        microcycleId: cycle.id,
+   577→        subPrincipleId: spId["reaccion-perdida"],
+   578→        phase: "OFF_TRANSITION",
+   579→        kind: "TACTICAL",
+   580→        severity: 4,
+   581→        evidence: "8 pérdidas en construcción (1/3 propio), 5 por el carril izquierdo",
+   582→        metric: { totalLosses: 8, buildUpLosses: 8, leftSide: 5 },
+   583→      },
+   584→    });
+   585→
+   586→    const issuePhysical = await prisma.diagnosisIssue.create({
+   587→      data: {
+   588→        microcycleId: cycle.id,
+   589→        kind: "PHYSICAL",
+   590→        severity: 3,
+   591→        evidence: "Fatiga grupal acumulada 7/10 — controlar la carga de la semana",
+   592→        metric: { fatigueScore: 7 },
+   593→      },
+   594→    });
+   595→
+   596→    // Sesiones y tareas prescritas
+   597→    const sMD1 = await prisma.session.create({
+   598→      data: {
+   599→        microcycleId: cycle.id,
+   600→        date: sessionDate(1),
+   601→        label: "MD+1",
+   602→        objective: "Regeneración y asimilación del esfuerzo del partido",
+   603→        durationMin: 50,
+   604→      },
+   605→    });
+   606→    await prisma.sessionTask.create({
+   607→      data: {
+   608→        sessionId: sMD1.id,
+   609→        taskId: taskIdByTitle["Regeneración: rondos suaves + movilidad"],
+   610→        order: 1,
+   611→        durationMin: 40,
+   612→        rationale: "Fatiga 7/10: intensidad controlada para asimilar el esfuerzo del sábado.",
+   613→        prescribedIssueId: issuePhysical.id,
+   614→      },
+   615→    });
+   616→
+   617→    const sMD3 = await prisma.session.create({
+   618→      data: {
+   619→        microcycleId: cycle.id,
+   620→        date: sessionDate(2),
+   621→        label: "MD-3",
+   622→        objective: "Sesión principal: salida limpia + reacción tras pérdida",
+   623→        durationMin: 80,
+   624→      },
+   625→    });
+   626→    await prisma.sessionTask.create({
+   627→      data: {
+   628→        sessionId: sMD3.id,
+   629→        taskId: taskIdByTitle["Salida de balón 4+3 desde el portero bajo presión media"],
+   630→        order: 1,
+   631→        durationMin: 30,
+   632→        rationale: "Entra por: 8 pérdidas en construcción. Tarea núcleo de salida bajo presión, anchura de CB y tercer hombre.",
+   633→        prescribedIssueId: issueTactical.id,
+   634→      },
+   635→    });
+   636→    await prisma.sessionTask.create({
+   637→      data: {
+   638→        sessionId: sMD3.id,
+   639→        taskId: taskIdByTitle["Transiciones 4v4+2: reacción de 5 segundos"],
+   640→        order: 2,
+   641→        durationMin: 24,
+   642→        rationale: "Repite el gesto de presión tras pérdida en formato reducido: máxima repetición, fatiga controlada.",
+   643→      },
+   644→    });
+   645→
+   646→    const sMD2 = await prisma.session.create({
+   647→      data: {
+   648→        microcycleId: cycle.id,
+   649→        date: sessionDate(3),
+   650→        label: "MD-2",
+   651→        objective: "Consolidación + preparación del plan de partido",
+   652→        durationMin: 70,
+   653→      },
+   654→    });
+   655→    await prisma.sessionTask.create({
+   656→      data: {
+   657→        sessionId: sMD2.id,
+   658→        taskId: taskIdByTitle["Partido 8v8 con reacción tras pérdida de 5 segundos"],
+   659→        order: 1,
+   660→        durationMin: 30,
+   661→        rationale: "Automatismo del 5s en formato global antes del partido, con dosis alta pero dirigida.",
+   662→      },
+   663→    });
+   664→
+   665→    const sMD1pre = await prisma.session.create({
+   666→      data: {
+   667→        microcycleId: cycle.id,
+   668→        date: sessionDate(4),
+   669→        label: "MD-1",
+   670→        objective: "Activación pre-partido: velocidad y automatismos",
+   671→        durationMin: 45,
+   672→      },
+   673→    });
+   674→    await prisma.sessionTask.create({
+   675→      data: {
+   676→        sessionId: sMD1pre.id,
+   677→        taskId: taskIdByTitle["Activación pre-partido: velocidad de pies + posesión 5v2"],
+   678→        order: 1,
+   679→        durationMin: 35,
+   680→        rationale: "Activación neuromuscular previa al partido.",
+   681→      },
+   682→    });
+   683→
+   684→    console.log("SEED: microciclo PROPOSED cocinado (4 sesiones, 5 tareas, 2 issues)");
+   685→  }
+   686→
+   687→  console.log("SEED: completo");
+   688→}
+   689→
+   690→main()
+   691→  .then(() => prisma.$disconnect())
+   692→  .catch(async (e) => {
+   693→    console.error("SEED error:", e);
+   694→    await prisma.$disconnect();
+   695→    process.exit(1);
+   696→  });
+   697→

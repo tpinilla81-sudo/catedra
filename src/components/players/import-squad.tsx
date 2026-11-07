@@ -86,7 +86,7 @@ export function ImportSquadDialog() {
           aria-label="Importar plantilla desde CSV o Excel"
         >
           <UploadCloud className="w-5 h-5" aria-hidden />
-          <span className="hidden sm:inline">Importar</span>
+          <span>Importar</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="bg-zinc-900 border-zinc-800 rounded-3xl max-w-lg gap-4">
