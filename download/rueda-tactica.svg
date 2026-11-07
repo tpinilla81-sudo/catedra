@@ -1,0 +1,27 @@
+<svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" class="w-full h-full" role="img" aria-labelledby="tt">
+  <title id="tt">Rueda Táctica — ECOSYSTEM MÉTODO</title>
+
+  <!-- Fondo y Círculo Exterior -->
+  <circle cx="250.0" cy="250.0" r="230" fill="#F4F1EA" stroke="#1B4D3E" stroke-width="14" />
+
+  <!-- Sectores de la Rueda Táctica: 4 × 80°, separadores crema de 10° en las diagonales -->
+  <path d="M 250.0 250.0 L 115.01 89.13 A 210.0 210.0 0 0 1 384.99 89.13 Z" fill="#77C378" stroke="#F4F1EA" stroke-width="8" />
+  <path d="M 250.0 250.0 L 410.87 115.01 A 210.0 210.0 0 0 1 410.87 384.99 Z" fill="#77C378" stroke="#F4F1EA" stroke-width="8" />
+  <path d="M 250.0 250.0 L 384.99 410.87 A 210.0 210.0 0 0 1 115.01 410.87 Z" fill="#77C378" stroke="#F4F1EA" stroke-width="8" />
+  <path d="M 250.0 250.0 L 89.13 384.99 A 210.0 210.0 0 0 1 89.13 115.01 Z" fill="#77C378" stroke="#F4F1EA" stroke-width="8" />
+
+  <!-- Sombra interior del sector norte (efecto profundidad hacia el núcleo) -->
+  <path d="M 250.0 250.0 L 160.01 142.75 A 140.0 140.0 0 0 1 339.99 142.75 Z" fill="#5BA85C" opacity="0.35" />
+
+  <!-- Núcleo Central -->
+  <circle cx="250.0" cy="250.0" r="75" fill="#FFFFFF" stroke="#D3C5B4" stroke-width="6" />
+  <circle cx="250.0" cy="250.0" r="60" fill="none" stroke="#77C378" stroke-width="3" />
+
+  <!-- Letra 'C' fina, centrada de verdad (text-anchor=middle en x=250) -->
+  <text x="250" y="278"
+        font-family="system-ui, -apple-system, sans-serif"
+        font-weight="300"
+        font-size="78"
+        fill="#5BA85C"
+        text-anchor="middle">C</text>
+</svg>
