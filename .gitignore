@@ -52,3 +52,10 @@ prompt
 server.log
 # Skills directory
 /skills/tool-results/
+
+# datos locales embebidos (no versionar)
+.pgdata/
+pg.log
+
+# ejemplo de entorno sí se versiona
+!.env.example
