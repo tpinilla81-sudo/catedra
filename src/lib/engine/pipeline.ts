@@ -20,7 +20,7 @@
 //   • scripts/validate-pilar4.ts (validación E2E)
 // ============================================================================
 import { addDays, subDays } from "date-fns";
-import type { PrismaClient } from "@prisma/client";
+import type { GamePhase, PrismaClient } from "@prisma/client";
 import {
   buildIssueDrafts,
   collectInputs,
@@ -187,7 +187,7 @@ async function rankPhaseCandidates(
   db: PipelineDb,
   phase: string,
 ): Promise<CandidateRow[]> {
-  const sps = await db.subPrinciple.findMany({ where: { phase }, select: { id: true } });
+  const sps = await db.subPrinciple.findMany({ where: { phase: phase as GamePhase }, select: { id: true } });
   if (sps.length === 0) return [];
   const links = await db.taskSubPrinciple.findMany({
     where: { subPrincipleId: { in: sps.map((s) => s.id) } },

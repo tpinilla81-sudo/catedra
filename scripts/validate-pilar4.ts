@@ -16,6 +16,7 @@
 import { PrismaClient } from "@prisma/client";
 import { addDays, startOfWeek } from "date-fns";
 import { createTenantClient } from "../src/lib/tenant";
+import { writeResults } from "./validation-output";
 import {
   prescribeForIssues,
   rankTaskCandidates,
@@ -28,8 +29,13 @@ import {
 const PG = "postgresql://postgres:postgres@localhost:5432/metodo";
 const BASE = "http://localhost:3000";
 let failures = 0;
+let total = 0;
+const checkLog: Array<{ name: string; ok: boolean }> = [];
+const t0 = Date.now();
 
 function check(name: string, cond: boolean, detail = "") {
+  total++;
+  checkLog.push({ name, ok: cond });
   if (cond) {
     console.log(`  ✅ ${name}`);
   } else {
@@ -472,6 +478,8 @@ await purgeTestData();
 console.log("  material sintético eliminado (equipo, microciclos, runs, tareas, recetas, SPs)");
 
 await raw.$disconnect();
+
+await writeResults(4, "Motor Prescriptivo + Auditoría + Hoy (Pilar 4)", total, failures, t0, checkLog);
 
 console.log(
   `\n${failures === 0 ? "🎉 TODO OK — Pilar 4 validado (motor prescriptivo + auditoría + transparencia)" : `💥 ${failures} fallos`}`,

@@ -1,0 +1,219 @@
+{
+  "pilar": 3,
+  "title": "Ingesta Post-Partido (Pilar 3)",
+  "total": 52,
+  "passed": 52,
+  "failed": 0,
+  "durationMs": 1876,
+  "timestamp": "2026-11-07T10:05:33.559Z",
+  "checks": [
+    {
+      "name": "mondayOf: domingo → lunes de su semana ISO",
+      "ok": true
+    },
+    {
+      "name": "fatiga 9/10 → hallazgo FÍSICO severidad 4",
+      "ok": true
+    },
+    {
+      "name": "ánimo 2/10 → hallazgo ANÍMICO (éxito temprano)",
+      "ok": true
+    },
+    {
+      "name": "7 pérdidas en 1/3 propio → táctico OFF_TRANSITION con subprincipio",
+      "ok": true
+    },
+    {
+      "name": "severidad escala con el volumen: 7 pérdidas → severidad 3",
+      "ok": true
+    },
+    {
+      "name": "6 duelos perdidos → táctico DEFENSIVE",
+      "ok": true
+    },
+    {
+      "name": "5 pérdidas (umbral 6) con pulso sano → consolidación ofensiva",
+      "ok": true
+    },
+    {
+      "name": "ingesta completa → ok:true con reportId",
+      "ok": true
+    },
+    {
+      "name": "eventos saneados: 21 guardados de 22 enviados",
+      "ok": true
+    },
+    {
+      "name": "notas saneadas: 2 guardadas de 4 enviadas",
+      "ok": true
+    },
+    {
+      "name": "partido → ANALYZED con marcador 2-1",
+      "ok": true
+    },
+    {
+      "name": "semáforo GREEN + sliders saneados (99→10, -3→1, 7.5→8)",
+      "ok": true
+    },
+    {
+      "name": "notas del reporte truncadas a 500",
+      "ok": true
+    },
+    {
+      "name": "21 eventos en la pizarra (22 enviados − 1 tipo inválido)",
+      "ok": true
+    },
+    {
+      "name": "coordenadas clamp 0-100 y minuto ≤130 (remate saneado)",
+      "ok": true
+    },
+    {
+      "name": "zona 1/3 propio: 8 pérdidas registradas en construcción",
+      "ok": true
+    },
+    {
+      "name": "evento con jugador ajeno → playerId null (colectivo)",
+      "ok": true
+    },
+    {
+      "name": "eventos firmados por el jugador correcto",
+      "ok": true
+    },
+    {
+      "name": "cuaderno: 2 notas (una por jugador, inválidas filtradas)",
+      "ok": true
+    },
+    {
+      "name": "nota verde 'Gran partido' persistida",
+      "ok": true
+    },
+    {
+      "name": "nota ámbar truncada a 140 caracteres",
+      "ok": true
+    },
+    {
+      "name": "hook: racha de resultados cacheada en el pulso (+1 victoria)",
+      "ok": true
+    },
+    {
+      "name": "hook: PROPOSED re-diagnosticado con los 2 hallazgos tácticos",
+      "ok": true
+    },
+    {
+      "name": "hallazgos con métrica cruda auditada (Json)",
+      "ok": true
+    },
+    {
+      "name": "feedback inmediato: evidencia del motor en la respuesta de la ingesta",
+      "ok": true
+    },
+    {
+      "name": "hook: semana del partido refrescada",
+      "ok": true
+    },
+    {
+      "name": "hook: EngineRun EVIDENCE_REFRESH persistido (auditoría)",
+      "ok": true
+    },
+    {
+      "name": "re-ingesta → ok:true con EL MISMO reportId (edición)",
+      "ok": true
+    },
+    {
+      "name": "matchReport unique: solo 1 reporte para el partido",
+      "ok": true
+    },
+    {
+      "name": "semáforo actualizado a AMBER y marcador 1-1",
+      "ok": true
+    },
+    {
+      "name": "marcador del partido actualizado 1-1",
+      "ok": true
+    },
+    {
+      "name": "pizarra reemplazada por completo (1 evento, sin residuos)",
+      "ok": true
+    },
+    {
+      "name": "cuaderno actualizado sin duplicados (mismas 2 notas, flags nuevos)",
+      "ok": true
+    },
+    {
+      "name": "racha recalculada tras re-ingesta: empate → 0",
+      "ok": true
+    },
+    {
+      "name": "club A NO ve matchReports del intruso (RELATION_SCOPED)",
+      "ok": true
+    },
+    {
+      "name": "club A NO ve eventos tácticos del intruso",
+      "ok": true
+    },
+    {
+      "name": "club A NO ve notas del cuaderno del intruso",
+      "ok": true
+    },
+    {
+      "name": "ingesta de partido cross-club → 'Partido no encontrado.'",
+      "ok": true
+    },
+    {
+      "name": "ingesta de partido de otro equipo del club → rechazada",
+      "ok": true
+    },
+    {
+      "name": "Tenant Guard bloquea create de partido cross-tenant",
+      "ok": true
+    },
+    {
+      "name": "ingesta rechazada NO escribió ningún dato",
+      "ok": true
+    },
+    {
+      "name": "login COACH_ADMIN obtiene session-token",
+      "ok": true
+    },
+    {
+      "name": "COACH_ADMIN: /dashboard/matches 200",
+      "ok": true
+    },
+    {
+      "name": "matches: partido analizado con rival, resultado 1-1 y semáforo ámbar",
+      "ok": true
+    },
+    {
+      "name": "matches: enlace firmado a la ingesta ?g=",
+      "ok": true
+    },
+    {
+      "name": "COACH_ADMIN: /dashboard/match?g= 200 con el asistente de 3 pasos",
+      "ok": true
+    },
+    {
+      "name": "ingesta: carga el reporte previo para edición",
+      "ok": true
+    },
+    {
+      "name": "seguridad: ingesta del partido del intruso → 404",
+      "ok": true
+    },
+    {
+      "name": "diseño: /dashboard/match sin ?g= → 404 (la ingesta se firma desde Partidos)",
+      "ok": true
+    },
+    {
+      "name": "login ANALYST obtiene session-token",
+      "ok": true
+    },
+    {
+      "name": "ANALYST: /dashboard/matches 200 (la ingesta es su trabajo)",
+      "ok": true
+    },
+    {
+      "name": "anónimo: /dashboard/matches → redirect a /",
+      "ok": true
+    }
+  ]
+}

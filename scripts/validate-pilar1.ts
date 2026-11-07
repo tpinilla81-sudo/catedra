@@ -10,11 +10,17 @@
 import { PrismaClient } from "@prisma/client";
 import { hasPermission, canWriteClubContent, canWriteCatedra, isReadOnlyRole } from "../src/utils/permissions";
 import { createTenantClient } from "../src/lib/tenant";
+import { writeResults } from "./validation-output";
 
 const PG = "postgresql://postgres:postgres@localhost:5432/metodo";
 let failures = 0;
+let total = 0;
+const checkLog: Array<{ name: string; ok: boolean }> = [];
+const t0 = Date.now();
 
 function check(name: string, cond: boolean, detail = "") {
+  total++;
+  checkLog.push({ name, ok: cond });
   if (cond) {
     console.log(`  ✅ ${name}`);
   } else {
@@ -191,6 +197,8 @@ const anonCat = await GET("/dashboard/catedra");
 check("anónimo: /catedra → redirect a /", anonCat.status >= 300 && anonCat.status < 400);
 
 await raw.$disconnect();
+
+await writeResults(1, "Biblioteca de Sabiduría + RBAC (Pilar 1)", total, failures, t0, checkLog);
 
 console.log(`\n${failures === 0 ? "🎉 TODO OK — Pilar 1 validado" : `💥 ${failures} fallos`}`);
 process.exit(failures === 0 ? 0 : 1);

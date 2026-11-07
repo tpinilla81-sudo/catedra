@@ -1,0 +1,287 @@
+{
+  "pilar": 2,
+  "title": "Plantilla y Pulso (Pilar 2)",
+  "total": 69,
+  "passed": 69,
+  "failed": 0,
+  "durationMs": 1467,
+  "timestamp": "2026-11-07T10:05:31.547Z",
+  "checks": [
+    {
+      "name": "parseCsv: delimitador coma",
+      "ok": true
+    },
+    {
+      "name": "parseCsv: delimitador ; auto + CRLF",
+      "ok": true
+    },
+    {
+      "name": "parseCsv: delimitador tab auto",
+      "ok": true
+    },
+    {
+      "name": "parseCsv: comillas RFC-4180 con comilla escapada",
+      "ok": true
+    },
+    {
+      "name": "parseCsv: coma dentro de comillas no parte campo",
+      "ok": true
+    },
+    {
+      "name": "parseCsv: BOM UTF-8 eliminado",
+      "ok": true
+    },
+    {
+      "name": "parseCsv: filas vacías descartadas",
+      "ok": true
+    },
+    {
+      "name": "buildColumnMap: alias castellanos mapeados (nombre completo)",
+      "ok": true
+    },
+    {
+      "name": "buildColumnMap: 'nota' NO colisiona con dorsal 'no'",
+      "ok": true
+    },
+    {
+      "name": "buildColumnMap: 'Nombre' → firstName",
+      "ok": true
+    },
+    {
+      "name": "clampRating: 0 → 1 (suelo)",
+      "ok": true
+    },
+    {
+      "name": "clampRating: 9 → 5 (techo)",
+      "ok": true
+    },
+    {
+      "name": "clampRating: coma decimal '3,5' → 4",
+      "ok": true
+    },
+    {
+      "name": "clampRating: texto basura → null",
+      "ok": true
+    },
+    {
+      "name": "clampRating: vacío → null",
+      "ok": true
+    },
+    {
+      "name": "parseShirt: '10' → 10",
+      "ok": true
+    },
+    {
+      "name": "parseShirt: 'sin' → null",
+      "ok": true
+    },
+    {
+      "name": "parseStatus: 'Lesionado' → INJURED",
+      "ok": true
+    },
+    {
+      "name": "parseStatus: 'SANCIONADO' → SUSPENDED",
+      "ok": true
+    },
+    {
+      "name": "parseStatus: desconocido → AVAILABLE",
+      "ok": true
+    },
+    {
+      "name": "parseSecondary: split multi-separador + filtra demarcación principal",
+      "ok": true
+    },
+    {
+      "name": "normalizePosition: 'central' → CB",
+      "ok": true
+    },
+    {
+      "name": "normalizePosition: 'MCO' → AM",
+      "ok": true
+    },
+    {
+      "name": "normalizePosition: 'Delantero Centro' → CF",
+      "ok": true
+    },
+    {
+      "name": "normalizePosition: 'pivote' → DM",
+      "ok": true
+    },
+    {
+      "name": "normalizePosition: desconocida → null",
+      "ok": true
+    },
+    {
+      "name": "normalizeName: acentos/caso/espacios",
+      "ok": true
+    },
+    {
+      "name": "import CSV: 2 creados + 1 actualizado + 2 errores",
+      "ok": true
+    },
+    {
+      "name": "error de dorsal duplicado identifica al dueño",
+      "ok": true
+    },
+    {
+      "name": "error de posición no reconocida es legible",
+      "ok": true
+    },
+    {
+      "name": "metadata: posición principal CB + secundarias [CM, LB] (array nativo)",
+      "ok": true
+    },
+    {
+      "name": "metadata: rating técnico clamped '3,5' → 4",
+      "ok": true
+    },
+    {
+      "name": "metadata: dorsal 4 asignado",
+      "ok": true
+    },
+    {
+      "name": "metadata: portero GK con nota 'Sin problemas'",
+      "ok": true
+    },
+    {
+      "name": "actualización: RW → LW, dorsal 20 → 11, estado INJURED con nota",
+      "ok": true
+    },
+    {
+      "name": "actualización: ratings sobrescritos 5/3/3",
+      "ok": true
+    },
+    {
+      "name": "reimportación idempotente: 0 creados, 3 actualizados, mismos 2 errores",
+      "ok": true
+    },
+    {
+      "name": "sin duplicados en BD tras reimportar",
+      "ok": true
+    },
+    {
+      "name": "import 2 columnas: nombre y apellidos separados",
+      "ok": true
+    },
+    {
+      "name": "import 2 columnas: lastName 'Guardiola' + pivote DM",
+      "ok": true
+    },
+    {
+      "name": "fileToMatrix: lee .xlsx real (no .csv)",
+      "ok": true
+    },
+    {
+      "name": "import XLSX: jugador creado con alias ingleses",
+      "ok": true
+    },
+    {
+      "name": "import XLSX: GK con dorsal 13 persistido",
+      "ok": true
+    },
+    {
+      "name": "fileToMatrix: acepta .csv con BOM",
+      "ok": true
+    },
+    {
+      "name": "fileToMatrix: formato no soportado → error claro",
+      "ok": true
+    },
+    {
+      "name": "disponibilidad calculada de la plantilla: 4 disponibles + 1 lesionado",
+      "ok": true
+    },
+    {
+      "name": "club A NO ve jugadores del intruso",
+      "ok": true
+    },
+    {
+      "name": "Tenant Guard bloquea create de jugador cross-tenant",
+      "ok": true
+    },
+    {
+      "name": "create de jugador sin clubId → inyecta clubId del tenant",
+      "ok": true
+    },
+    {
+      "name": "update de jugador del intruso falla y no muta nada",
+      "ok": true
+    },
+    {
+      "name": "TeamPulse: unique (teamId, date) rechaza segundo pulso del día",
+      "ok": true
+    },
+    {
+      "name": "TeamPulse: fatiga 5 → 8 y ánimo 6 → 3 persistidos (edición, no duplicado)",
+      "ok": true
+    },
+    {
+      "name": "collectInputs: devuelve el pulso más reciente (fatiga 8)",
+      "ok": true
+    },
+    {
+      "name": "pulso fatiga 8/10 → hallazgo FÍSICO con evidencia legible",
+      "ok": true
+    },
+    {
+      "name": "pulso ánimo 3/10 → hallazgo ANÍMICO (éxito temprano)",
+      "ok": true
+    },
+    {
+      "name": "racha: 2 victorias seguidas → +2",
+      "ok": true
+    },
+    {
+      "name": "racha: empate lo más reciente → 0",
+      "ok": true
+    },
+    {
+      "name": "racha: derrota lo más reciente → -1",
+      "ok": true
+    },
+    {
+      "name": "racha cacheada en TeamPulse.resultsStreak del lunes",
+      "ok": true
+    },
+    {
+      "name": "club A NO ve pulsos del intruso",
+      "ok": true
+    },
+    {
+      "name": "update de pulso del intruso bloqueado por scope",
+      "ok": true
+    },
+    {
+      "name": "login COACH_ADMIN obtiene session-token",
+      "ok": true
+    },
+    {
+      "name": "COACH_ADMIN: /dashboard/players 200",
+      "ok": true
+    },
+    {
+      "name": "COACH_ADMIN: vista Plantilla con stats de disponibilidad",
+      "ok": true
+    },
+    {
+      "name": "COACH_ADMIN: acceso a importación CSV/Excel",
+      "ok": true
+    },
+    {
+      "name": "COACH_ADMIN: /dashboard/today 200 (pulso visible si existe)",
+      "ok": true
+    },
+    {
+      "name": "login ANALYST obtiene session-token",
+      "ok": true
+    },
+    {
+      "name": "ANALYST: /dashboard/players 200 (la ingesta es su trabajo)",
+      "ok": true
+    },
+    {
+      "name": "anónimo: /dashboard/players → redirect a /",
+      "ok": true
+    }
+  ]
+}

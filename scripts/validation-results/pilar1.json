@@ -1,0 +1,171 @@
+{
+  "pilar": 1,
+  "title": "Biblioteca de Sabiduría + RBAC (Pilar 1)",
+  "total": 40,
+  "passed": 40,
+  "failed": 0,
+  "durationMs": 3548,
+  "timestamp": "2026-11-07T10:05:29.399Z",
+  "checks": [
+    {
+      "name": "ANALYST no pasa guard COACH_ADMIN",
+      "ok": true
+    },
+    {
+      "name": "COACH_ADMIN pasa guard COACH_ADMIN",
+      "ok": true
+    },
+    {
+      "name": "COACH_ADMIN pasa guard ANALYST",
+      "ok": true
+    },
+    {
+      "name": "PLATFORM_ADMIN pasa guard COACH_ADMIN",
+      "ok": true
+    },
+    {
+      "name": "null no pasa nada",
+      "ok": true
+    },
+    {
+      "name": "ANALYST no escribe contenido de club",
+      "ok": true
+    },
+    {
+      "name": "COACH_ADMIN escribe contenido de club",
+      "ok": true
+    },
+    {
+      "name": "PLATFORM_ADMIN NO escribe contenido de club",
+      "ok": true
+    },
+    {
+      "name": "PLATFORM_ADMIN escribe Cátedra",
+      "ok": true
+    },
+    {
+      "name": "COACH_ADMIN NO escribe Cátedra",
+      "ok": true
+    },
+    {
+      "name": "ANALYST es solo lectura",
+      "ok": true
+    },
+    {
+      "name": "COACH_ADMIN no es solo lectura",
+      "ok": true
+    },
+    {
+      "name": "helpers aceptan rol suelto",
+      "ok": true
+    },
+    {
+      "name": "club A ve su contenido",
+      "ok": true
+    },
+    {
+      "name": "club A ve contenido global Cátedra (clubId=null)",
+      "ok": true
+    },
+    {
+      "name": "club A NO ve contenido de club intruso",
+      "ok": true
+    },
+    {
+      "name": "club A NO ve tareas del intruso",
+      "ok": true
+    },
+    {
+      "name": "Tenant Guard bloquea create cross-tenant",
+      "ok": true
+    },
+    {
+      "name": "create sin clubId explícito → inyecta clubId del tenant",
+      "ok": true
+    },
+    {
+      "name": "TaskSubPrinciple del intruso invisible para club A (scope por relación)",
+      "ok": true
+    },
+    {
+      "name": "login COACH_ADMIN obtiene session-token",
+      "ok": true
+    },
+    {
+      "name": "COACH_ADMIN: /library 200",
+      "ok": true
+    },
+    {
+      "name": "COACH_ADMIN: ve botón '+ Tarea'",
+      "ok": true
+    },
+    {
+      "name": "COACH_ADMIN: /catedra → redirect a /",
+      "ok": true
+    },
+    {
+      "name": "COACH_ADMIN: / 200 (Hoy)",
+      "ok": true
+    },
+    {
+      "name": "COACH_ADMIN: sin banner 'Gestión Plataforma'",
+      "ok": true
+    },
+    {
+      "name": "login ANALYST obtiene session-token",
+      "ok": true
+    },
+    {
+      "name": "ANALYST: /library 200",
+      "ok": true
+    },
+    {
+      "name": "ANALYST: ve banner 'Solo lectura'",
+      "ok": true
+    },
+    {
+      "name": "ANALYST: NO ve botón '+ Tarea' de cabecera",
+      "ok": true
+    },
+    {
+      "name": "ANALYST: /catedra → redirect a /",
+      "ok": true
+    },
+    {
+      "name": "ANALYST: / 200 (Hoy)",
+      "ok": true
+    },
+    {
+      "name": "login PLATFORM_ADMIN obtiene session-token",
+      "ok": true
+    },
+    {
+      "name": "PLATFORM_ADMIN: / 200 o redirect→/catedra",
+      "ok": true
+    },
+    {
+      "name": "PLATFORM_ADMIN: /catedra 200",
+      "ok": true
+    },
+    {
+      "name": "PLATFORM_ADMIN: ve banner 'Gestión Plataforma'",
+      "ok": true
+    },
+    {
+      "name": "PLATFORM_ADMIN: ve botón '+ Tarea'",
+      "ok": true
+    },
+    {
+      "name": "PLATFORM_ADMIN: /library → redirect a /",
+      "ok": true
+    },
+    {
+      "name": "anónimo: /library → redirect a /",
+      "ok": true
+    },
+    {
+      "name": "anónimo: /catedra → redirect a /",
+      "ok": true
+    }
+  ]
+}

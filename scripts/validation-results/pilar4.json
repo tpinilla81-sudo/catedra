@@ -1,0 +1,135 @@
+{
+  "pilar": 4,
+  "title": "Motor Prescriptivo + Auditoría + Hoy (Pilar 4)",
+  "total": 31,
+  "passed": 31,
+  "failed": 0,
+  "durationMs": 1196,
+  "timestamp": "2026-11-07T10:05:34.928Z",
+  "checks": [
+    {
+      "name": "ranking: rel3 HIGH primero, luego rel2 LOW, luego rel2 MEDIUM",
+      "ok": true
+    },
+    {
+      "name": "prescripción: tras descartes, elige la factible",
+      "ok": true
+    },
+    {
+      "name": "duración ajustada a la regla táctica (≤60')",
+      "ok": true
+    },
+    {
+      "name": "descartada HIGH por fatiga 8/10",
+      "ok": true
+    },
+    {
+      "name": "descartada por jugadores insuficientes",
+      "ok": true
+    },
+    {
+      "name": "exactamente 2 descartadas en el unit",
+      "ok": true
+    },
+    {
+      "name": "pipeline crea la propuesta",
+      "ok": true
+    },
+    {
+      "name": "EngineRun persistido (WEEKLY_PROPOSAL)",
+      "ok": true
+    },
+    {
+      "name": "3 hallazgos diagnosticados (físico + 2 tácticos)",
+      "ok": true
+    },
+    {
+      "name": "2 prescripciones tácticas con rationale",
+      "ok": true
+    },
+    {
+      "name": "descartadas auditadas con motivo legible",
+      "ok": true
+    },
+    {
+      "name": "microciclo PROPOSED con engineVersion v0.2",
+      "ok": true
+    },
+    {
+      "name": "MD-3 lleva 2 tareas tácticas con rationale del motor",
+      "ok": true
+    },
+    {
+      "name": "MD-2 consolida la 2ª prescripción",
+      "ok": true
+    },
+    {
+      "name": "SessionTask con prescribedIssueId (trazabilidad hallazgo→césped) en MD-3 y MD-2",
+      "ok": true
+    },
+    {
+      "name": "prescripciones auditadas llevan etiqueta de sesión",
+      "ok": true
+    },
+    {
+      "name": "EngineRun guarda issuesJson + prescriptions + discarded + durationMs",
+      "ok": true
+    },
+    {
+      "name": "EngineRun ligado al microciclo",
+      "ok": true
+    },
+    {
+      "name": "refresh procesa la semana del partido (PROPOSED)",
+      "ok": true
+    },
+    {
+      "name": "PROPOSED re-prescrito: MD-3 reemplazado con tareas frescas",
+      "ok": true
+    },
+    {
+      "name": "prescribedIssueId re-enlazado tras re-prescripción",
+      "ok": true
+    },
+    {
+      "name": "EngineRun EVIDENCE_REFRESH persistido",
+      "ok": true
+    },
+    {
+      "name": "plan ACCEPTED intacto (ni directrices ni tareas tocadas)",
+      "ok": true
+    },
+    {
+      "name": "equipo demo re-cocinado con motor v0.2",
+      "ok": true
+    },
+    {
+      "name": "equipo demo con auditoría completa",
+      "ok": true
+    },
+    {
+      "name": "login COACH_ADMIN",
+      "ok": true
+    },
+    {
+      "name": "GET /dashboard/today 200",
+      "ok": true
+    },
+    {
+      "name": "muestra 'Por qué este plan' (transparencia)",
+      "ok": true
+    },
+    {
+      "name": "muestra versión del motor v0.2",
+      "ok": true
+    },
+    {
+      "name": "muestra candidatas descartadas",
+      "ok": true
+    },
+    {
+      "name": "muestra botón Aceptar Plan",
+      "ok": true
+    }
+  ]
+}
