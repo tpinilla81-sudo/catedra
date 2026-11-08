@@ -29,7 +29,7 @@ BUNDLE="$HERE/catedra-deploy.bundle"
 [ -f "$BUNDLE" ] || die "No encuentro catedra-deploy.bundle en esta carpeta — descárgalo del chat junto a este script (versión ACTUALIZADA de hoy)"
 DIGEST="$(sha256sum "$BUNDLE" 2>/dev/null | cut -d' ' -f1 || shasum -a 256 "$BUNDLE" | cut -d' ' -f1)"
 case "$DIGEST" in
-  5ce0d1de9fc170e48468*) ok "bundle verificado (sha256 correcto — workflow con seed + proyecto catedra-sooty)" ;;
+  e13c6963593c8fb60265*) ok "bundle verificado (sha256 correcto — workflow con seed + proyecto catedra-sooty)" ;;
   *) die "El bundle NO es la versión actualizada (descargaste el antiguo) → bórralo y descarga el nuevo del chat" ;;
 esac
 
