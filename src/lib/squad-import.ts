@@ -63,13 +63,9 @@ export const RPE_MIN = 1;
 export const RPE_MAX = 10;
 export const PROFILE_TEXT_MAX = 500;
 
-/** Carga y color del chip RPE: fresco (≤4), justo (5-7), fatigado (≥8) */
-export function rpeLoadLevel(rpe: number | null | undefined): "FRESH" | "TIGHT" | "FATIGUED" | null {
-  if (rpe === null || rpe === undefined) return null;
-  if (rpe <= 4) return "FRESH";
-  if (rpe <= 7) return "TIGHT";
-  return "FATIGUED";
-}
+/** Carga y color del chip RPE: fresco (≤4), justo (5-7), fatigado (≥8).
+ *  Fuente única de verdad en taxonomy.ts (compartida con la pizarra en directo) */
+export { rpeLoadLevel } from "@/lib/taxonomy";
 
 function cleanProfileText(raw: string | null | undefined, max = PROFILE_TEXT_MAX): string | null {
   if (raw === null || raw === undefined) return null;

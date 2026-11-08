@@ -222,6 +222,127 @@ export const POSITION_SHORT: Record<string, string> = {
   CF: "DC",
 };
 
+// ---------- Ficha rápida en directo (Pilar 3 · 1 toque) ----------
+
+/**
+ * Vocabulario canónico de la ficha rápida: los tres ejes de ESTADO del
+ * jugador durante el partido (fatiga, clínico y táctico). Estado único por
+ * eje — el último toque gana y repetir el toque lo apaga. El servidor valida
+ * SIEMPRE contra estos mapas (fuente de verdad); el cliente solo los pinta.
+ * Deben cubrir exactamente los enums FatigueFlag / ClinicalFlag / TacticalFlag.
+ */
+export const FATIGUE_FLAG_META: Record<
+  string,
+  { label: string; hint: string; emoji: string; dot: string; btn: string; chip: string }
+> = {
+  FRESH: {
+    label: "Fresco / Arriba",
+    hint: "Rindiendo al máximo",
+    emoji: "🟢",
+    dot: "bg-emerald-400",
+    btn: "bg-emerald-500/15 border-emerald-500/60 hover:bg-emerald-500/25 text-emerald-200",
+    chip: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+  },
+  HEAVY: {
+    label: "Cargado / Al límite",
+    hint: "Vigila sus minutos",
+    emoji: "🟡",
+    dot: "bg-amber-400",
+    btn: "bg-amber-500/15 border-amber-500/60 hover:bg-amber-500/25 text-amber-200",
+    chip: "bg-amber-500/15 text-amber-300 border-amber-500/40",
+  },
+  EXHAUSTED: {
+    label: "Fundido / Pide cambio",
+    hint: "Avisa al banquillo ya",
+    emoji: "🔴",
+    dot: "bg-rose-400",
+    btn: "bg-rose-500/15 border-rose-500/60 hover:bg-rose-500/25 text-rose-200",
+    chip: "bg-rose-500/15 text-rose-300 border-rose-500/40",
+  },
+};
+
+export const CLINICAL_FLAG_META: Record<
+  string,
+  { label: string; hint: string; emoji: string; dot: string; btn: string; chip: string }
+> = {
+  MINOR: {
+    label: "Molestia leve / En observación",
+    hint: "Sigue jugando, con vigilancia",
+    emoji: "⚠️",
+    dot: "bg-amber-400",
+    btn: "bg-amber-500/15 border-amber-500/60 hover:bg-amber-500/25 text-amber-200",
+    chip: "bg-amber-500/15 text-amber-300 border-amber-500/40",
+  },
+  FORCED_SUB: {
+    label: "Golpe fuerte / Cambio forzado",
+    hint: "Prioridad máxima en la banqueta",
+    emoji: "❌",
+    dot: "bg-rose-400",
+    btn: "bg-rose-500/15 border-rose-500/60 hover:bg-rose-500/25 text-rose-200",
+    chip: "bg-rose-500/15 text-rose-300 border-rose-500/40",
+  },
+};
+
+export const TACTICAL_FLAG_META: Record<
+  string,
+  { label: string; hint: string; emoji: string; dot: string; btn: string; chip: string }
+> = {
+  EXPLOITING: {
+    label: "Explotando su fortaleza",
+    hint: "El plan le beneficia: mantiene",
+    emoji: "⭐",
+    dot: "bg-violet-400",
+    btn: "bg-violet-500/15 border-violet-500/60 hover:bg-violet-500/25 text-violet-200",
+    chip: "bg-violet-500/15 text-violet-300 border-violet-500/40",
+  },
+  STRUGGLING: {
+    label: "Sufriendo / Necesita ajuste",
+    hint: "Revisa el plan con él",
+    emoji: "⚠️",
+    dot: "bg-orange-400",
+    btn: "bg-orange-500/15 border-orange-500/60 hover:bg-orange-500/25 text-orange-200",
+    chip: "bg-orange-500/15 text-orange-300 border-orange-500/40",
+  },
+};
+
+// ---------- Carga RPE (Pilar 2 · semáforo de frescura pre-partido) ----------
+
+export type RpeLoadLevel = "FRESH" | "TIGHT" | "FATIGUED" | null;
+
+/**
+ * Nivel de carga del RPE reciente (1-10): ≤4 fresco, 5-7 justo, ≥8 fatigado.
+ * Función PURA — la usa la vista de plantilla, la importación CSV y la
+ * pizarra en directo (ficha pre-partido en la ficha rápida).
+ */
+export function rpeLoadLevel(rpe: number | null | undefined): RpeLoadLevel {
+  if (rpe === null || rpe === undefined) return null;
+  if (rpe <= 4) return "FRESH";
+  if (rpe <= 7) return "TIGHT";
+  return "FATIGUED";
+}
+
+/** Chip y punto del nivel de carga RPE (mismo lenguaje visual que Plantilla) */
+export const RPE_LOAD_META: Record<
+  Exclude<RpeLoadLevel, null>,
+  { label: string; chip: string; dot: string }
+> = {
+  FRESH: {
+    label: "Fresco",
+    chip: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+    dot: "bg-emerald-400",
+  },
+  TIGHT: {
+    label: "Con carga",
+    chip: "bg-amber-500/15 text-amber-300 border-amber-500/40",
+    dot: "bg-amber-400",
+  },
+  FATIGUED: {
+    label: "Fatigado",
+    chip: "bg-rose-500/15 text-rose-300 border-rose-500/40",
+    dot: "bg-rose-400",
+  },
+};
+
 // ---------- Varios ----------
 
 export const PHASE_LABEL: Record<string, string> = {

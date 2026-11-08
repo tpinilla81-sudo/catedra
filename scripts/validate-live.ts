@@ -1,22 +1,35 @@
 // ============================================================================
-// VALIDACIÓN E2E — PILAR 3 EN DIRECTO (tablón de evaluación 1-clic)
+// VALIDACIÓN E2E — PILAR 3 EN DIRECTO (tablón de evaluación 1-clic + ficha rápida)
 // ----------------------------------------------------------------------------
 // Suite standalone (NO altera los totales canónicos de la batería 261):
 // 1) Unit: TACTICAL_TAG_META cubre exactamente el enum TagCode (9 códigos,
-//    5 positivos + 4 correctivos) y POSITION_SHORT cubre todas las Position.
+//    5 positivos + 4 correctivos), POSITION_SHORT cubre todas las Position y
+//    los 3 metas de la FICHA RÁPIDA cubren FatigueFlag (3) / ClinicalFlag (2)
+//    / TacticalFlag (2) + niveles RPE (Pilar 2).
 // 2) HTTP+Auth: POST /api/matches/:id/evaluations con NextAuth — 401 anónimo,
 //    tag 1-clic crea evaluación+tag, segundo tag acumula (misma evaluación),
-//    toggle isStarter sin tagCode, tag desconocido → 400, jugador inexistente
+//    toggle isStarter sin tagCode, ESTADO de la ficha rápida (fatiga/clínico/
+//    táctico): fijar, sustituir (último toque gana), apagar con null,
+//    valor inválido → 400, tag desconocido → 400, jugador inexistente
 //    → 404, jugador de otro equipo → 400, partido de otro club → 404 (guard).
-// 3) GET restaura el estado (evaluaciones+tags) del tablón.
+// 3) GET restaura el estado (evaluaciones+tags+flags) del tablón.
 // 4) Páginas: /dashboard/match/live?g= propio → 200 con banqueta; ajeno → 404;
 //    sin ?g= → 404; /dashboard/matches firma el enlace "Pizarra en directo".
 // Idempotente: limpia restos de ejecuciones interrumpidas antes de empezar.
 // Ejecutar: bun scripts/validate-live.ts  (dev server :3000, PG :5432)
 // ============================================================================
-import { PrismaClient, TagCode } from "@prisma/client";
+import { PrismaClient, ClinicalFlag, FatigueFlag, TacticalFlag, TagCode } from "@prisma/client";
 import { subHours, addDays } from "date-fns";
-import { TACTICAL_TAG_META, POSITION_SHORT, ALL_POSITIONS } from "../src/lib/taxonomy";
+import {
+  ALL_POSITIONS,
+  CLINICAL_FLAG_META,
+  FATIGUE_FLAG_META,
+  POSITION_SHORT,
+  RPE_LOAD_META,
+  TACTICAL_FLAG_META,
+  TACTICAL_TAG_META,
+  rpeLoadLevel,
+} from "../src/lib/taxonomy";
 
 const PG = "postgresql://postgres:postgres@localhost:5432/metodo";
 const BASE = "http://localhost:3000";
@@ -78,6 +91,38 @@ const correctives = Object.values(TACTICAL_TAG_META).filter((m) => m.type === "C
 check("5 aspectos positivos y 4 correctivos", positives.length === 5 && correctives.length === 4, `${positives.length}/${correctives.length}`);
 check("POSITION_SHORT cubre las 15 demarcaciones", ALL_POSITIONS.every((p) => p in POSITION_SHORT));
 check("sin etiquetas vacías en el vocabulario", Object.values(TACTICAL_TAG_META).every((m) => m.label.trim().length > 0));
+
+// Vocabulario de la FICHA RÁPIDA (estado en directo): los metas cubren
+// EXACTAMENTE los enums nuevos (fuente de verdad servidor + cliente).
+const fatigueEnum = Object.values(FatigueFlag) as string[];
+check(
+  "FATIGUE_FLAG_META cubre exactamente FatigueFlag (3 niveles)",
+  fatigueEnum.length === 3 &&
+    Object.keys(FATIGUE_FLAG_META).length === 3 &&
+    fatigueEnum.every((c) => c in FATIGUE_FLAG_META),
+  `enum=[${fatigueEnum.join(",")}]`,
+);
+const clinicalEnum = Object.values(ClinicalFlag) as string[];
+check(
+  "CLINICAL_FLAG_META cubre exactamente ClinicalFlag (2 avisos)",
+  clinicalEnum.length === 2 &&
+    Object.keys(CLINICAL_FLAG_META).length === 2 &&
+    clinicalEnum.every((c) => c in CLINICAL_FLAG_META),
+);
+const tacticalEnum = Object.values(TacticalFlag) as string[];
+check(
+  "TACTICAL_FLAG_META cubre exactamente TacticalFlag (2 lecturas)",
+  tacticalEnum.length === 2 &&
+    Object.keys(TACTICAL_FLAG_META).length === 2 &&
+    tacticalEnum.every((c) => c in TACTICAL_FLAG_META),
+);
+check(
+  "RPE_LOAD_META cubre los 3 niveles de carga con etiqueta",
+  Object.keys(RPE_LOAD_META).length === 3 &&
+    (Object.values(RPE_LOAD_META) as Array<{ label: string }>).every((m) => m.label.trim().length > 0) &&
+    rpeLoadLevel(10) === "FATIGUED" &&
+    rpeLoadLevel(null) === null,
+);
 
 // ============================================================================
 console.log("\n══ 2) Material de prueba (club A + intruso club B) ══");
@@ -240,6 +285,42 @@ if (coachSession) {
   const t3body = t3.json as { evaluation?: { id: string; isStarter: boolean; totalTags: number } } | null;
   check("toggle titular: isStarter=true sin crear tag", t3body?.evaluation?.isStarter === true && t3body?.evaluation?.totalTags === 2);
 
+  // --- FICHA RÁPIDA: estado en directo (1 toque, último toque gana) ---
+  // (la pizarra siempre reenvía isStarter junto al estado, igual que aquí)
+  const f1 = await http("POST", EVALS(testMatch.id), coachSession, {
+    playerId: p9.id,
+    isStarter: true,
+    fatigueFlag: "EXHAUSTED",
+  });
+  const f1body = f1.json as { evaluation?: { fatigueFlag?: string | null; statusUpdatedAt?: string | null } } | null;
+  check(
+    "ficha rápida: 🔴 EXHAUSTED fija fatiga + marca de tiempo",
+    f1.status === 200 && f1body?.evaluation?.fatigueFlag === "EXHAUSTED" && !!f1body?.evaluation?.statusUpdatedAt,
+    `status=${f1.status} body=${JSON.stringify(f1body)}`,
+  );
+
+  const f2 = await http("POST", EVALS(testMatch.id), coachSession, {
+    playerId: p9.id,
+    isStarter: true,
+    fatigueFlag: "HEAVY",
+  });
+  const f2body = f2.json as { evaluation?: { fatigueFlag?: string | null } } | null;
+  check("ficha rápida: 🟡 sustituye al toque anterior (el último manda)", f2body?.evaluation?.fatigueFlag === "HEAVY");
+
+  const f3 = await http("POST", EVALS(testMatch.id), coachSession, {
+    playerId: p9.id,
+    isStarter: true,
+    fatigueFlag: null,
+  });
+  const f3body = f3.json as { evaluation?: { fatigueFlag?: string | null } } | null;
+  check("ficha rápida: null explícito apaga el semáforo (toggle)", f3body?.evaluation?.fatigueFlag === null);
+
+  const f4 = await http("POST", EVALS(testMatch.id), coachSession, {
+    playerId: p9.id,
+    fatigueFlag: "MEDIO",
+  });
+  check("ficha rápida: valor no canónico → 400", f4.status === 400, `status=${f4.status}`);
+
   // --- Validaciones ---
   const badTag = await http("POST", EVALS(testMatch.id), coachSession, { playerId: p9.id, tagCode: "CEPILLO_DIENTES" });
   check("tag desconocido → 400", badTag.status === 400, `status=${badTag.status}`);
@@ -254,7 +335,17 @@ if (coachSession) {
 
   // --- GET restaura el estado ---
   const get1 = await http("GET", EVALS(testMatch.id), coachSession);
-  const get1body = get1.json as { ok?: boolean; evaluations?: Array<{ playerId: string; isStarter: boolean; tags: Array<{ code: string }> }> } | null;
+  const get1body = get1.json as {
+    ok?: boolean;
+    evaluations?: Array<{
+      playerId: string;
+      isStarter: boolean;
+      fatigueFlag: string | null;
+      clinicalFlag: string | null;
+      tacticalFlag: string | null;
+      tags: Array<{ code: string }>;
+    }>;
+  } | null;
   check(
     "GET: 1 evaluación con 2 tags y titular restaurado",
     get1.status === 200 &&
@@ -262,6 +353,26 @@ if (coachSession) {
       get1body?.evaluations?.length === 1 &&
       get1body?.evaluations?.[0]?.tags?.length === 2 &&
       get1body?.evaluations?.[0]?.isStarter === true,
+  );
+  check(
+    "GET: la ficha rápida de 9 vuelve vacía tras el toggle (estado restaurado)",
+    get1body?.evaluations?.[0]?.fatigueFlag === null &&
+      get1body?.evaluations?.[0]?.clinicalFlag === null &&
+      get1body?.evaluations?.[0]?.tacticalFlag === null,
+  );
+
+  // Dos ejes a la vez en un jugador distinto (clínico + táctico)
+  const f5 = await http("POST", EVALS(testMatch.id), coachSession, {
+    playerId: p10.id,
+    isStarter: true,
+    clinicalFlag: "MINOR",
+    tacticalFlag: "EXPLOITING",
+  });
+  const f5body = f5.json as { evaluation?: { clinicalFlag?: string | null; tacticalFlag?: string | null } } | null;
+  check(
+    "ficha rápida: clínico y táctico se fijan juntos sin pisarse",
+    f5body?.evaluation?.clinicalFlag === "MINOR" && f5body?.evaluation?.tacticalFlag === "EXPLOITING",
+    `body=${JSON.stringify(f5body)}`,
   );
 
   // --- Segundo jugador independiente ---
@@ -271,8 +382,14 @@ if (coachSession) {
     tagCode: "FATIGUE_NOTICED",
   });
   const get2 = await http("GET", EVALS(testMatch.id), coachSession);
-  const get2body = get2.json as { evaluations?: Array<{ playerId: string; tags: unknown[] }> } | null;
-  check("segundo jugador: evaluación independiente", p10tag.status === 200 && get2body?.evaluations?.length === 2);
+  const get2body = get2.json as {
+    evaluations?: Array<{ playerId: string; tags: unknown[]; clinicalFlag: string | null; tacticalFlag: string | null }>;
+  } | null;
+  const p10Eval = get2body?.evaluations?.find((e) => e.playerId === p10.id);
+  check(
+    "segundo jugador: evaluación independiente + sus flags restaurados",
+    p10tag.status === 200 && get2body?.evaluations?.length === 2 && p10Eval?.clinicalFlag === "MINOR" && p10Eval?.tacticalFlag === "EXPLOITING",
+  );
 
   await raw.user.update({ where: { id: coach.id }, data: { lastTeamId: originalLastTeam } });
 }

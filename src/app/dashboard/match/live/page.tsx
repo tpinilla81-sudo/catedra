@@ -48,11 +48,22 @@ export default async function LiveMatchPage({
     lastName: p.lastName,
     shirtNumber: p.shirtNumber,
     mainPosition: p.mainPosition,
+    secondaryPositions: p.secondaryPositions,
+    currentRpe: p.currentRpe,
+    injuryHistory: p.injuryHistory,
+    academicConstraints: p.academicConstraints,
+    strength: p.strength,
+    status: p.status,
+    statusNote: p.statusNote,
   }));
 
   const evaluationData: LiveEvaluationData[] = match.liveEvaluations.map((e) => ({
     playerId: e.playerId,
     isStarter: e.isStarter,
+    fatigueFlag: e.fatigueFlag,
+    clinicalFlag: e.clinicalFlag,
+    tacticalFlag: e.tacticalFlag,
+    statusUpdatedAt: e.statusUpdatedAt?.toISOString() ?? null,
     tags: e.tags.map((t) => ({
       id: t.id,
       code: t.code,

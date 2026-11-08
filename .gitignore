@@ -62,3 +62,6 @@ pg.log
 
 # Bundle de despliegue (artefacto entregable, no vive en el repo)
 download/catedra-deploy.bundle
+
+# Resultados de herramientas del agente (nunca en el repo)
+tool-results/

@@ -4,8 +4,8 @@
   "total": 40,
   "passed": 40,
   "failed": 0,
-  "durationMs": 2916,
-  "timestamp": "2026-11-08T21:28:13.171Z",
+  "durationMs": 2468,
+  "timestamp": "2026-11-08T21:59:12.626Z",
   "checks": [
     {
       "name": "ANALYST no pasa guard COACH_ADMIN",

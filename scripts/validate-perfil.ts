@@ -189,7 +189,7 @@ const mister = await raw.user.findFirstOrThrow({
 });
 const demoTeam = mister.lastTeamId
   ? await raw.team.findFirstOrThrow({ where: { id: mister.lastTeamId } })
-  : await raw.team.findFirstOrThrow({ where: { clubId: mister.clubId }, orderBy: { createdAt: "asc" } });
+  : await raw.team.findFirstOrThrow({ where: { clubId: mister.clubId! }, orderBy: { createdAt: "asc" } });
 
 let zicoId: string | null = null;
 try {

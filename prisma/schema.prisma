@@ -682,6 +682,16 @@ model LiveMatchEvaluation {
   matchId   String
   playerId  String
   isStarter Boolean    @default(false) /// Alineación de partida
+
+  /// ---- FICHA RÁPIDA EN DIRECTO (Pilar 3 · 1 toque, modal flotante) ----
+  /// Estado "ahora mismo" del jugador: un valor por eje, sustituible al
+  /// instante (el último toque gana; repetir el toque lo apaga). Los tags
+  /// tácticos (MatchTag) siguen acumulando hechos; estos flags son ESTADO.
+  fatigueFlag     FatigueFlag? /// 🟢 Fresco · 🟡 Cargado · 🔴 Fundido (pide cambio)
+  clinicalFlag    ClinicalFlag? /// ⚠️ Molestia leve (vigilar) · ❌ Golpe fuerte (cambio forzado)
+  tacticalFlag    TacticalFlag? /// ⭐ Explotando su fortaleza · ⚠️ Sufriendo (ajustar)
+  statusUpdatedAt DateTime? /// Última vez que se tocó algún eje de estado (línea del partido)
+
   timestamp DateTime   @default(now())
   tags      MatchTag[]
 
@@ -722,4 +732,24 @@ enum TagCode {
 enum TagType {
   POSITIVE
   CORRECTIVE
+}
+
+/// Semáforo de fatiga del jugador DURANTE el partido (ficha rápida 1-toque).
+/// Estado único y sustituible: el último toque manda, repetirlo lo apaga.
+enum FatigueFlag {
+  FRESH /// 🟢 Fresco / Arriba — rinde al máximo
+  HEAVY /// 🟡 Cargado / Al límite — ojo con los minutos
+  EXHAUSTED /// 🔴 Fundido / Pide cambio — aviso al banquillo
+}
+
+/// Aviso clínico en directo: disponibilidad física real del jugador.
+enum ClinicalFlag {
+  MINOR /// ⚠️ Molestia leve / En observación
+  FORCED_SUB /// ❌ Golpe fuerte / Cambio forzado
+}
+
+/// Lectura táctica en directo: si el plan está explotando al jugador o al revés.
+enum TacticalFlag {
+  EXPLOITING /// ⭐ Explotando su fortaleza — el plan le beneficia
+  STRUGGLING /// ⚠️ Sufriendo / Necesita ajuste — revisar el plan
 }
