@@ -244,6 +244,15 @@ model Player {
   ratingsUpdatedAt   DateTime? /// Evolución de los perfiles cualitativos
   status             PlayerStatus @default(AVAILABLE)
   statusNote         String? /// Apunte corto: "molestias tobillo izq."
+
+  /// ---- PERFIL PRE-PARTIDO (Pilar 2 · decisión del cuerpo técnico) ----
+  /// Lo que el míster mira antes de alinear: frescura muscular, riesgo
+  /// médico, carga invisible y el atributo que desequilibra el plan.
+  currentRpe          Int?    /// Carga física / fatiga reciente (RPE 1-10)
+  injuryHistory       String? /// Lesiones activas o precauciones médicas
+  academicConstraints String? /// Disponibilidad por horarios / estrés académico
+  strength            String? /// Atributo o fortaleza principal destacada
+
   isActive           Boolean      @default(true) /// Baja lógica: nunca se borra historia
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt

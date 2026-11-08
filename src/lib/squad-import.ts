@@ -41,7 +41,85 @@ export type PlayerQuickPatch = {
   tacticalRating?: number | null;
   physicalRating?: number | null;
   statusNote?: string | null;
+  mainPosition?: string | null;
+  secondaryPositions?: string[] | null;
+  // --- Perfil pre-partido (decisión del cuerpo técnico) ---
+  currentRpe?: number | null;
+  injuryHistory?: string | null;
+  academicConstraints?: string | null;
+  strength?: string | null;
 };
+
+// ---------- Perfil pre-partido: saneado puro (testable sin servidor) ----------
+
+export type PlayerProfilePatch = {
+  currentRpe?: number | null;
+  injuryHistory?: string | null;
+  academicConstraints?: string | null;
+  strength?: string | null;
+};
+
+export const RPE_MIN = 1;
+export const RPE_MAX = 10;
+export const PROFILE_TEXT_MAX = 500;
+
+/** Carga y color del chip RPE: fresco (≤4), justo (5-7), fatigado (≥8) */
+export function rpeLoadLevel(rpe: number | null | undefined): "FRESH" | "TIGHT" | "FATIGUED" | null {
+  if (rpe === null || rpe === undefined) return null;
+  if (rpe <= 4) return "FRESH";
+  if (rpe <= 7) return "TIGHT";
+  return "FATIGUED";
+}
+
+function cleanProfileText(raw: string | null | undefined, max = PROFILE_TEXT_MAX): string | null {
+  if (raw === null || raw === undefined) return null;
+  const s = String(raw).trim().slice(0, max);
+  return s.length > 0 ? s : null;
+}
+
+/**
+ * Sanea el bloque pre-partido de la ficha: RPE acotado 1-10, textos
+ * recortados y vacíos → null (borrar). Función PURA — la usan la Server
+ * Action, la importación CSV y la validación standalone.
+ */
+export function sanitizePlayerProfilePatch(raw: PlayerProfilePatch): {
+  data: {
+    currentRpe?: number | null;
+    injuryHistory?: string | null;
+    academicConstraints?: string | null;
+    strength?: string | null;
+  };
+  rpeOutOfRange: boolean;
+} {
+  let rpeOutOfRange = false;
+  let currentRpe: number | null | undefined;
+  if (raw.currentRpe !== undefined) {
+    if (raw.currentRpe === null) {
+      currentRpe = null;
+    } else {
+      const n = Math.round(Number(raw.currentRpe));
+      if (!Number.isFinite(n) || n < RPE_MIN || n > RPE_MAX) {
+        rpeOutOfRange = true;
+        currentRpe = Math.min(RPE_MAX, Math.max(RPE_MIN, Number.isFinite(n) ? n : RPE_MIN));
+      } else {
+        currentRpe = n;
+      }
+    }
+  }
+
+  const data: {
+    currentRpe?: number | null;
+    injuryHistory?: string | null;
+    academicConstraints?: string | null;
+    strength?: string | null;
+  } = {};
+  if (currentRpe !== undefined) data.currentRpe = currentRpe;
+  if (raw.injuryHistory !== undefined) data.injuryHistory = cleanProfileText(raw.injuryHistory);
+  if (raw.academicConstraints !== undefined) data.academicConstraints = cleanProfileText(raw.academicConstraints);
+  if (raw.strength !== undefined) data.strength = cleanProfileText(raw.strength);
+
+  return { data, rpeOutOfRange };
+}
 
 // ---------- Parser CSV (RFC-4180: comillas, delimitador auto) ----------
 
@@ -149,6 +227,11 @@ export const HEADER_ALIASES: Record<string, string[]> = {
   physical: ["fisico", "fis", "physical", "valoracion fisica", "rating fisico"],
   status: ["estado", "status", "disponibilidad"],
   note: ["nota", "notas", "statusnote", "observaciones", "apunte", "comentario"],
+  // --- Perfil pre-partido (opcional en el CSV) ---
+  rpe: ["rpe", "rpe actual", "carga", "fatiga", "carga fisica", "esfuerzo", "percepcion de esfuerzo"],
+  injuries: ["lesiones", "lesion", "lesiones activas", "historial de lesiones", "precauciones medicas", "clinico", "medical"],
+  academic: ["horarios", "horario", "academico", "estres academico", "restricciones academicas", "disponibilidad academica", "examenes", "examen"],
+  strength: ["fortaleza", "fortaleza principal", "punto fuerte", "atributo", "atributo principal", "strength"],
 };
 
 export function buildColumnMap(headerRow: string[]): Record<string, number> {
@@ -204,6 +287,15 @@ export function parseSecondary(raw: string, main: string): string[] {
     .map((t) => normalizePosition(t))
     .filter((p): p is string => p !== null && p !== main)
     .filter((p, i, arr) => arr.indexOf(p) === i);
+}
+
+/** RPE 1-10 desde CSV: vacío → null, fuera de rango → acotado */
+export function parseRpeValue(raw: string): number | null {
+  const s = raw.trim().replace(",", ".");
+  if (!s || /^(sin|no|-)$/i.test(s)) return null;
+  const n = Math.round(parseFloat(s));
+  if (Number.isNaN(n)) return null;
+  return Math.min(RPE_MAX, Math.max(RPE_MIN, n));
 }
 
 // ---------- Núcleo de importación (matching + escritura bajo Tenant Guard) ----------
@@ -316,6 +408,15 @@ export async function applySquadImport(
     const status = cell(row, "status") ? parseStatus(cell(row, "status")) : null;
     const note = cell(row, "note") || null;
 
+    // Perfil pre-partido (columnas opcionales del CSV)
+    const profileRaw: PlayerProfilePatch = {
+      currentRpe: cell(row, "rpe") ? parseRpeValue(cell(row, "rpe")) : undefined,
+      injuryHistory: cell(row, "injuries") ? cell(row, "injuries") : undefined,
+      academicConstraints: cell(row, "academic") ? cell(row, "academic") : undefined,
+      strength: cell(row, "strength") ? cell(row, "strength") : undefined,
+    };
+    const profile = sanitizePlayerProfilePatch(profileRaw);
+
     try {
       if (existing) {
         await db.player.update({
@@ -331,6 +432,7 @@ export async function applySquadImport(
             ...(physical !== null ? { physicalRating: physical } : {}),
             ...(status ? { status } : {}),
             ...(note !== null ? { statusNote: note } : {}),
+            ...profile.data,
           },
         });
         updated++;
@@ -350,6 +452,7 @@ export async function applySquadImport(
             physicalRating: physical,
             ...(status ? { status } : {}),
             ...(note !== null ? { statusNote: note } : {}),
+            ...profile.data,
           },
         });
         squad.push(createdPlayer);

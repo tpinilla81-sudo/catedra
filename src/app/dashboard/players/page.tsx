@@ -31,6 +31,11 @@ export default async function PlayersPage() {
     physicalRating: p.physicalRating,
     status: p.status,
     statusNote: p.statusNote,
+    // --- Perfil pre-partido (decisión del cuerpo técnico) ---
+    currentRpe: p.currentRpe,
+    injuryHistory: p.injuryHistory,
+    academicConstraints: p.academicConstraints,
+    strength: p.strength,
   }));
 
   return (

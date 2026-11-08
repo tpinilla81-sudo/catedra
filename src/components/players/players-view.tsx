@@ -3,11 +3,15 @@
 // ============================================================================
 // PILAR 2 — VISTA DE PLANTILLA (Modo Vestuario, táctil)
 // ----------------------------------------------------------------------------
-// • Filtros rápidos por demarcación principal (1 toque, chips con contador).
-// • Tarjetas grandes: dorsal, posición, POLIVALENCIAS (Position[]) visibles,
-//   perfiles 1-5 como barras de puntos, estado de disponibilidad con color.
-// • Toque en tarjeta → hoja inferior con edición de un toque (estado + ratings
-//   con steppers + nota corta) vía updatePlayerQuick.
+// • Filtros rápidos por demarcación principal (1 toque, chips con contador)
+//   + filtro de decisión "Carga alta" (RPE ≥ 8) para el análisis pre-partido.
+// • Tarjetas grandes: dorsal, posición, POLIVALENCIAS visibles, perfiles 1-5,
+//   estado de disponibilidad y bloque PRE-PARTIDO de un vistazo (RPE con
+//   color por carga, precaución médica, horarios/estrés académico y la
+//   fortaleza principal del jugador).
+// • Toque en tarjeta → hoja inferior con edición de un toque: estado, ratings,
+//   nota corta, demarcaciones y perfil pre-partido completo vía
+//   updatePlayerQuick. Alta manual de jugadores sueltos con <NewPlayerDialog>.
 // ============================================================================
 
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -16,6 +20,7 @@ import type { PlayerStatus } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Sheet,
   SheetContent,
@@ -24,6 +29,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ImportSquadDialog } from "@/components/players/import-squad";
+import { NewPlayerDialog } from "@/components/players/new-player-dialog";
+import { PositionPicker } from "@/components/players/position-picker";
 import { updatePlayerQuick } from "@/app/dashboard/players/actions";
 import {
   PLAYER_STATUS_META,
@@ -31,6 +38,7 @@ import {
   POSITION_LABEL,
   positionGroupKey,
 } from "@/lib/taxonomy";
+import { rpeLoadLevel } from "@/lib/squad-import";
 import { useToast } from "@/hooks/use-toast";
 
 export type PlayerCardData = {
@@ -45,6 +53,11 @@ export type PlayerCardData = {
   physicalRating: number | null;
   status: string;
   statusNote: string | null;
+  // --- Perfil pre-partido (decisión del cuerpo técnico) ---
+  currentRpe: number | null;
+  injuryHistory: string | null;
+  academicConstraints: string | null;
+  strength: string | null;
 };
 
 type EditorDraft = {
@@ -53,9 +66,26 @@ type EditorDraft = {
   tacticalRating: number | null;
   physicalRating: number | null;
   statusNote: string;
+  mainPosition: string;
+  secondary: string[];
+  currentRpe: number | null;
+  injuryHistory: string;
+  academicConstraints: string;
+  strength: string;
 };
 
 const STATUSES = ["AVAILABLE", "INJURED", "SUSPENDED", "RETURNING"] as const;
+
+/** Umbral de decisión pre-partido: desde aquí el jugador llega fatigado */
+const FATIGUE_THRESHOLD = 8;
+
+/** Color del chip RPE según la carga (fresco / justo / fatigado) */
+function rpeChipClass(rpe: number): string {
+  const level = rpeLoadLevel(rpe);
+  if (level === "FRESH") return "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40";
+  if (level === "TIGHT") return "bg-amber-500/15 text-amber-300 border border-amber-500/40";
+  return "bg-rose-500/15 text-rose-300 border border-rose-500/40";
+}
 
 function RatingBar({ label, value }: { label: string; value: number | null }) {
   return (
@@ -77,10 +107,12 @@ function Stepper({
   label,
   value,
   onChange,
+  max = 5,
 }: {
   label: string;
   value: number | null;
   onChange: (v: number | null) => void;
+  max?: number;
 }) {
   return (
     <div className="flex items-center justify-between rounded-2xl bg-zinc-800/60 px-3 py-2">
@@ -91,7 +123,7 @@ function Stepper({
           variant="outline"
           size="icon"
           className="h-11 w-11 rounded-2xl border-zinc-700 bg-zinc-950 text-zinc-200 hover:bg-zinc-800"
-          onClick={() => onChange(Math.max(1, (value ?? 3) - 1))}
+          onClick={() => onChange(Math.max(1, (value ?? Math.min(5, max)) - 1))}
           aria-label={`Bajar ${label}`}
         >
           <Minus className="w-5 h-5" aria-hidden />
@@ -104,7 +136,7 @@ function Stepper({
           variant="outline"
           size="icon"
           className="h-11 w-11 rounded-2xl border-zinc-700 bg-zinc-950 text-zinc-200 hover:bg-zinc-800"
-          onClick={() => onChange(Math.min(5, (value ?? 3) + 1))}
+          onClick={() => onChange(Math.min(max, (value ?? Math.min(5, max)) + 1))}
           aria-label={`Subir ${label}`}
         >
           <Plus className="w-5 h-5" aria-hidden />
@@ -125,7 +157,7 @@ export function PlayersView({
   const [filter, setFilter] = useState<string>("ALL");
 
   // Los datos del servidor (RSC) son la fuente de verdad: tras un
-  // router.refresh() (importación, edición) se sincroniza el estado local.
+  // router.refresh() (importación, edición, alta) se sincroniza el estado.
   useEffect(() => {
     setPlayers(initialPlayers);
   }, [initialPlayers]);
@@ -136,26 +168,31 @@ export function PlayersView({
   const { toast } = useToast();
 
   const counts = useMemo(() => {
-    const map: Record<string, number> = { ALL: players.length };
+    const map: Record<string, number> = {
+      ALL: players.length,
+      FATIGUE: players.filter((p) => (p.currentRpe ?? 0) >= FATIGUE_THRESHOLD).length,
+    };
     for (const g of POSITION_GROUPS) {
       map[g.key] = players.filter((p) => positionGroupKey(p.mainPosition) === g.key).length;
     }
     return map;
   }, [players]);
 
-  const filtered = useMemo(
-    () =>
-      filter === "ALL"
-        ? players
-        : players.filter((p) => positionGroupKey(p.mainPosition) === filter),
-    [players, filter],
-  );
+  const filtered = useMemo(() => {
+    if (filter === "FATIGUE") {
+      return players.filter((p) => (p.currentRpe ?? 0) >= FATIGUE_THRESHOLD);
+    }
+    return filter === "ALL"
+      ? players
+      : players.filter((p) => positionGroupKey(p.mainPosition) === filter);
+  }, [players, filter]);
 
   const stats = useMemo(
     () => ({
       available: players.filter((p) => p.status === "AVAILABLE").length,
       out: players.filter((p) => p.status === "INJURED" || p.status === "SUSPENDED").length,
       poly: players.filter((p) => p.secondaryPositions.length > 0).length,
+      fatigued: players.filter((p) => (p.currentRpe ?? 0) >= FATIGUE_THRESHOLD).length,
     }),
     [players],
   );
@@ -168,6 +205,12 @@ export function PlayersView({
       tacticalRating: p.tacticalRating,
       physicalRating: p.physicalRating,
       statusNote: p.statusNote ?? "",
+      mainPosition: p.mainPosition,
+      secondary: p.secondaryPositions,
+      currentRpe: p.currentRpe,
+      injuryHistory: p.injuryHistory ?? "",
+      academicConstraints: p.academicConstraints ?? "",
+      strength: p.strength ?? "",
     });
   }
 
@@ -183,31 +226,43 @@ export function PlayersView({
       tacticalRating: draft.tacticalRating,
       physicalRating: draft.physicalRating,
       statusNote: draft.statusNote.trim() || null,
+      mainPosition: draft.mainPosition,
+      secondaryPositions: draft.secondary,
+      currentRpe: draft.currentRpe,
+      injuryHistory: draft.injuryHistory.trim() || null,
+      academicConstraints: draft.academicConstraints.trim() || null,
+      strength: draft.strength.trim() || null,
     };
-    setPlayers((prev) =>
-      prev.map((p) =>
-        p.id === target.id
-          ? {
-              ...p,
-              status: draft.status,
-              technicalRating: draft.technicalRating,
-              tacticalRating: draft.tacticalRating,
-              physicalRating: draft.physicalRating,
-              statusNote: draft.statusNote.trim() || null,
-            }
-          : p,
-      ),
-    );
+    // El estado optimista ya aplica el saneado del cliente (mismas reglas
+    // que el servidor): lo que ve el míster es lo que queda guardado.
+    const optimistic: PlayerCardData = {
+      ...target,
+      status: draft.status,
+      technicalRating: draft.technicalRating,
+      tacticalRating: draft.tacticalRating,
+      physicalRating: draft.physicalRating,
+      statusNote: draft.statusNote.trim() || null,
+      mainPosition: draft.mainPosition,
+      secondaryPositions: draft.secondary.filter((s) => s !== draft.mainPosition),
+      currentRpe: draft.currentRpe,
+      injuryHistory: draft.injuryHistory.trim() || null,
+      academicConstraints: draft.academicConstraints.trim() || null,
+      strength: draft.strength.trim() || null,
+    };
+    setPlayers((prev) => prev.map((p) => (p.id === target.id ? optimistic : p)));
     startTransition(async () => {
       try {
-        await updatePlayerQuick(target.id, patch);
+        const res = await updatePlayerQuick(target.id, patch);
+        if (!res.ok) {
+          throw new Error("error" in res ? res.error : "error");
+        }
         toast({
           title: "Ficha actualizada",
           description: `${target.firstName} ${target.lastName}`,
           duration: 1800,
         });
         setEditing(null);
-      } catch {
+      } catch (e) {
         // Rollback del estado optimista + aviso claro: nada queda a medias.
         if (snapshot) {
           setPlayers((prev) =>
@@ -216,7 +271,10 @@ export function PlayersView({
         }
         toast({
           title: "No se pudo guardar la ficha",
-          description: `Los cambios de ${target.firstName} se han restaurado. Revisa tu conexión e inténtalo de nuevo.`,
+          description:
+            e instanceof Error && e.message !== "error"
+              ? e.message
+              : `Los cambios de ${target.firstName} se han restaurado. Revisa tu conexión e inténtalo de nuevo.`,
           variant: "destructive",
           duration: 5000,
         });
@@ -233,13 +291,16 @@ export function PlayersView({
             <p className="text-xs text-zinc-500 leading-tight truncate">Pilar 2 · {teamName}</p>
             <h1 className="text-2xl font-black text-zinc-50 leading-tight">Plantilla</h1>
           </div>
-          <ImportSquadDialog />
+          <div className="flex items-center gap-2">
+            <NewPlayerDialog />
+            <ImportSquadDialog />
+          </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-5xl px-4 space-y-5 pt-5">
         {/* ---------- Pulso de plantilla ---------- */}
-        <section aria-label="Resumen de plantilla" className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <section aria-label="Resumen de plantilla" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <div className="rounded-3xl bg-zinc-900 border border-zinc-800 p-4">
             <p className="text-xs font-semibold text-zinc-400">JUGADORES</p>
             <p className="text-2xl font-black text-zinc-50 mt-1">{players.length}</p>
@@ -256,13 +317,22 @@ export function PlayersView({
             <p className="text-xs font-semibold text-zinc-400">POLIVALENTES</p>
             <p className="text-2xl font-black text-amber-300 mt-1">{stats.poly}</p>
           </div>
+          <div className="rounded-3xl bg-zinc-900 border border-zinc-800 p-4">
+            <p className="text-xs font-semibold text-zinc-400">CARGA ALTA</p>
+            <p className="text-2xl font-black text-rose-300 mt-1">{stats.fatigued}</p>
+          </div>
         </section>
 
         {/* ---------- Filtros rápidos por demarcación ---------- */}
         <section aria-label="Filtros por demarcación">
           <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            {[{ key: "ALL", label: "Todos" }, ...POSITION_GROUPS].map((chip) => {
+            {[
+              { key: "ALL", label: "Todos" },
+              ...POSITION_GROUPS,
+              { key: "FATIGUE", label: `Carga alta (RPE ≥ ${FATIGUE_THRESHOLD})` },
+            ].map((chip) => {
               const active = filter === chip.key;
+              const fatigue = chip.key === "FATIGUE";
               return (
                 <button
                   key={chip.key}
@@ -270,12 +340,20 @@ export function PlayersView({
                   aria-pressed={active}
                   className={`shrink-0 min-h-[44px] px-4 py-2 rounded-full border text-sm font-bold transition ${
                     active
-                      ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300"
-                      : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                      ? fatigue
+                        ? "bg-rose-500/15 border-rose-500/50 text-rose-300"
+                        : "bg-emerald-500/15 border-emerald-500/50 text-emerald-300"
+                      : fatigue
+                        ? "bg-zinc-900 border-rose-500/30 text-rose-300/80 hover:text-rose-200"
+                        : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
                   }`}
                 >
                   {chip.label}
-                  <span className={`ml-1.5 text-xs font-black ${active ? "text-emerald-400/80" : "text-zinc-600"}`}>
+                  <span
+                    className={`ml-1.5 text-xs font-black ${
+                      active ? (fatigue ? "text-rose-300/90" : "text-emerald-400/80") : "text-zinc-600"
+                    }`}
+                  >
                     {counts[chip.key] ?? 0}
                   </span>
                 </button>
@@ -354,6 +432,44 @@ export function PlayersView({
                   <RatingBar label="TAC" value={p.tacticalRating} />
                   <RatingBar label="FÍS" value={p.physicalRating} />
                 </div>
+
+                {/* ---------- Pre-partido de un vistazo ---------- */}
+                {(p.currentRpe !== null || p.injuryHistory || p.academicConstraints || p.strength) && (
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {p.currentRpe !== null && (
+                      <span
+                        className={`rounded-lg px-2 py-0.5 text-xs font-black ${rpeChipClass(p.currentRpe)}`}
+                        title={`Carga física reciente: RPE ${p.currentRpe} de 10`}
+                      >
+                        RPE {p.currentRpe}/10
+                      </span>
+                    )}
+                    {p.injuryHistory && (
+                      <span
+                        className="rounded-lg bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 text-xs font-bold text-rose-300 max-w-full truncate"
+                        title={`Precaución médica: ${p.injuryHistory}`}
+                      >
+                        ⚕ Precaución médica
+                      </span>
+                    )}
+                    {p.academicConstraints && (
+                      <span
+                        className="rounded-lg bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 text-xs font-bold text-sky-300 max-w-full truncate"
+                        title={`Horarios / estrés académico: ${p.academicConstraints}`}
+                      >
+                        🎓 Carga invisible
+                      </span>
+                    )}
+                    {p.strength && (
+                      <span
+                        className="rounded-lg bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 text-xs font-bold text-amber-200 max-w-full truncate"
+                        title={`Fortaleza principal: ${p.strength}`}
+                      >
+                        ★ {p.strength}
+                      </span>
+                    )}
+                  </div>
+                )}
               </button>
             );
           })}
@@ -430,6 +546,86 @@ export function PlayersView({
             value={draft?.statusNote ?? ""}
             onChange={(e) => setDraft((d) => (d ? { ...d, statusNote: e.target.value } : d))}
           />
+
+          {/* ---------- Demarcaciones (principal + polivalencia) ---------- */}
+          <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mt-5 mb-2">
+            Demarcaciones
+          </p>
+          {draft && (
+            <PositionPicker
+              main={draft.mainPosition}
+              secondary={draft.secondary}
+              onMainChange={(p) =>
+                setDraft((d) =>
+                  d ? { ...d, mainPosition: p, secondary: d.secondary.filter((s) => s !== p) } : d,
+                )
+              }
+              onToggleSecondary={(p) =>
+                setDraft((d) =>
+                  d
+                    ? {
+                        ...d,
+                        secondary: d.secondary.includes(p)
+                          ? d.secondary.filter((s) => s !== p)
+                          : [...d.secondary, p],
+                      }
+                    : d,
+                )
+              }
+            />
+          )}
+
+          {/* ---------- Perfil pre-partido ---------- */}
+          <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mt-5 mb-2">
+            Pre-partido · decisión del cuerpo técnico
+          </p>
+          <div className="space-y-3">
+            <Stepper
+              label={`Carga física reciente (RPE 1–10)`}
+              value={draft?.currentRpe ?? null}
+              onChange={(v) => setDraft((d) => (d ? { ...d, currentRpe: v } : d))}
+              max={10}
+            />
+            <div>
+              <label htmlFor="ed-injury" className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+                Lesiones activas / precauciones médicas
+              </label>
+              <Textarea
+                id="ed-injury"
+                className="mt-1 min-h-[64px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+                placeholder="Ej.: esguince de tobillo derecho, alta prevista en 3 semanas"
+                maxLength={500}
+                value={draft?.injuryHistory ?? ""}
+                onChange={(e) => setDraft((d) => (d ? { ...d, injuryHistory: e.target.value } : d))}
+              />
+            </div>
+            <div>
+              <label htmlFor="ed-academic" className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+                Horarios / estrés académico
+              </label>
+              <Textarea
+                id="ed-academic"
+                className="mt-1 min-h-[64px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+                placeholder="Ej.: exámenes esta semana, duerme poco por evaluaciones"
+                maxLength={500}
+                value={draft?.academicConstraints ?? ""}
+                onChange={(e) => setDraft((d) => (d ? { ...d, academicConstraints: e.target.value } : d))}
+              />
+            </div>
+            <div>
+              <label htmlFor="ed-strength" className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+                Fortaleza principal
+              </label>
+              <Input
+                id="ed-strength"
+                className="mt-1 min-h-[48px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+                placeholder="Ej.: desmarque al espacio, golpeo de falta"
+                maxLength={500}
+                value={draft?.strength ?? ""}
+                onChange={(e) => setDraft((d) => (d ? { ...d, strength: e.target.value } : d))}
+              />
+            </div>
+          </div>
 
           <Button
             onClick={saveEditor}

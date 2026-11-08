@@ -32,10 +32,10 @@ import {
 import { importSquadFile, type ImportSummary } from "@/app/dashboard/players/actions";
 
 const TEMPLATE_CSV = [
-  "nombre,apellidos,dorsal,posicion,secundarias,tecnico,tactico,fisico,estado,nota",
-  'Marco,Pérez,15,DFC,"MCD, MC",3,4,4,disponible,Buen pie izquierdo',
-  "Iván,Torres,23,EI,\"ED, SD\",4,3,5,,Rápido al espacio",
-  "Dani,Ruiz,8,MCO,MC,4,4,3,disponible,",
+  "nombre,apellidos,dorsal,posicion,secundarias,tecnico,tactico,fisico,estado,nota,rpe,lesiones,academico,fortaleza",
+  'Marco,Pérez,15,DFC,"MCD, MC",3,4,4,disponible,Buen pie izquierdo,4,,,"Salida limpia con la zurda"',
+  'Iván,Torres,23,EI,"ED, SD",4,3,5,,Rápido al espacio,7,"Molestia en isquios, lado derecho","Exámenes la semana del 20",Velocidad pura al espacio',
+  "Dani,Ruiz,8,MCO,MC,4,4,3,disponible,,2,,,Última llegada al área",
 ].join("\n");
 
 function downloadTemplate() {
