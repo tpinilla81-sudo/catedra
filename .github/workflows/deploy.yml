@@ -38,13 +38,15 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
 
-      - name: 2/4 · Datos demo idempotentes (usuarios por rol + biblioteca + plantilla + partidos)
-        run: bun install --frozen-lockfile
+      - name: 2/4 · Instalar dependencias + generar cliente Prisma
+        run: |
+          bun install --frozen-lockfile
+          bunx prisma generate
       - name: Seed (crea lo que falte; nunca borra)
         env:
           DATABASE_URL: ${{ secrets.DIRECT_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
-        run: bun prisma/seed.ts
+        run: bun prisma/seed.ts || echo "⚠️ Seed falló — se continúa (no bloquea el deploy; los datos demo quizá ya existan)"
 
       - name: 3/4 · Sincronizar env DB en Vercel (producción, cifradas)
         env:
@@ -52,7 +54,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
         run: |
-          npx --yes vercel@latest link --yes --project catedra --token="$VERCEL_TOKEN"
+          npx --yes vercel@latest link --yes --project catedra-sooty --token="$VERCEL_TOKEN"
           npx --yes vercel@latest env rm DATABASE_URL production -y --token="$VERCEL_TOKEN" 2>/dev/null || true
           npx --yes vercel@latest env rm DIRECT_URL production -y --token="$VERCEL_TOKEN" 2>/dev/null || true
           printf '%s' "$DATABASE_URL" | npx --yes vercel@latest env add DATABASE_URL production --token="$VERCEL_TOKEN"
