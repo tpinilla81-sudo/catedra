@@ -15,11 +15,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Método — Ecosistema del Cuerpo Técnico",
+  title: "CATEDRA by Método — El ecosistema del cuerpo técnico",
   description:
     "Motor de decisiones metodológicas de élite para entrenadores de fútbol profesional y cantera. Biblioteca de la Cátedra, ingesta exprés post-partido y microciclo prescriptivo.",
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/logo.svg",
   },
 };
 
@@ -31,7 +31,7 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-zinc-950 text-zinc-50`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-cream text-peel`}
       >
         <Providers>{children}</Providers>
         <Toaster />

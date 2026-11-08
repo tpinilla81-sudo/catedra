@@ -19,10 +19,10 @@ export function UserMenu({ userName, role }: Props) {
   return (
     <div className="flex items-center gap-3">
       <div className="text-right hidden sm:block">
-        <p className="text-sm font-semibold text-zinc-200 leading-tight">
+        <p className="text-sm font-semibold text-[#2a4630] leading-tight">
           {userName}
         </p>
-        <p className="text-xs text-emerald-400 font-medium">
+        <p className="text-xs text-brand-600 font-medium">
           {ROLE_LABELS[role] ?? role}
         </p>
       </div>
@@ -31,7 +31,7 @@ export function UserMenu({ userName, role }: Props) {
           href="/dashboard/quality"
           aria-label="Panel de validación E2E"
           title="Panel de validación E2E"
-          className="h-11 w-11 rounded-2xl border border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 flex items-center justify-center"
+          className="h-11 w-11 rounded-2xl border border-cream-border-strong text-[#5d7263] hover:bg-cream-dark hover:text-peel flex items-center justify-center"
         >
           <FlaskConical className="w-5 h-5" aria-hidden />
         </Link>
@@ -42,7 +42,7 @@ export function UserMenu({ userName, role }: Props) {
         aria-label="Cerrar sesión"
         title="Cerrar sesión"
         onClick={() => signOut({ callbackUrl: "/" })}
-        className="h-11 w-11 rounded-2xl border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+        className="h-11 w-11 rounded-2xl border-cream-border-strong text-[#3d5844] hover:bg-cream-dark hover:text-peel"
       >
         <LogOut className="w-5 h-5" aria-hidden />
       </Button>

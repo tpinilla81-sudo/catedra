@@ -8,7 +8,7 @@
 // También marca qué subprincipios tienen hallazgos ABIERTOS del motor esta
 // semana → la biblioteca siempre sabe dónde duele al equipo.
 // ============================================================================
-import { AppNav } from "@/components/dashboard/app-nav";
+import { AppShell } from "@/components/dashboard/app-shell";
 import { LibraryView } from "@/components/library/library-view";
 import type { LibraryData, RecipeLink, SPNode, TaskCard } from "@/components/library/types";
 import { requireTenantContext } from "@/lib/session";
@@ -111,10 +111,11 @@ export default async function LibraryPage() {
   const data: LibraryData = { subprinciples, tasks: taskData };
 
   return (
-    <main className="min-h-screen bg-zinc-950 pb-28">
+    <AppShell active="library" userName={user.name} role={user.role}>
+    <main className="min-h-screen bg-cream pb-10">
       {/* RBAC de presentación: los guards autoritativos viven en cada Server Action */}
       <LibraryView data={data} role={user.role} />
-      <AppNav active="library" />
     </main>
+    </AppShell>
   );
 }

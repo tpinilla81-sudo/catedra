@@ -104,28 +104,28 @@ export const SEMAPHORE_META: Record<
   GREEN: {
     label: "Verde",
     hint: "Buen sabor de boca",
-    dot: "bg-emerald-400",
-    btn: "bg-emerald-500/15 border-emerald-500/50 text-emerald-300",
-    text: "text-emerald-300",
-    bg: "bg-emerald-500/15",
+    dot: "bg-brand-400",
+    btn: "bg-brand-600/15 border-emerald-500/50 text-brand-600",
+    text: "text-brand-600",
+    bg: "bg-brand-600/15",
     border: "border-emerald-500/40",
   },
   AMBER: {
     label: "Ámbar",
     hint: "Con matices",
-    dot: "bg-amber-400",
-    btn: "bg-amber-500/15 border-amber-500/50 text-amber-300",
-    text: "text-amber-300",
+    dot: "bg-[#e3a93c]",
+    btn: "bg-amber-500/15 border-amber-500/50 text-[#8a6206]",
+    text: "text-[#8a6206]",
     bg: "bg-amber-500/15",
     border: "border-amber-500/40",
   },
   RED: {
     label: "Rojo",
     hint: "Preocupado",
-    dot: "bg-rose-400",
-    btn: "bg-rose-500/15 border-rose-500/50 text-rose-300",
-    text: "text-rose-300",
-    bg: "bg-rose-500/15",
+    dot: "bg-[#e05252]",
+    btn: "bg-[#c62f32]/15 border-rose-500/50 text-[#b4232a]",
+    text: "text-[#b4232a]",
+    bg: "bg-[#c62f32]/15",
     border: "border-rose-500/40",
   },
 };
@@ -134,10 +134,10 @@ export const PLAYER_STATUS_META: Record<
   string,
   { label: string; chip: string; dot: string }
 > = {
-  AVAILABLE: { label: "Disponible", chip: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40", dot: "bg-emerald-400" },
-  INJURED: { label: "Lesionado", chip: "bg-rose-500/15 text-rose-300 border-rose-500/40", dot: "bg-rose-400" },
-  SUSPENDED: { label: "Sancionado", chip: "bg-amber-500/15 text-amber-300 border-amber-500/40", dot: "bg-amber-400" },
-  RETURNING: { label: "Reincorporación", chip: "bg-sky-500/15 text-sky-300 border-sky-500/40", dot: "bg-sky-400" },
+  AVAILABLE: { label: "Disponible", chip: "bg-brand-600/15 text-brand-600 border-emerald-500/40", dot: "bg-brand-400" },
+  INJURED: { label: "Lesionado", chip: "bg-[#c62f32]/15 text-[#b4232a] border-rose-500/40", dot: "bg-[#e05252]" },
+  SUSPENDED: { label: "Sancionado", chip: "bg-amber-500/15 text-[#8a6206] border-amber-500/40", dot: "bg-[#e3a93c]" },
+  RETURNING: { label: "Reincorporación", chip: "bg-sky-500/15 text-[#0369a1] border-sky-500/40", dot: "bg-sky-400" },
 };
 
 // ---------- Eventing de la pizarra ----------
@@ -157,15 +157,15 @@ export const EVENT_META: Record<
     negative: boolean;
   }
 > = {
-  BALL_LOSS: { label: "Pérdida", short: "P", icon: TrendingDown, btn: "bg-rose-500/20 border-rose-500/60 text-rose-200", dot: "#f43f5e", text: "text-rose-300", negative: true },
-  BALL_RECOVERY: { label: "Recuperación", short: "R", icon: Hand, btn: "bg-emerald-500/20 border-emerald-500/60 text-emerald-200", dot: "#34d399", text: "text-emerald-300", negative: false },
-  POSITIVE_DUEL: { label: "Duelo ganado", short: "D+", icon: Swords, btn: "bg-emerald-500/20 border-emerald-500/60 text-emerald-200", dot: "#10b981", text: "text-emerald-300", negative: false },
-  NEGATIVE_DUEL: { label: "Duelo perdido", short: "D−", icon: ShieldAlert, btn: "bg-rose-500/20 border-rose-500/60 text-rose-200", dot: "#fb7185", text: "text-rose-300", negative: true },
-  ATTEMPTED_SHOT: { label: "Remate", short: "T", icon: Crosshair, btn: "bg-amber-500/20 border-amber-500/60 text-amber-200", dot: "#fbbf24", text: "text-amber-300", negative: false },
-  GOAL_FOR: { label: "Gol a favor", short: "G+", icon: Goal, btn: "bg-emerald-500/20 border-emerald-500/60 text-emerald-200", dot: "#22c55e", text: "text-emerald-300", negative: false },
-  GOAL_AGAINST: { label: "Gol en contra", short: "G−", icon: Goal, btn: "bg-rose-500/20 border-rose-500/60 text-rose-200", dot: "#e11d48", text: "text-rose-300", negative: true },
-  OPPONENT_CHANCE: { label: "Ocasión rival", short: "O", icon: Zap, btn: "bg-amber-500/20 border-amber-500/60 text-amber-200", dot: "#f59e0b", text: "text-amber-300", negative: true },
-  CUSTOM: { label: "Otro", short: "C", icon: Cloud, btn: "bg-zinc-700/40 border-zinc-500/60 text-zinc-200", dot: "#a1a1aa", text: "text-zinc-300", negative: false },
+  BALL_LOSS: { label: "Pérdida", short: "P", icon: TrendingDown, btn: "bg-[#c62f32]/20 border-rose-500/60 text-[#8f1d22]", dot: "#f43f5e", text: "text-[#b4232a]", negative: true },
+  BALL_RECOVERY: { label: "Recuperación", short: "R", icon: Hand, btn: "bg-brand-600/20 border-emerald-500/60 text-brand", dot: "#34d399", text: "text-brand-600", negative: false },
+  POSITIVE_DUEL: { label: "Duelo ganado", short: "D+", icon: Swords, btn: "bg-brand-600/20 border-emerald-500/60 text-brand", dot: "#10b981", text: "text-brand-600", negative: false },
+  NEGATIVE_DUEL: { label: "Duelo perdido", short: "D−", icon: ShieldAlert, btn: "bg-[#c62f32]/20 border-rose-500/60 text-[#8f1d22]", dot: "#fb7185", text: "text-[#b4232a]", negative: true },
+  ATTEMPTED_SHOT: { label: "Remate", short: "T", icon: Crosshair, btn: "bg-amber-500/20 border-amber-500/60 text-amber-200", dot: "#fbbf24", text: "text-[#8a6206]", negative: false },
+  GOAL_FOR: { label: "Gol a favor", short: "G+", icon: Goal, btn: "bg-brand-600/20 border-emerald-500/60 text-brand", dot: "#22c55e", text: "text-brand-600", negative: false },
+  GOAL_AGAINST: { label: "Gol en contra", short: "G−", icon: Goal, btn: "bg-[#c62f32]/20 border-rose-500/60 text-[#8f1d22]", dot: "#e11d48", text: "text-[#b4232a]", negative: true },
+  OPPONENT_CHANCE: { label: "Ocasión rival", short: "O", icon: Zap, btn: "bg-amber-500/20 border-amber-500/60 text-amber-200", dot: "#f59e0b", text: "text-[#8a6206]", negative: true },
+  CUSTOM: { label: "Otro", short: "C", icon: Cloud, btn: "bg-cream-border-strong/40 border-[#a8a389]/60 text-[#2a4630]", dot: "#a1a1aa", text: "text-[#3d5844]", negative: false },
 };
 
 /** Paleta compacta para el marcado exprés (CUSTOM queda para fase 4) */
@@ -224,36 +224,36 @@ export const PHASE_META: Record<
   OFFENSIVE: {
     label: "Organización Ofensiva",
     icon: Swords,
-    chip: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
-    solid: "text-emerald-300",
+    chip: "bg-brand-600/15 text-brand-600 border-emerald-500/40",
+    solid: "text-brand-600",
     desc: "Ataque posicional: creación y ocupación de espacios con el balón.",
   },
   DEFENSIVE: {
     label: "Organización Defensiva",
     icon: Shield,
-    chip: "bg-sky-500/15 text-sky-300 border-sky-500/40",
-    solid: "text-sky-300",
+    chip: "bg-sky-500/15 text-[#0369a1] border-sky-500/40",
+    solid: "text-[#0369a1]",
     desc: "Bloque coordinado: compactación, coberturas y presión.",
   },
   OFF_TRANSITION: {
     label: "Transición Ofensiva",
     icon: Zap,
-    chip: "bg-amber-500/15 text-amber-300 border-amber-500/40",
-    solid: "text-amber-300",
+    chip: "bg-amber-500/15 text-[#8a6206] border-amber-500/40",
+    solid: "text-[#8a6206]",
     desc: "Pérdida → reacción inmediata: verticalidad en los 5 segundos.",
   },
   DEF_TRANSITION: {
     label: "Transición Defensiva",
     icon: FastForward,
-    chip: "bg-violet-500/15 text-violet-300 border-violet-500/40",
-    solid: "text-violet-300",
+    chip: "bg-violet-500/15 text-[#6d28d9] border-violet-500/40",
+    solid: "text-[#6d28d9]",
     desc: "Recuperación → progresión: counter-pressing y repliegue organizado.",
   },
   SET_PIECE: {
     label: "Balón Parado (ABP)",
     icon: Flag,
-    chip: "bg-zinc-500/15 text-zinc-300 border-zinc-500/40",
-    solid: "text-zinc-300",
+    chip: "bg-zinc-500/15 text-[#3d5844] border-[#a8a389]/40",
+    solid: "text-[#3d5844]",
     desc: "Córners, tiros libres y saques: rutinas de ataque y defensa.",
   },
 };
@@ -266,20 +266,20 @@ export const RELEVANCE_META: Record<
   3: {
     label: "Núcleo",
     hint: "La corrige de forma directa — primera opción del motor",
-    chip: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
-    btn: "bg-emerald-500/20 border-emerald-500/60 text-emerald-200",
+    chip: "bg-brand-600/15 text-brand-600 border-emerald-500/40",
+    btn: "bg-brand-600/20 border-emerald-500/60 text-brand",
   },
   2: {
     label: "Refuerza",
     hint: "Trabaja el objetivo de forma secundaria",
-    chip: "bg-amber-500/15 text-amber-300 border-amber-500/40",
+    chip: "bg-amber-500/15 text-[#8a6206] border-amber-500/40",
     btn: "bg-amber-500/20 border-amber-500/60 text-amber-200",
   },
   1: {
     label: "Apoyo",
     hint: "Conexión periférica / calentamiento",
-    chip: "bg-zinc-500/15 text-zinc-300 border-zinc-600",
-    btn: "bg-zinc-700/40 border-zinc-500/60 text-zinc-200",
+    chip: "bg-zinc-500/15 text-[#3d5844] border-[#b9b49c]",
+    btn: "bg-cream-border-strong/40 border-[#a8a389]/60 text-[#2a4630]",
   },
 };
 
@@ -289,18 +289,18 @@ export const INTENSITY_META: Record<
 > = {
   LOW: {
     label: "Suave",
-    chip: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
-    dot: "bg-emerald-400",
+    chip: "bg-brand-600/15 text-brand-600 border-emerald-500/40",
+    dot: "bg-brand-400",
   },
   MEDIUM: {
     label: "Media",
-    chip: "bg-amber-500/15 text-amber-300 border-amber-500/40",
-    dot: "bg-amber-400",
+    chip: "bg-amber-500/15 text-[#8a6206] border-amber-500/40",
+    dot: "bg-[#e3a93c]",
   },
   HIGH: {
     label: "Alta",
-    chip: "bg-rose-500/15 text-rose-300 border-rose-500/40",
-    dot: "bg-rose-400",
+    chip: "bg-[#c62f32]/15 text-[#b4232a] border-rose-500/40",
+    dot: "bg-[#e05252]",
   },
 };
 
@@ -312,13 +312,13 @@ export const ORIGIN_META: Record<
   cathedral: {
     label: "Cátedra",
     hint: "Contenido oficial de la plataforma — solo lectura · duplica para personalizar",
-    chip: "bg-violet-500/15 text-violet-300 border-violet-500/40",
+    chip: "bg-violet-500/15 text-[#6d28d9] border-violet-500/40",
     icon: Landmark,
   },
   club: {
     label: "Mi club",
     hint: "Contenido propio del club — editable por el cuerpo técnico",
-    chip: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
+    chip: "bg-brand-600/15 text-brand-600 border-emerald-500/40",
     icon: Users,
   },
 };

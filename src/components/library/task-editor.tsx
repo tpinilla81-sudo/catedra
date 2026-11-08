@@ -113,21 +113,21 @@ function ListEditor({
   }
 
   return (
-    <div className="rounded-2xl bg-zinc-800/50 p-3">
-      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{label}</p>
+    <div className="rounded-2xl bg-cream-dark/60 p-3">
+      <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest">{label}</p>
       {items.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2">
           {items.map((it) => (
             <span
               key={it}
-              className="inline-flex items-center gap-1 rounded-lg bg-zinc-900 border border-zinc-700 pl-2 pr-1 py-1 text-xs font-semibold text-zinc-200"
+              className="inline-flex items-center gap-1 rounded-lg bg-white border border-cream-border-strong pl-2 pr-1 py-1 text-xs font-semibold text-[#2a4630]"
             >
               {it}
               <button
                 type="button"
                 onClick={() => onChange(items.filter((x) => x !== it))}
                 aria-label={`Quitar: ${it}`}
-                className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-500 hover:text-rose-300 hover:bg-rose-500/10"
+                className="w-6 h-6 rounded-md flex items-center justify-center text-[#6c8070] hover:text-[#b4232a] hover:bg-[#c62f32]/10"
               >
                 <X className="w-3.5 h-3.5" aria-hidden />
               </button>
@@ -147,14 +147,14 @@ function ListEditor({
           }}
           placeholder={placeholder}
           maxLength={160}
-          className="min-h-[44px] rounded-xl bg-zinc-950 border-zinc-700 text-zinc-100 placeholder:text-zinc-600"
+          className="min-h-[44px] rounded-xl bg-cream border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
         />
         <Button
           type="button"
           size="icon"
           onClick={add}
           aria-label={`Añadir a ${label}`}
-          className="h-11 w-11 shrink-0 rounded-xl bg-zinc-950 border border-zinc-700 text-emerald-300 hover:bg-emerald-500/10"
+          className="h-11 w-11 shrink-0 rounded-xl bg-cream border border-cream-border-strong text-brand-600 hover:bg-brand-600/10"
         >
           <Plus className="w-5 h-5" aria-hidden />
         </Button>
@@ -183,30 +183,30 @@ function Stepper({
   step?: number;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl bg-zinc-800/60 px-3 py-2">
-      <span className="text-sm font-semibold text-zinc-300">
+    <div className="flex items-center justify-between rounded-2xl bg-cream-dark/70 px-3 py-2">
+      <span className="text-sm font-semibold text-[#3d5844]">
         {label}
-        {suffix ? <span className="text-zinc-500"> ({suffix})</span> : null}
+        {suffix ? <span className="text-[#6c8070]"> ({suffix})</span> : null}
       </span>
       <div className="flex items-center gap-2">
         <Button
           type="button"
           variant="outline"
           size="icon"
-          className="h-11 w-11 rounded-2xl border-zinc-700 bg-zinc-950 text-zinc-200 hover:bg-zinc-800"
+          className="h-11 w-11 rounded-2xl border-cream-border-strong bg-cream text-[#2a4630] hover:bg-cream-dark"
           onClick={() => onChange(Math.max(min, value - step))}
           aria-label={`Bajar ${label}`}
         >
           <Minus className="w-5 h-5" aria-hidden />
         </Button>
-        <span className="w-10 text-center text-xl font-black text-zinc-50" aria-live="polite">
+        <span className="w-10 text-center text-xl font-black text-peel" aria-live="polite">
           {value}
         </span>
         <Button
           type="button"
           variant="outline"
           size="icon"
-          className="h-11 w-11 rounded-2xl border-zinc-700 bg-zinc-950 text-zinc-200 hover:bg-zinc-800"
+          className="h-11 w-11 rounded-2xl border-cream-border-strong bg-cream text-[#2a4630] hover:bg-cream-dark"
           onClick={() => onChange(Math.min(max, value + step))}
           aria-label={`Subir ${label}`}
         >
@@ -219,7 +219,7 @@ function Stepper({
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mt-5 mb-2 first:mt-1">
+    <p className="text-xs font-bold text-[#6c8070] uppercase tracking-widest mt-5 mb-2 first:mt-1">
       {children}
     </p>
   );
@@ -315,13 +315,13 @@ export function TaskEditor({
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent
         side="bottom"
-        className="bg-zinc-900 border-zinc-800 rounded-t-3xl max-h-[94vh] px-4 pb-4 pt-2 overflow-y-auto"
+        className="bg-white border-cream-border rounded-t-3xl max-h-[94vh] px-4 pb-4 pt-2 overflow-y-auto"
       >
         <SheetHeader className="text-left pb-1">
-          <SheetTitle className="text-xl font-black text-zinc-50">
+          <SheetTitle className="text-xl font-black text-peel">
             {task ? "Editar tarea" : platform ? "Nueva tarea de la Cátedra" : "Nueva tarea del club"}
           </SheetTitle>
-          <SheetDescription className="text-zinc-400 text-sm">
+          <SheetDescription className="text-[#5d7263] text-sm">
             Ficha de ingeniería: espacio, jugadores, intensidad y recetas hacia la taxonomía.
           </SheetDescription>
         </SheetHeader>
@@ -333,7 +333,7 @@ export function TaskEditor({
           onChange={(e) => set("title", e.target.value)}
           placeholder="Título — ej. «Salida de balón 4+3 bajo presión media»"
           maxLength={120}
-          className="min-h-[48px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 font-semibold"
+          className="min-h-[48px] rounded-2xl bg-cream-dark/70 border-cream-border text-peel placeholder:text-[#8a9a8d] font-semibold"
         />
         <Textarea
           value={draft.objective}
@@ -341,7 +341,7 @@ export function TaskEditor({
           placeholder="Objetivo en lenguaje de míster — ¿qué se busca entrenar?"
           maxLength={600}
           rows={3}
-          className="mt-2 rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-600"
+          className="mt-2 rounded-2xl bg-cream-dark/70 border-cream-border text-peel placeholder:text-[#8a9a8d]"
         />
 
         {/* ---------- Fases del juego ---------- */}
@@ -363,7 +363,7 @@ export function TaskEditor({
                 }
                 aria-pressed={selected}
                 className={`min-h-[52px] rounded-2xl border px-3 py-2 text-left text-sm font-bold transition ${
-                  selected ? meta.chip : "bg-zinc-800/60 border-zinc-800 text-zinc-400"
+                  selected ? meta.chip : "bg-cream-dark/70 border-cream-border text-[#5d7263]"
                 }`}
               >
                 <Icon className="w-4 h-4 inline mr-1.5 -mt-0.5" aria-hidden />
@@ -376,8 +376,8 @@ export function TaskEditor({
         {/* ---------- Ingeniería del espacio y la carga ---------- */}
         <SectionTitle>Ingeniería del espacio y la carga</SectionTitle>
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-2xl bg-zinc-800/60 px-3 py-2">
-            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+          <div className="rounded-2xl bg-cream-dark/70 px-3 py-2">
+            <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest">
               LARGO (M)
             </p>
             <Input
@@ -388,11 +388,11 @@ export function TaskEditor({
               value={draft.spaceLengthM}
               onChange={(e) => set("spaceLengthM", e.target.value)}
               placeholder="—"
-              className="mt-1 h-11 rounded-xl bg-zinc-950 border-zinc-700 text-zinc-100 text-lg font-black placeholder:text-zinc-600"
+              className="mt-1 h-11 rounded-xl bg-cream border-cream-border-strong text-peel text-lg font-black placeholder:text-[#8a9a8d]"
             />
           </div>
-          <div className="rounded-2xl bg-zinc-800/60 px-3 py-2">
-            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+          <div className="rounded-2xl bg-cream-dark/70 px-3 py-2">
+            <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest">
               ANCHO (M)
             </p>
             <Input
@@ -403,7 +403,7 @@ export function TaskEditor({
               value={draft.spaceWidthM}
               onChange={(e) => set("spaceWidthM", e.target.value)}
               placeholder="—"
-              className="mt-1 h-11 rounded-xl bg-zinc-950 border-zinc-700 text-zinc-100 text-lg font-black placeholder:text-zinc-600"
+              className="mt-1 h-11 rounded-xl bg-cream border-cream-border-strong text-peel text-lg font-black placeholder:text-[#8a9a8d]"
             />
           </div>
         </div>
@@ -412,7 +412,7 @@ export function TaskEditor({
           onChange={(e) => set("spaceNote", e.target.value)}
           placeholder="Nota del espacio — ej. «con dos zonas laterales libres»"
           maxLength={200}
-          className="mt-2 min-h-[44px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-600"
+          className="mt-2 min-h-[44px] rounded-2xl bg-cream-dark/70 border-cream-border text-peel placeholder:text-[#8a9a8d]"
         />
 
         <div className="space-y-2 mt-2">
@@ -423,8 +423,8 @@ export function TaskEditor({
             min={1}
             max={40}
           />
-          <div className="flex items-center justify-between rounded-2xl bg-zinc-800/60 px-3 py-2">
-            <span className="text-sm font-semibold text-zinc-300">Jugadores máximo</span>
+          <div className="flex items-center justify-between rounded-2xl bg-cream-dark/70 px-3 py-2">
+            <span className="text-sm font-semibold text-[#3d5844]">Jugadores máximo</span>
             <Input
               type="number"
               inputMode="numeric"
@@ -433,7 +433,7 @@ export function TaskEditor({
               value={draft.playersMax}
               onChange={(e) => set("playersMax", e.target.value)}
               placeholder="libre"
-              className="w-24 h-11 rounded-xl bg-zinc-950 border-zinc-700 text-zinc-100 text-lg font-black text-center placeholder:text-zinc-600 placeholder:text-sm placeholder:font-semibold"
+              className="w-24 h-11 rounded-xl bg-cream border-cream-border-strong text-peel text-lg font-black text-center placeholder:text-[#8a9a8d] placeholder:text-sm placeholder:font-semibold"
             />
           </div>
           <Stepper
@@ -450,7 +450,7 @@ export function TaskEditor({
             onChange={(e) => set("repetitions", e.target.value)}
             placeholder="Repeticiones — ej. «3 series x 6'»"
             maxLength={80}
-            className="min-h-[44px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-600"
+            className="min-h-[44px] rounded-2xl bg-cream-dark/70 border-cream-border text-peel placeholder:text-[#8a9a8d]"
           />
         </div>
 
@@ -467,7 +467,7 @@ export function TaskEditor({
                 onClick={() => set("intensity", i)}
                 aria-pressed={selected}
                 className={`min-h-[52px] rounded-2xl border text-sm font-bold transition flex items-center justify-center gap-2 ${
-                  selected ? meta.chip : "bg-zinc-800/60 border-zinc-800 text-zinc-400"
+                  selected ? meta.chip : "bg-cream-dark/70 border-cream-border text-[#5d7263]"
                 }`}
               >
                 <span className={`w-2.5 h-2.5 rounded-full ${meta.dot}`} aria-hidden />
@@ -509,23 +509,23 @@ export function TaskEditor({
           placeholder="URL de la pizarra / esquema (http…)"
           maxLength={300}
           inputMode="url"
-          className="min-h-[44px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-600"
+          className="min-h-[44px] rounded-2xl bg-cream-dark/70 border-cream-border text-peel placeholder:text-[#8a9a8d]"
         />
 
         {/* ---------- MOTOR DE RECETAS ---------- */}
         <SectionTitle>
           Recetas — qué subprincipios corrige esta tarea (relevancia 1-3)
         </SectionTitle>
-        <div className="rounded-2xl bg-zinc-800/50 p-3">
+        <div className="rounded-2xl bg-cream-dark/60 p-3">
           <Input
             value={spQuery}
             onChange={(e) => setSpQuery(e.target.value)}
             placeholder="Buscar subprincipio para conectar…"
-            className="min-h-[44px] rounded-xl bg-zinc-950 border-zinc-700 text-zinc-100 placeholder:text-zinc-600"
+            className="min-h-[44px] rounded-xl bg-cream border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
             aria-label="Buscar subprincipio"
           />
           {spQuery.trim() && spCandidates.length > 0 && (
-            <div className="mt-2 max-h-44 overflow-y-auto rounded-xl border border-zinc-800 divide-y divide-zinc-800">
+            <div className="mt-2 max-h-44 overflow-y-auto rounded-xl border border-cream-border divide-y divide-cream-border">
               {spCandidates.map((s) => {
                 const pMeta = PHASE_META[s.phase] ?? PHASE_META.OFFENSIVE;
                 const origin = s.clubId === null ? ORIGIN_META.cathedral : ORIGIN_META.club;
@@ -534,9 +534,9 @@ export function TaskEditor({
                     key={s.id}
                     type="button"
                     onClick={() => addRecipe(s)}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-zinc-800/70 min-h-[44px]"
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-cream-dark/75 min-h-[44px]"
                   >
-                    <span className="text-sm font-semibold text-zinc-200 flex-1 min-w-0 truncate">
+                    <span className="text-sm font-semibold text-[#2a4630] flex-1 min-w-0 truncate">
                       {s.name}
                     </span>
                     <span
@@ -555,7 +555,7 @@ export function TaskEditor({
             </div>
           )}
           {spQuery.trim() && spCandidates.length === 0 && (
-            <p className="text-xs text-zinc-500 mt-2">Sin resultados para «{spQuery}».</p>
+            <p className="text-xs text-[#6c8070] mt-2">Sin resultados para «{spQuery}».</p>
           )}
 
           {/* Recetas conectadas */}
@@ -564,9 +564,9 @@ export function TaskEditor({
               {draft.recipes.map((r) => {
                 const sp = subprinciples.find((s) => s.id === r.subPrincipleId);
                 return (
-                  <div key={r.subPrincipleId} className="rounded-xl bg-zinc-900 border border-zinc-800 p-2.5">
+                  <div key={r.subPrincipleId} className="rounded-xl bg-white border border-cream-border p-2.5">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-bold text-zinc-100 flex-1 min-w-0 truncate">
+                      <p className="text-sm font-bold text-peel flex-1 min-w-0 truncate">
                         {sp?.name ?? "subprincipio"}
                       </p>
                       <button
@@ -578,7 +578,7 @@ export function TaskEditor({
                           )
                         }
                         aria-label={`Quitar receta: ${sp?.name ?? ""}`}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-500 hover:text-rose-300 hover:bg-rose-500/10 shrink-0"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6c8070] hover:text-[#b4232a] hover:bg-[#c62f32]/10 shrink-0"
                       >
                         <X className="w-4 h-4" aria-hidden />
                       </button>
@@ -604,7 +604,7 @@ export function TaskEditor({
                             aria-pressed={active}
                             title={meta.hint}
                             className={`min-h-[40px] rounded-lg border text-xs font-black transition ${
-                              active ? meta.btn : "bg-zinc-950 border-zinc-800 text-zinc-500"
+                              active ? meta.btn : "bg-cream border-cream-border text-[#6c8070]"
                             }`}
                           >
                             {rel} · {meta.label}
@@ -626,14 +626,14 @@ export function TaskEditor({
                       }
                       placeholder="Nota de uso — ¿cuándo usarla para este objetivo?"
                       maxLength={200}
-                      className="mt-2 min-h-[40px] rounded-xl bg-zinc-950 border-zinc-800 text-zinc-100 text-sm placeholder:text-zinc-600"
+                      className="mt-2 min-h-[40px] rounded-xl bg-cream border-cream-border text-peel text-sm placeholder:text-[#8a9a8d]"
                     />
                   </div>
                 );
               })}
             </div>
           ) : (
-            <p className="text-xs text-zinc-500 mt-2">
+            <p className="text-xs text-[#6c8070] mt-2">
               Sin recetas la tarea no aparecerá en la prescripción del motor. Conéctala a la
               taxonomía para que el lunes sepa cuándo usarla.
             </p>
@@ -645,7 +645,7 @@ export function TaskEditor({
           <Button
             onClick={save}
             disabled={saving}
-            className="w-full min-h-[56px] rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-base"
+            className="w-full min-h-[56px] rounded-2xl bg-brand-600 hover:bg-brand text-white font-black text-base"
           >
             {saving ? (
               <Loader2 className="w-5 h-5 animate-spin" aria-hidden />

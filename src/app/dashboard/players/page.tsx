@@ -5,14 +5,14 @@
 // pasa a la vista táctil. Fricción cero: filtros de 1 toque, tarjetas grandes,
 // polivalencias visibles de un vistazo, edición rápida en hoja inferior.
 // ============================================================================
-import { AppNav } from "@/components/dashboard/app-nav";
+import { AppShell } from "@/components/dashboard/app-shell";
 import { PlayersView, type PlayerCardData } from "@/components/players/players-view";
 import { requireTenantContext } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function PlayersPage() {
-  const { db, team } = await requireTenantContext();
+  const { db, team, user } = await requireTenantContext();
 
   const players = await db.player.findMany({
     where: { teamId: team.id, isActive: true },
@@ -34,9 +34,10 @@ export default async function PlayersPage() {
   }));
 
   return (
-    <main className="min-h-screen bg-zinc-950 pb-28">
+    <AppShell active="players" userName={user.name} role={user.role}>
+    <main className="min-h-screen bg-cream pb-10">
       <PlayersView teamName={team.name} players={data} />
-      <AppNav active="players" />
     </main>
+    </AppShell>
   );
 }

@@ -87,7 +87,7 @@ export function NewMatchDialog() {
     >
       <DialogTrigger asChild>
         <Button
-          className="min-h-[48px] rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black border border-emerald-400/60"
+          className="min-h-[48px] rounded-2xl bg-brand-600 hover:bg-brand text-white font-black border border-brand-600/60"
           aria-label="Crear partido nuevo"
         >
           <Plus className="w-5 h-5" aria-hidden />
@@ -96,12 +96,12 @@ export function NewMatchDialog() {
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="bg-zinc-900 border-zinc-800 rounded-3xl max-w-lg gap-4">
+      <DialogContent className="bg-white border-cream-border rounded-3xl max-w-lg gap-4">
         <DialogHeader>
-          <DialogTitle className="text-zinc-50 text-lg font-black">
+          <DialogTitle className="text-peel text-lg font-black">
             Nuevo partido
           </DialogTitle>
-          <DialogDescription className="text-zinc-400 text-sm">
+          <DialogDescription className="text-[#5d7263] text-sm">
             Date de alta en 20 segundos. Al crear, pasas directo a la ingesta:
             semáforo, pizarra táctica y cuaderno de notas.
           </DialogDescription>
@@ -110,7 +110,7 @@ export function NewMatchDialog() {
         <div className="space-y-4">
           {/* Rival */}
           <div className="space-y-2">
-            <Label htmlFor="nm-opponent" className="text-zinc-300">
+            <Label htmlFor="nm-opponent" className="text-[#3d5844]">
               Rival
             </Label>
             <Input
@@ -119,14 +119,14 @@ export function NewMatchDialog() {
               onChange={(e) => setOpponent(e.target.value)}
               placeholder="Ej. Atlético Torrent"
               maxLength={80}
-              className="h-12 rounded-2xl bg-zinc-950 border-zinc-700 text-zinc-100"
+              className="h-12 rounded-2xl bg-cream border-cream-border-strong text-peel"
             />
           </div>
 
           {/* Fecha + Hora */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="nm-date" className="text-zinc-300">
+              <Label htmlFor="nm-date" className="text-[#3d5844]">
                 Fecha
               </Label>
               <Input
@@ -134,11 +134,11 @@ export function NewMatchDialog() {
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="h-12 rounded-2xl bg-zinc-950 border-zinc-700 text-zinc-100 [color-scheme:dark]"
+                className="h-12 rounded-2xl bg-cream border-cream-border-strong text-peel [color-scheme:dark]"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="nm-time" className="text-zinc-300">
+              <Label htmlFor="nm-time" className="text-[#3d5844]">
                 Hora
               </Label>
               <Input
@@ -146,14 +146,14 @@ export function NewMatchDialog() {
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                className="h-12 rounded-2xl bg-zinc-950 border-zinc-700 text-zinc-100 [color-scheme:dark]"
+                className="h-12 rounded-2xl bg-cream border-cream-border-strong text-peel [color-scheme:dark]"
               />
             </div>
           </div>
 
           {/* Casa / Fuera */}
           <div className="space-y-2">
-            <Label className="text-zinc-300">Condición</Label>
+            <Label className="text-[#3d5844]">Condición</Label>
             <div className="grid grid-cols-2 gap-2" role="group" aria-label="Condición del partido">
               <button
                 type="button"
@@ -161,8 +161,8 @@ export function NewMatchDialog() {
                 aria-pressed={isHome}
                 className={`min-h-[48px] rounded-2xl border font-bold transition ${
                   isHome
-                    ? "bg-emerald-500/15 border-emerald-400/60 text-emerald-300"
-                    : "bg-zinc-950 border-zinc-700 text-zinc-400 hover:text-zinc-200"
+                    ? "bg-brand-600/15 border-brand-600/60 text-brand-600"
+                    : "bg-cream border-cream-border-strong text-[#5d7263] hover:text-[#2a4630]"
                 }`}
               >
                 En casa
@@ -173,8 +173,8 @@ export function NewMatchDialog() {
                 aria-pressed={!isHome}
                 className={`min-h-[48px] rounded-2xl border font-bold transition ${
                   !isHome
-                    ? "bg-amber-500/15 border-amber-400/60 text-amber-300"
-                    : "bg-zinc-950 border-zinc-700 text-zinc-400 hover:text-zinc-200"
+                    ? "bg-amber-500/15 border-amber-400/60 text-[#8a6206]"
+                    : "bg-cream border-cream-border-strong text-[#5d7263] hover:text-[#2a4630]"
                 }`}
               >
                 Fuera
@@ -185,8 +185,8 @@ export function NewMatchDialog() {
           {/* Competición + Lugar (opcionales) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="nm-comp" className="text-zinc-300">
-                Competición <span className="text-zinc-600">(opcional)</span>
+              <Label htmlFor="nm-comp" className="text-[#3d5844]">
+                Competición <span className="text-[#8a9a8d]">(opcional)</span>
               </Label>
               <Input
                 id="nm-comp"
@@ -194,12 +194,12 @@ export function NewMatchDialog() {
                 onChange={(e) => setCompetition(e.target.value)}
                 placeholder="Liga · Jornada 12"
                 maxLength={60}
-                className="h-12 rounded-2xl bg-zinc-950 border-zinc-700 text-zinc-100"
+                className="h-12 rounded-2xl bg-cream border-cream-border-strong text-peel"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="nm-loc" className="text-zinc-300">
-                Lugar <span className="text-zinc-600">(opcional)</span>
+              <Label htmlFor="nm-loc" className="text-[#3d5844]">
+                Lugar <span className="text-[#8a9a8d]">(opcional)</span>
               </Label>
               <Input
                 id="nm-loc"
@@ -207,7 +207,7 @@ export function NewMatchDialog() {
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="Campo municipal"
                 maxLength={80}
-                className="h-12 rounded-2xl bg-zinc-950 border-zinc-700 text-zinc-100"
+                className="h-12 rounded-2xl bg-cream border-cream-border-strong text-peel"
               />
             </div>
           </div>
@@ -216,7 +216,7 @@ export function NewMatchDialog() {
           {error && (
             <p
               role="alert"
-              className="rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-200 text-sm px-4 py-3"
+              className="rounded-2xl bg-[#c62f32]/15 border border-rose-500/40 text-[#8f1d22] text-sm px-4 py-3"
             >
               {error}
             </p>
@@ -226,7 +226,7 @@ export function NewMatchDialog() {
           <Button
             onClick={submit}
             disabled={pending || opponent.trim().length < 2}
-            className="w-full min-h-[56px] rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-lg font-black"
+            className="w-full min-h-[56px] rounded-2xl bg-brand-600 hover:bg-brand text-white text-lg font-black"
           >
             {pending ? (
               <>

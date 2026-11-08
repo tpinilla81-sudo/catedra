@@ -84,20 +84,20 @@ function SPRow({
   return (
     <button
       onClick={() => onOpen(node)}
-      className={`w-full rounded-2xl border text-left transition hover:border-zinc-600 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 ${
+      className={`w-full rounded-2xl border text-left transition hover:border-[#b9b49c] active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-600 ${
         child
-          ? "border-zinc-800/70 bg-zinc-900/60"
-          : "border-zinc-800 bg-zinc-900"
+          ? "border-cream-border/80 bg-white/80"
+          : "border-cream-border bg-white"
       }`}
       aria-label={`Abrir subprincipio ${node.name}`}
     >
       <div className={`flex items-start gap-2 ${child ? "px-3 py-2.5" : "px-3.5 py-3"}`}>
         {child && (
-          <CornerDownRight className="w-4 h-4 text-zinc-600 shrink-0 mt-0.5" aria-hidden />
+          <CornerDownRight className="w-4 h-4 text-[#8a9a8d] shrink-0 mt-0.5" aria-hidden />
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <p className={`font-bold text-zinc-50 leading-snug ${child ? "text-sm" : "text-[15px]"}`}>
+            <p className={`font-bold text-peel leading-snug ${child ? "text-sm" : "text-[15px]"}`}>
               {node.name}
             </p>
             <span
@@ -109,29 +109,29 @@ function SPRow({
             </span>
           </div>
           {node.description && (
-            <p className="text-xs text-zinc-500 mt-0.5 line-clamp-1 leading-snug">
+            <p className="text-xs text-[#6c8070] mt-0.5 line-clamp-1 leading-snug">
               {node.description}
             </p>
           )}
           <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
             {recipeCount > 0 ? (
-              <span className="rounded-md bg-amber-500/15 border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-bold text-amber-300 inline-flex items-center gap-1">
+              <span className="rounded-md bg-amber-500/15 border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-bold text-[#8a6206] inline-flex items-center gap-1">
                 <BookOpen className="w-3 h-3" aria-hidden /> {recipeCount} tarea
                 {recipeCount > 1 ? "s" : ""}
               </span>
             ) : (
-              <span className="rounded-md bg-zinc-800 px-1.5 py-0.5 text-[10px] font-bold text-zinc-500">
+              <span className="rounded-md bg-cream-dark px-1.5 py-0.5 text-[10px] font-bold text-[#6c8070]">
                 sin recetas
               </span>
             )}
             {childCount > 0 && (
-              <span className="rounded-md bg-zinc-800 px-1.5 py-0.5 text-[10px] font-bold text-zinc-400">
+              <span className="rounded-md bg-cream-dark px-1.5 py-0.5 text-[10px] font-bold text-[#5d7263]">
                 {childCount} detalle{childCount > 1 ? "s" : ""}
               </span>
             )}
             {node.issue && (
               <span
-                className="rounded-md bg-rose-500/15 border border-rose-500/50 px-1.5 py-0.5 text-[10px] font-black text-rose-300 inline-flex items-center gap-1"
+                className="rounded-md bg-[#c62f32]/15 border border-rose-500/50 px-1.5 py-0.5 text-[10px] font-black text-[#b4232a] inline-flex items-center gap-1"
                 title={node.issue.evidence}
               >
                 <AlertTriangle className="w-3 h-3" aria-hidden /> falla esta semana
@@ -204,10 +204,10 @@ function SPEditorSheet({
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent
         side="bottom"
-        className="bg-zinc-900 border-zinc-800 rounded-t-3xl max-h-[92vh] overflow-y-auto px-4 pb-6 pt-2"
+        className="bg-white border-cream-border rounded-t-3xl max-h-[92vh] overflow-y-auto px-4 pb-6 pt-2"
       >
         <SheetHeader className="text-left pb-1">
-          <SheetTitle className="text-xl font-black text-zinc-50">
+          <SheetTitle className="text-xl font-black text-peel">
             {node ? "Editar subprincipio" : editor.parent ? "Nuevo detalle" : "Nuevo subprincipio"}
           </SheetTitle>
           <SheetDescription className="flex items-center gap-1.5 text-sm">
@@ -220,7 +220,7 @@ function SPEditorSheet({
               })()}
               {phaseMeta.label}
             </span>
-            <span className="text-zinc-500">· la fase no se puede cambiar tras crear</span>
+            <span className="text-[#6c8070]">· la fase no se puede cambiar tras crear</span>
           </SheetDescription>
         </SheetHeader>
 
@@ -229,7 +229,7 @@ function SPEditorSheet({
           onChange={(e) => setName(e.target.value)}
           placeholder="Nombre — ej. «Salida de balón desde presión rival en 3/4»"
           maxLength={120}
-          className="mt-2 min-h-[48px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 font-semibold"
+          className="mt-2 min-h-[48px] rounded-2xl bg-cream-dark/70 border-cream-border text-peel placeholder:text-[#8a9a8d] font-semibold"
         />
         <Textarea
           value={description}
@@ -237,17 +237,17 @@ function SPEditorSheet({
           placeholder="Descripción metodológica (opcional)"
           maxLength={500}
           rows={3}
-          className="mt-2 rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-600"
+          className="mt-2 rounded-2xl bg-cream-dark/70 border-cream-border text-peel placeholder:text-[#8a9a8d]"
         />
 
         {/* Jerarquía (solo si el nodo no tiene hijos) */}
         {nodeHasChildren ? (
-          <p className="mt-3 text-xs text-zinc-500">
+          <p className="mt-3 text-xs text-[#6c8070]">
             Este subprincipio tiene detalles propios: se mantiene como raíz de la jerarquía.
           </p>
         ) : (
           <>
-            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-4 mb-2">
+            <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest mt-4 mb-2">
               Jerarquía — ¿raíz o detalle de otro subprincipio?
             </p>
             <div className="flex flex-wrap gap-2">
@@ -257,8 +257,8 @@ function SPEditorSheet({
                 aria-pressed={parentId === null}
                 className={`min-h-[44px] px-3.5 rounded-2xl border text-sm font-bold transition ${
                   parentId === null
-                    ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300"
-                    : "bg-zinc-800/60 border-zinc-800 text-zinc-400"
+                    ? "bg-brand-600/15 border-emerald-500/50 text-brand-600"
+                    : "bg-cream-dark/70 border-cream-border text-[#5d7263]"
                 }`}
               >
                 Raíz de la fase
@@ -271,8 +271,8 @@ function SPEditorSheet({
                   aria-pressed={parentId === p.id}
                   className={`min-h-[44px] max-w-[48%] px-3.5 rounded-2xl border text-sm font-bold transition truncate ${
                     parentId === p.id
-                      ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300"
-                      : "bg-zinc-800/60 border-zinc-800 text-zinc-400"
+                      ? "bg-brand-600/15 border-emerald-500/50 text-brand-600"
+                      : "bg-cream-dark/70 border-cream-border text-[#5d7263]"
                   }`}
                 >
                   {p.name}
@@ -285,7 +285,7 @@ function SPEditorSheet({
         <Button
           onClick={save}
           disabled={saving}
-          className="mt-4 w-full min-h-[56px] rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-base"
+          className="mt-4 w-full min-h-[56px] rounded-2xl bg-brand-600 hover:bg-brand text-white font-black text-base"
         >
           {saving ? (
             <Loader2 className="w-5 h-5 animate-spin" aria-hidden />
@@ -391,7 +391,7 @@ export function TaxonomyTab({
           <section
             key={phase}
             aria-label={`Fase ${meta.label}`}
-            className="rounded-3xl border border-zinc-800 bg-zinc-900/40 overflow-hidden"
+            className="rounded-3xl border border-cream-border bg-white/65 overflow-hidden"
           >
             {/* Cabecera de fase */}
             <div className="flex items-center gap-2 px-3 py-3">
@@ -406,25 +406,25 @@ export function TaxonomyTab({
                   <Icon className="w-4.5 h-4.5" aria-hidden />
                 </span>
                 <span className="min-w-0">
-                  <span className="block font-black text-zinc-50 text-[15px] leading-tight truncate">
+                  <span className="block font-black text-peel text-[15px] leading-tight truncate">
                     {meta.label}
                     {hasIssue && (
-                      <AlertTriangle className="w-4 h-4 text-rose-300 inline ml-1.5 -mt-0.5" aria-label="Con hallazgos abiertos esta semana" />
+                      <AlertTriangle className="w-4 h-4 text-[#b4232a] inline ml-1.5 -mt-0.5" aria-label="Con hallazgos abiertos esta semana" />
                     )}
                   </span>
-                  <span className="block text-[11px] text-zinc-500 leading-tight truncate">
+                  <span className="block text-[11px] text-[#6c8070] leading-tight truncate">
                     {roots.length} subprincipio{roots.length !== 1 ? "s" : ""} · {meta.desc}
                   </span>
                 </span>
                 <ChevronDown
-                  className={`w-5 h-5 text-zinc-500 shrink-0 transition-transform ${expanded ? "" : "-rotate-90"}`}
+                  className={`w-5 h-5 text-[#6c8070] shrink-0 transition-transform ${expanded ? "" : "-rotate-90"}`}
                   aria-hidden
                 />
               </button>
               {canWrite && (
                 <button
                   onClick={() => setEditor({ node: null, phase, parent: null })}
-                  className="shrink-0 min-h-[44px] min-w-[44px] rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 flex items-center justify-center hover:bg-emerald-500/20 transition"
+                  className="shrink-0 min-h-[44px] min-w-[44px] rounded-xl border border-emerald-500/40 bg-brand-600/10 text-brand-600 flex items-center justify-center hover:bg-brand-600/20 transition"
                   aria-label={`Añadir subprincipio a ${meta.label}`}
                   title={platform ? "Añadir subprincipio de la Cátedra" : "Añadir subprincipio del club"}
                 >
@@ -437,7 +437,7 @@ export function TaxonomyTab({
             {expanded && (
               <div className="px-3 pb-3 space-y-2">
                 {roots.length === 0 && (
-                  <p className="rounded-2xl border border-dashed border-zinc-800 px-4 py-4 text-center text-sm text-zinc-500">
+                  <p className="rounded-2xl border border-dashed border-cream-border px-4 py-4 text-center text-sm text-[#6c8070]">
                     Sin subprincipios en esta fase todavía.
                   </p>
                 )}
@@ -475,12 +475,12 @@ export function TaxonomyTab({
       <Sheet open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <SheetContent
           side="bottom"
-          className="bg-zinc-900 border-zinc-800 rounded-t-3xl max-h-[92vh] overflow-y-auto px-4 pb-8 pt-2"
+          className="bg-white border-cream-border rounded-t-3xl max-h-[92vh] overflow-y-auto px-4 pb-8 pt-2"
         >
           {detail && (
             <>
               <SheetHeader className="text-left pb-1">
-                <SheetTitle className="text-xl font-black text-zinc-50 leading-snug">
+                <SheetTitle className="text-xl font-black text-peel leading-snug">
                   {detail.name}
                 </SheetTitle>
                 <SheetDescription className="flex flex-wrap items-center gap-1.5 pt-1">
@@ -511,21 +511,21 @@ export function TaxonomyTab({
               </SheetHeader>
 
               {detail.description && (
-                <p className="text-sm text-zinc-300 leading-relaxed mt-1">{detail.description}</p>
+                <p className="text-sm text-[#3d5844] leading-relaxed mt-1">{detail.description}</p>
               )}
 
               {/* Hallazgo del motor */}
               {detail.issue && (
-                <div className="mt-3 rounded-2xl bg-rose-500/10 border border-rose-500/40 px-3.5 py-3 flex gap-2.5">
-                  <AlertTriangle className="w-5 h-5 text-rose-300 shrink-0 mt-0.5" aria-hidden />
+                <div className="mt-3 rounded-2xl bg-[#c62f32]/10 border border-rose-500/40 px-3.5 py-3 flex gap-2.5">
+                  <AlertTriangle className="w-5 h-5 text-[#b4232a] shrink-0 mt-0.5" aria-hidden />
                   <div>
-                    <p className="text-sm font-black text-rose-300">
+                    <p className="text-sm font-black text-[#b4232a]">
                       Falla esta semana (severidad {detail.issue.severity}/5)
                     </p>
-                    <p className="text-sm text-rose-200/90 mt-0.5 leading-snug">
+                    <p className="text-sm text-[#8f1d22] mt-0.5 leading-snug">
                       {detail.issue.evidence}
                     </p>
-                    <p className="text-[11px] text-zinc-500 mt-1">
+                    <p className="text-[11px] text-[#6c8070] mt-1">
                       Las tareas con receta núcleo hacia aquí son la primera opción del motor para
                       el lunes.
                     </p>
@@ -536,7 +536,7 @@ export function TaxonomyTab({
               {/* Detalles (hijos) */}
               {childrenOf(detail.id).length > 0 && (
                 <>
-                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-5 mb-2">
+                  <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest mt-5 mb-2">
                     Detalles del subprincipio
                   </p>
                   <div className="space-y-1.5">
@@ -555,14 +555,14 @@ export function TaxonomyTab({
               )}
 
               {/* RECETAS: tareas que lo resuelven (motor relacional bidireccional) */}
-              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-5 mb-2">
+              <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest mt-5 mb-2">
                 Tareas que lo resuelven (recetas del motor)
               </p>
               {(() => {
                 const links = tasksForSubPrinciple(data.tasks, detail.id);
                 if (links.length === 0)
                   return (
-                    <p className="rounded-2xl border border-dashed border-zinc-700 px-4 py-3 text-sm text-zinc-500">
+                    <p className="rounded-2xl border border-dashed border-cream-border-strong px-4 py-3 text-sm text-[#6c8070]">
                       Ninguna tarea conectada todavía. Abre una tarea de tu club y añade una receta
                       hacia este subprincipio — o crea una nueva.
                     </p>
@@ -576,7 +576,7 @@ export function TaxonomyTab({
                         <li key={task.id}>
                           <button
                             onClick={() => onOpenTask(task)}
-                            className="w-full rounded-2xl bg-zinc-800/50 border border-zinc-800 px-3 py-2.5 text-left hover:border-zinc-600 transition"
+                            className="w-full rounded-2xl bg-cream-dark/60 border border-cream-border px-3 py-2.5 text-left hover:border-[#b9b49c] transition"
                             aria-label={`Abrir tarea ${task.title}`}
                           >
                             <div className="flex items-center gap-2 flex-wrap">
@@ -586,7 +586,7 @@ export function TaxonomyTab({
                               >
                                 {relevance} · {rel.label}
                               </span>
-                              <p className="text-sm font-bold text-zinc-100 flex-1 min-w-[50%] leading-snug">
+                              <p className="text-sm font-bold text-peel flex-1 min-w-[50%] leading-snug">
                                 {task.title}
                               </p>
                               <span
@@ -597,7 +597,7 @@ export function TaxonomyTab({
                               </span>
                             </div>
                             {usageNote && (
-                              <p className="text-xs italic text-zinc-400 mt-1.5 leading-snug">
+                              <p className="text-xs italic text-[#5d7263] mt-1.5 leading-snug">
                                 «{usageNote}»
                               </p>
                             )}
@@ -622,13 +622,13 @@ export function TaxonomyTab({
                             parent: null,
                           })
                         }
-                        className="min-h-[52px] rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black"
+                        className="min-h-[52px] rounded-2xl bg-brand-600 hover:bg-brand text-white font-black"
                       >
                         <PenLine className="w-5 h-5" aria-hidden /> Editar
                       </Button>
                       <Button
                         onClick={() => setEditor({ node: null, phase: detail.phase, parent: detail })}
-                        className="min-h-[52px] rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-black border border-zinc-700"
+                        className="min-h-[52px] rounded-2xl bg-cream-dark hover:bg-cream-border-strong text-peel font-black border border-cream-border-strong"
                       >
                         <Plus className="w-5 h-5" aria-hidden /> Detalle
                       </Button>
@@ -637,7 +637,7 @@ export function TaxonomyTab({
                       variant="outline"
                       onClick={() => setConfirmDelete(true)}
                       disabled={busy}
-                      className="w-full min-h-[48px] rounded-2xl border-zinc-700 bg-zinc-950 text-rose-300 hover:bg-rose-500/10 hover:text-rose-300 font-bold"
+                      className="w-full min-h-[48px] rounded-2xl border-cream-border-strong bg-cream text-[#b4232a] hover:bg-[#c62f32]/10 hover:text-[#b4232a] font-bold"
                     >
                       <Trash2 className="w-4 h-4" aria-hidden /> Eliminar subprincipio
                     </Button>
@@ -647,7 +647,7 @@ export function TaxonomyTab({
                   <Button
                     onClick={() => runDuplicate(detail)}
                     disabled={busy}
-                    className="w-full min-h-[52px] rounded-2xl bg-violet-500/90 hover:bg-violet-400 text-zinc-950 font-black"
+                    className="w-full min-h-[52px] rounded-2xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white font-black"
                   >
                     {busy ? (
                       <Loader2 className="w-5 h-5 animate-spin" aria-hidden />
@@ -660,7 +660,7 @@ export function TaxonomyTab({
                   </Button>
                 )}
                 {!canWrite && (
-                  <p className="rounded-2xl border border-zinc-800 bg-zinc-900/60 px-3.5 py-2.5 text-xs text-zinc-500 font-semibold">
+                  <p className="rounded-2xl border border-cream-border bg-white/80 px-3.5 py-2.5 text-xs text-[#6c8070] font-semibold">
                     Solo lectura: tu rol consulta la biblioteca sin modificarla.
                   </p>
                 )}
@@ -668,7 +668,7 @@ export function TaxonomyTab({
                   <Button
                     variant="ghost"
                     onClick={onNewTask}
-                    className="w-full min-h-[44px] rounded-2xl text-zinc-400 hover:text-zinc-200 font-bold"
+                    className="w-full min-h-[44px] rounded-2xl text-[#5d7263] hover:text-[#2a4630] font-bold"
                   >
                     <BookOpen className="w-4 h-4" aria-hidden /> Crear una tarea para este objetivo
                   </Button>
@@ -676,18 +676,18 @@ export function TaxonomyTab({
               </div>
 
               <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-                <AlertDialogContent className="bg-zinc-900 border-zinc-800 rounded-3xl max-w-sm mx-auto">
+                <AlertDialogContent className="bg-white border-cream-border rounded-3xl max-w-sm mx-auto">
                   <AlertDialogHeader>
-                    <AlertDialogTitle className="text-zinc-50">
+                    <AlertDialogTitle className="text-peel">
                       ¿Eliminar «{detail.name}»?
                     </AlertDialogTitle>
-                    <AlertDialogDescription className="text-zinc-400">
+                    <AlertDialogDescription className="text-[#5d7263]">
                       Sus detalles quedarán como raíces y las recetas conectadas se desconectarán.
                       Los hallazgos históricos del motor conservan su evidencia.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter className="flex-row gap-2">
-                    <AlertDialogCancel className="rounded-2xl border-zinc-700 bg-zinc-950 text-zinc-200 mt-0">
+                    <AlertDialogCancel className="rounded-2xl border-cream-border-strong bg-cream text-[#2a4630] mt-0">
                       Cancelar
                     </AlertDialogCancel>
                     <AlertDialogAction
@@ -695,7 +695,7 @@ export function TaxonomyTab({
                         e.preventDefault();
                         runDelete();
                       }}
-                      className="rounded-2xl bg-rose-500 text-white hover:bg-rose-400 mt-0"
+                      className="rounded-2xl bg-[#c62f32] text-white hover:bg-[#a81f24] mt-0"
                     >
                       {busy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : "Eliminar"}
                     </AlertDialogAction>

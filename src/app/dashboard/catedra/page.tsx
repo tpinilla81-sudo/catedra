@@ -96,7 +96,7 @@ export default async function CatedraPage() {
   const data: LibraryData = { subprinciples, tasks: taskData };
 
   return (
-    <main className="min-h-screen bg-zinc-950 pb-16">
+    <main className="min-h-screen bg-cream pb-16">
       <LibraryView
         data={data}
         role={user.role}

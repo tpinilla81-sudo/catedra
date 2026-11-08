@@ -32,7 +32,7 @@ export function AcceptPlanButton({ microcycleId }: { microcycleId: string }) {
     <Button
       onClick={handleAccept}
       disabled={pending || done}
-      className="w-full h-20 text-2xl font-black rounded-3xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 shadow-lg shadow-emerald-500/20 min-h-[44px]"
+      className="w-full h-20 text-2xl font-black rounded-3xl bg-brand-600 hover:bg-brand text-white shadow-lg shadow-brand-600/25 min-h-[44px]"
     >
       <CheckCheck className="w-7 h-7 mr-3" aria-hidden />
       {done ? "Plan aceptado" : pending ? "Aceptando…" : "✅ Aceptar Plan"}
