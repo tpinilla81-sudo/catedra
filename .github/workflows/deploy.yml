@@ -1,0 +1,54 @@
+# ============================================================================
+# CATEDRA by Método — Despliegue a producción desde GitHub Actions
+# ----------------------------------------------------------------------------
+# Los secretos viven SOLO en GitHub (Settings → Secrets and variables → Actions):
+#   DATABASE_URL  → cadena de Neon CON -pooler
+#   DIRECT_URL    → cadena de Neon SIN -pooler
+#   VERCEL_TOKEN  → token de Vercel (Account Settings → Tokens)
+# El checkout usa el GITHUB_TOKEN automático de Actions — nada en el repo.
+# Cada push a main despliega. También se puede lanzar a mano (Run workflow).
+# ============================================================================
+name: Deploy producción
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 1/3 · Migrar Neon (solo CREATE — nunca destruye datos)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: npx --yes prisma@6.11.1 migrate deploy
+
+      - name: 2/3 · Sincronizar env DB en Vercel (producción, cifradas)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: |
+          npx --yes vercel@latest link --yes --project catedra --token="$VERCEL_TOKEN"
+          npx --yes vercel@latest env rm DATABASE_URL production -y --token="$VERCEL_TOKEN" 2>/dev/null || true
+          npx --yes vercel@latest env rm DIRECT_URL production -y --token="$VERCEL_TOKEN" 2>/dev/null || true
+          printf '%s' "$DATABASE_URL" | npx --yes vercel@latest env add DATABASE_URL production --token="$VERCEL_TOKEN"
+          printf '%s' "$DIRECT_URL" | npx --yes vercel@latest env add DIRECT_URL production --token="$VERCEL_TOKEN"
+          npx --yes vercel@latest env ls production --token="$VERCEL_TOKEN" | grep -q NEXTAUTH_SECRET || echo "⚠️ Falta NEXTAUTH_SECRET en Vercel — añádela (Settings → Environment Variables) si el login falla"
+
+      - name: 3/3 · Deploy a producción (build remoto en Vercel)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: npx --yes vercel@latest --prod --yes --token="$VERCEL_TOKEN"
