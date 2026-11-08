@@ -180,6 +180,48 @@ export const QUICK_EVENT_TYPES: string[] = [
   "OPPONENT_CHANCE",
 ];
 
+// ---------- Evaluación táctica en directo (Pilar 3 · tablón 1-clic) ----------
+
+/**
+ * Vocabulario canónico del tablón en directo: qué se ve en el jugador mientras
+ * se mira el partido. El servidor valida SIEMPRE contra este mapa (la fuente
+ * de verdad del tipo POSITIVE/CORRECTIVE); el cliente solo lo pinta.
+ * Debe cubrir exactamente los valores del enum TagCode del esquema.
+ */
+export const TACTICAL_TAG_META: Record<
+  string,
+  { label: string; type: "POSITIVE" | "CORRECTIVE" }
+> = {
+  GOOD_UNMARKED: { label: "Desmarque / Profundidad", type: "POSITIVE" },
+  PASS_ACCURACY: { label: "Precisión en el pase", type: "POSITIVE" },
+  DECISION_MAKING: { label: "Toma de decisiones", type: "POSITIVE" },
+  TRACKBACK_QUICK: { label: "Repliegue rápido", type: "POSITIVE" },
+  PRESS_INTENSITY: { label: "Presión intensa", type: "POSITIVE" },
+  POSITION_FAULT: { label: "Descolgado de línea", type: "CORRECTIVE" },
+  OVER_DRIBBLING: { label: "Exceso de conducción", type: "CORRECTIVE" },
+  NO_PRESS: { label: "Falta de presión", type: "CORRECTIVE" },
+  FATIGUE_NOTICED: { label: "Fatiga visible", type: "CORRECTIVE" },
+};
+
+/** Códigos cortos (es) para el chip del jugador en la pizarra en directo */
+export const POSITION_SHORT: Record<string, string> = {
+  GK: "PT",
+  CB: "DFC",
+  LB: "LI",
+  RB: "LD",
+  LWB: "CI",
+  RWB: "CD",
+  DM: "MCD",
+  CM: "MC",
+  AM: "MCO",
+  LM: "MI",
+  RM: "MD",
+  LW: "EI",
+  RW: "ED",
+  SS: "SD",
+  CF: "DC",
+};
+
 // ---------- Varios ----------
 
 export const PHASE_LABEL: Record<string, string> = {

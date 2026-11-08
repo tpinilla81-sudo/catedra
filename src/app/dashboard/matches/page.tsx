@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Clock,
   MapPin,
+  Radio,
   TriangleAlert,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -65,29 +66,36 @@ export default async function MatchesPage() {
               Ingesta pendiente · regístrala en menos de 3 min
             </h2>
             {pending.map((m) => (
-              <Link
-                key={m.id}
-                href={`/dashboard/match?g=${m.id}`}
-                className="block rounded-3xl border-2 border-amber-500/50 bg-amber-500/5 p-5 transition hover:border-amber-400 active:scale-[0.99]"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-lg font-black text-zinc-50 truncate">
-                      {m.isHome ? "vs" : "@"} {m.opponent}
-                    </p>
-                    <p className="text-sm text-zinc-400">
-                      {format(m.kickoffAt, "EEE d MMM · HH:mm'h'", { locale: es })}
-                      {m.competition ? ` · ${m.competition}` : ""}
-                    </p>
+              <div key={m.id} className="flex flex-col sm:flex-row gap-3">
+                <Link
+                  href={`/dashboard/match?g=${m.id}`}
+                  className="block flex-1 rounded-3xl border-2 border-amber-500/50 bg-amber-500/5 p-5 transition hover:border-amber-400 active:scale-[0.99]"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-lg font-black text-zinc-50 truncate">
+                        {m.isHome ? "vs" : "@"} {m.opponent}
+                      </p>
+                      <p className="text-sm text-zinc-400">
+                        {format(m.kickoffAt, "EEE d MMM · HH:mm'h'", { locale: es })}
+                        {m.competition ? ` · ${m.competition}` : ""}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant="outline" className="rounded-full bg-amber-500/15 text-amber-300 border-amber-500/40 font-bold animate-pulse">
+                        Registrar ingesta
+                      </Badge>
+                      <ChevronRight className="w-5 h-5 text-amber-300" aria-hidden />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Badge variant="outline" className="rounded-full bg-amber-500/15 text-amber-300 border-amber-500/40 font-bold animate-pulse">
-                      Registrar ingesta
-                    </Badge>
-                    <ChevronRight className="w-5 h-5 text-amber-300" aria-hidden />
-                  </div>
-                </div>
-              </Link>
+                </Link>
+                <Link
+                  href={`/dashboard/match/live?g=${m.id}`}
+                  className="flex items-center justify-center gap-2 rounded-3xl border border-emerald-500/50 bg-emerald-500/10 px-5 py-3 sm:py-0 text-sm font-bold text-emerald-300 transition hover:bg-emerald-500/20 active:scale-[0.99]"
+                >
+                  <Radio className="w-4 h-4" aria-hidden /> Pizarra en directo
+                </Link>
+              </div>
             ))}
           </section>
         )}
@@ -99,29 +107,36 @@ export default async function MatchesPage() {
               <Clock className="w-4 h-4" aria-hidden /> Próximos
             </h2>
             {upcoming.map((m) => (
-              <Link
-                key={m.id}
-                href={`/dashboard/match?g=${m.id}`}
-                className="block rounded-3xl border border-zinc-800 bg-zinc-900 p-5 transition hover:border-zinc-600 active:scale-[0.99]"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-lg font-black text-zinc-50 truncate">
-                      {m.isHome ? "vs" : "@"} {m.opponent}
-                    </p>
-                    <p className="text-sm text-zinc-400 flex items-center gap-2 flex-wrap">
-                      <span>{format(m.kickoffAt, "EEE d MMM · HH:mm'h'", { locale: es })}</span>
-                      {m.competition && <span className="text-zinc-600">· {m.competition}</span>}
-                      {m.location && (
-                        <span className="text-zinc-600 inline-flex items-center gap-1">
-                          <MapPin className="w-3 h-3" aria-hidden /> {m.location}
-                        </span>
-                      )}
-                    </p>
+              <div key={m.id} className="flex flex-col sm:flex-row gap-3">
+                <Link
+                  href={`/dashboard/match?g=${m.id}`}
+                  className="block flex-1 rounded-3xl border border-zinc-800 bg-zinc-900 p-5 transition hover:border-zinc-600 active:scale-[0.99]"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-lg font-black text-zinc-50 truncate">
+                        {m.isHome ? "vs" : "@"} {m.opponent}
+                      </p>
+                      <p className="text-sm text-zinc-400 flex items-center gap-2 flex-wrap">
+                        <span>{format(m.kickoffAt, "EEE d MMM · HH:mm'h'", { locale: es })}</span>
+                        {m.competition && <span className="text-zinc-600">· {m.competition}</span>}
+                        {m.location && (
+                          <span className="text-zinc-600 inline-flex items-center gap-1">
+                            <MapPin className="w-3 h-3" aria-hidden /> {m.location}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-zinc-600 shrink-0" aria-hidden />
                   </div>
-                  <ChevronRight className="w-5 h-5 text-zinc-600 shrink-0" aria-hidden />
-                </div>
-              </Link>
+                </Link>
+                <Link
+                  href={`/dashboard/match/live?g=${m.id}`}
+                  className="flex items-center justify-center gap-2 rounded-3xl border border-zinc-800 bg-zinc-900 px-5 py-3 sm:py-0 text-sm font-bold text-zinc-300 transition hover:border-emerald-500/50 hover:text-emerald-300 active:scale-[0.99]"
+                >
+                  <Radio className="w-4 h-4" aria-hidden /> Pizarra en directo
+                </Link>
+              </div>
             ))}
           </section>
         )}

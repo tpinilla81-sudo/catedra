@@ -4,8 +4,8 @@
   "total": 52,
   "passed": 52,
   "failed": 0,
-  "durationMs": 905,
-  "timestamp": "2026-11-08T14:26:44.742Z",
+  "durationMs": 1728,
+  "timestamp": "2026-11-08T14:54:11.499Z",
   "checks": [
     {
       "name": "mondayOf: domingo → lunes de su semana ISO",
