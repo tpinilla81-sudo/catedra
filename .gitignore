@@ -57,5 +57,9 @@ server.log
 .pgdata/
 pg.log
 
+# basura de sesión y sqlite del scaffold
+tool-results/
+db/custom.db
+
 # ejemplo de entorno sí se versiona
 !.env.example
