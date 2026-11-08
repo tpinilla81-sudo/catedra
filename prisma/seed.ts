@@ -208,6 +208,28 @@ async function main() {
     spId[sp.key] = row.id;
   }
 
+  // ---------- Contenido PROPIO del club (visibilidad "propio + Cátedra") ----------
+  // La biblioteca de cada club combina lo global de la Cátedra (clubId=null)
+  // con sus propios subprincipios. Sin esto, una base fresca no demuestra el
+  // contrato de visibilidad del Tenant Guard (y el panel de calidad lo nota).
+  const clubSPs: Array<{ phase: GamePhase; name: string; desc: string }> = [
+    {
+      phase: "OFFENSIVE",
+      name: "Ataque directo por bandas (propio del club)",
+      desc: "Identidad del club: amplitud, centrado temprano y llegada por dentro del extremo.",
+    },
+  ];
+  for (const sp of clubSPs) {
+    const existing = await prisma.subPrinciple.findFirst({
+      where: { clubId: club.id, name: sp.name, phase: sp.phase },
+    });
+    if (!existing) {
+      await prisma.subPrinciple.create({
+        data: { clubId: club.id, phase: sp.phase, name: sp.name, description: sp.desc, order: 100 },
+      });
+    }
+  }
+
   type TaskSeed = {
     title: string; objective: string; phases: GamePhase[];
     len: number; wid: number; pMin: number; pMax?: number; dur: number; reps: string;

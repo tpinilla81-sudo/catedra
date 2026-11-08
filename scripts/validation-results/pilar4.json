@@ -4,8 +4,8 @@
   "total": 31,
   "passed": 31,
   "failed": 0,
-  "durationMs": 784,
-  "timestamp": "2026-11-07T18:02:05.704Z",
+  "durationMs": 600,
+  "timestamp": "2026-11-08T14:26:45.538Z",
   "checks": [
     {
       "name": "ranking: rel3 HIGH primero, luego rel2 LOW, luego rel2 MEDIUM",

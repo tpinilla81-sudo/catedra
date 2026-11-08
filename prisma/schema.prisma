@@ -24,8 +24,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") /// Para migrar contra Neon (endpoint directo, sin pooler)
 }
 
 // ============================================================================
@@ -70,6 +71,7 @@ enum Position {
 /// Estado de disponibilidad del jugador (filtra la prescripción del motor)
 enum PlayerStatus {
   AVAILABLE
+  DOUBTFUL /// Duda de última hora para alinear (fútbol base)
   INJURED
   SUSPENDED
   RETURNING /// Reincorporándose: el motor limita la intensidad de sus tareas
@@ -144,16 +146,16 @@ model Club {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users         User[]
-  seasons       Season[]
-  teams         Team[]
-  players       Player[]
-  pulses        TeamPulse[]
-  matches       Match[]
-  subPrinciples SubPrinciple[] /// Subprincipios propios del club (además de los globales)
-  tasks         Task[] /// Tareas propias del club (además de la biblioteca global)
-  microcycles   Microcycle[]
-  engineRuns    EngineRun[]
+  users           User[]
+  seasons         Season[]
+  teams           Team[]
+  players         Player[]
+  pulses          TeamPulse[]
+  matches         Match[]
+  subPrinciples   SubPrinciple[] /// Subprincipios propios del club (además de los globales)
+  tasks           Task[] /// Tareas propias del club (además de la biblioteca global)
+  microcycles     Microcycle[]
+  engineRuns      EngineRun[]
   opponentReports OpponentReport[] /// Scouting de rival (P4.1)
 }
 
@@ -211,15 +213,15 @@ model Team {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  club        Club         @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  season      Season       @relation(fields: [seasonId], references: [id], onDelete: Cascade)
-  players     Player[]
-  pulses      TeamPulse[]
-  matches     Match[]
-  microcycles Microcycle[]
-  engineRuns  EngineRun[]
+  club            Club             @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  season          Season           @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  players         Player[]
+  pulses          TeamPulse[]
+  matches         Match[]
+  microcycles     Microcycle[]
+  engineRuns      EngineRun[]
   opponentReports OpponentReport[] /// Scouting de rival (P4.1)
-  openByUsers User[]       @relation("UserLastTeam")
+  openByUsers     User[]           @relation("UserLastTeam")
 
   @@unique([seasonId, name])
   @@index([clubId])
@@ -246,10 +248,12 @@ model Player {
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
-  club       Club              @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  team       Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  events     TacticalEvent[] /// Eventos tácticos marcados en la pizarra
-  matchNotes PlayerMatchNote[] /// Notas individuales post-partido
+  club              Club                  @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  team              Team                  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  events            TacticalEvent[] /// Eventos tácticos marcados en la pizarra
+  matchNotes        PlayerMatchNote[] /// Notas individuales post-partido
+  attendanceRecords AttendanceRecord[] /// Asistencia y carga por sesión (fútbol base)
+  liveEvaluations   LiveMatchEvaluation[] /// Evaluaciones en directo desde la pizarra
 
   @@unique([teamId, shirtNumber])
   @@index([clubId, teamId])
@@ -298,11 +302,12 @@ model Match {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  club              Club              @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  team              Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  club              Club                  @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  team              Team                  @relation(fields: [teamId], references: [id], onDelete: Cascade)
   report            MatchReport? /// Ingesta 1:1 (única por partido)
   usedInMicrocycles MicrocycleMatch[] /// Partidos que alimentaron cada microciclo
-  opponentReport    OpponentReport?   /// Informe de scouting de este rival (1:1 opcional, P4.1)
+  opponentReport    OpponentReport? /// Informe de scouting de este rival (1:1 opcional, P4.1)
+  liveEvaluations   LiveMatchEvaluation[] /// Evaluación en directo de cada jugador
 
   @@index([teamId, kickoffAt])
   @@index([clubId, status])
@@ -634,4 +639,78 @@ model EngineRun {
 
   @@index([teamId, createdAt])
   @@index([microcycleId])
+}
+
+// ============================================================================
+// AMPLIACIÓN FÚTBOL BASE — Asistencia y Carga (P2) · Evaluación en directo (P3)
+// ----------------------------------------------------------------------------
+// Extensión ADITIVA sobre el esquema de CATEDRA (no sustituye nada):
+//   • AttendanceRecord — quién ha venido y con qué RPE, marca de 1 toque.
+//   • LiveMatchEvaluation + MatchTag — tagging táctico en directo desde la
+//     pizarra mientras se mira el partido (positivos a reforzar / correctivos
+//     a corregir). El scope multi-tenant llega por relación:
+//     Player → Team/Club y Match → Team/Club.
+// ============================================================================
+
+/// Registro de asistencia e intensidad de una sesión (fútbol base).
+model AttendanceRecord {
+  id         String       @id @default(cuid())
+  date       DateTime     @default(now())
+  playerId   String
+  status     PlayerStatus @default(AVAILABLE)
+  sessionRPE Int? /// 1-10: intensidad marcada por el míster
+  notes      String?
+  createdAt  DateTime     @default(now())
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId, date])
+}
+
+/// Evaluación en directo de un jugador en un partido (1 por jugador/partido).
+model LiveMatchEvaluation {
+  id        String     @id @default(cuid())
+  matchId   String
+  playerId  String
+  isStarter Boolean    @default(false) /// Alineación de partida
+  timestamp DateTime   @default(now())
+  tags      MatchTag[]
+
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, playerId])
+  @@index([matchId])
+}
+
+/// Tag táctico de 1 clic sobre una evaluación en directo.
+model MatchTag {
+  id           String   @id @default(cuid())
+  evaluationId String
+  code         TagCode
+  type         TagType
+  createdAt    DateTime @default(now())
+
+  evaluation LiveMatchEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  @@index([evaluationId, code])
+}
+
+/// Código del tag en directo: qué se ha visto en el jugador
+enum TagCode {
+  GOOD_UNMARKED /// Buen desmarque / profundidad
+  PASS_ACCURACY /// Precisión en el pase
+  DECISION_MAKING /// Buena toma de decisiones
+  TRACKBACK_QUICK /// Repliegue rápido
+  PRESS_INTENSITY /// Intensidad en la presión
+  POSITION_FAULT /// Descolgado de línea / Mala posición
+  OVER_DRIBBLING /// Exceso de conducción
+  NO_PRESS /// Falta de intensidad
+  FATIGUE_NOTICED /// Fatiga visible
+}
+
+/// Naturaleza del tag: a reforzar (positivo) o a corregir (correctivo)
+enum TagType {
+  POSITIVE
+  CORRECTIVE
 }
