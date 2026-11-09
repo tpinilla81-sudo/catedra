@@ -30,6 +30,15 @@ jobs:
         with:
           node-version: 20
 
+      - name: 0 · Baseline histórico (P3005 — sella migraciones previas; NO toca datos)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: |
+          npx --yes prisma@6.11.1 migrate resolve --applied 20261106222758_init_schema_v0_1 || echo "· init_schema ya sellada — continúa"
+          npx --yes prisma@6.11.1 migrate resolve --applied 20261107000000_engine_columns_and_report_author || echo "· engine_columns ya sellada — continúa"
+          npx --yes prisma@6.11.1 migrate resolve --applied 20261108000000_p41_scouting_rival || echo "· p41_scouting ya sellada — continúa"
+
       - name: 1/4 · Migrar Neon (solo CREATE — nunca destruye datos)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
