@@ -1,15 +1,4 @@
-# ============================================================================
-# CATEDRA by Método — Despliegue a producción desde GitHub Actions
-# ----------------------------------------------------------------------------
-# Los secretos viven SOLO en GitHub (Settings → Secrets and variables → Actions):
-#   DATABASE_URL  → cadena de Neon CON -pooler
-#   DIRECT_URL    → cadena de Neon SIN -pooler
-#   VERCEL_TOKEN  → token de Vercel (Account Settings → Tokens)
-# El checkout usa el GITHUB_TOKEN automático de Actions — nada en el repo.
-# Flujo por push a main: 1) migrar · 2) seed demo idempotente · 3) env vars en
-# Vercel · 4) deploy producción. También se puede lanzar a mano (Run workflow).
-# ============================================================================
-name: Deploy producción
+name: CI migraciones Neon (deploy nativo en Vercel)
 
 on:
   push:
@@ -21,47 +10,32 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  migrate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
-
-      - name: 1/4 · Migrar Neon (solo CREATE — nunca destruye datos)
+          node-version: 22
+      - name: Baseline P3005 (sella migraciones previas, no toca datos)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: |
+          npx --yes prisma@6.11.1 migrate resolve --applied 20261106222758_init_schema_v0_1 || true
+          npx --yes prisma@6.11.1 migrate resolve --applied 20261107000000_engine_columns_and_report_author || true
+          npx --yes prisma@6.11.1 migrate resolve --applied 20261108000000_p41_scouting_rival || true
+      - name: Migrar Neon (solo CREATE)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
         run: npx --yes prisma@6.11.1 migrate deploy
-
       - uses: oven-sh/setup-bun@v2
-
-      - name: 2/4 · Instalar dependencias + generar cliente Prisma
-        run: |
-          bun install --frozen-lockfile
-          bunx prisma generate
-      - name: Seed (crea lo que falte; nunca borra)
+      - name: Instalar dependencias + seed (no bloquea el deploy)
         env:
           DATABASE_URL: ${{ secrets.DIRECT_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
-        run: bun prisma/seed.ts || echo "⚠️ Seed falló — se continúa (no bloquea el deploy; los datos demo quizá ya existan)"
-
-      - name: 3/4 · Sincronizar env DB en Vercel (producción, cifradas)
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL }}
         run: |
-          npx --yes vercel@latest link --yes --project catedra-sooty --token="$VERCEL_TOKEN"
-          npx --yes vercel@latest env rm DATABASE_URL production -y --token="$VERCEL_TOKEN" 2>/dev/null || true
-          npx --yes vercel@latest env rm DIRECT_URL production -y --token="$VERCEL_TOKEN" 2>/dev/null || true
-          printf '%s' "$DATABASE_URL" | npx --yes vercel@latest env add DATABASE_URL production --token="$VERCEL_TOKEN"
-          printf '%s' "$DIRECT_URL" | npx --yes vercel@latest env add DIRECT_URL production --token="$VERCEL_TOKEN"
-          npx --yes vercel@latest env ls production --token="$VERCEL_TOKEN" | grep -q NEXTAUTH_SECRET || echo "⚠️ Falta NEXTAUTH_SECRET en Vercel — añádela (Settings → Environment Variables) si el login falla"
-
-      - name: 4/4 · Deploy a producción (build remoto en Vercel)
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: npx --yes vercel@latest --prod --yes --token="$VERCEL_TOKEN"
+          bun install --frozen-lockfile
+          bunx prisma generate
+          bun prisma/seed.ts || echo "Seed fallo - se continua (no bloquea)"
