@@ -38,7 +38,7 @@ import {
   TACTICAL_TAG_META,
 } from "@/lib/taxonomy";
 
-type RouteParams = { params: Promise<{ matchId: string }> };
+type RouteParams = { params: Promise<{ id: string }> };
 
 type EvalBody = {
   playerId?: string;
@@ -70,7 +70,7 @@ export async function POST(
     );
   }
 
-  const { matchId } = await params;
+  const { id: matchId } = await params;
   const body = (await req.json().catch(() => null)) as EvalBody | null;
   const playerId = typeof body?.playerId === "string" ? body.playerId : "";
   if (!playerId) {
@@ -202,7 +202,7 @@ export async function GET(
     );
   }
 
-  const { matchId } = await params;
+  const { id: matchId } = await params;
   const db = createTenantClient(session.user.clubId);
 
   const match = await db.match.findUnique({
