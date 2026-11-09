@@ -29,7 +29,7 @@ BUNDLE="$HERE/catedra-deploy.bundle"
 [ -f "$BUNDLE" ] || die "No encuentro catedra-deploy.bundle en esta carpeta — descárgalo del chat junto a este script (versión ACTUALIZADA de hoy)"
 DIGEST="$(sha256sum "$BUNDLE" 2>/dev/null | cut -d' ' -f1 || shasum -a 256 "$BUNDLE" | cut -d' ' -f1)"
 case "$DIGEST" in
-  2a83650320f4863d0781ccbc*) ok "bundle verificado (sha256 correcto — perfil pre-partido 5 métricas + ficha rápida 1-toque)" ;;
+  bb0dc1b2fd787cfa769d0315*) ok "bundle verificado (sha256 correcto — unificación rebranding CÁTEDRA + perfil pre-partido + ficha rápida 1-toque)" ;;
   *) die "El bundle NO es la versión actualizada (descargaste el antiguo) → bórralo y descarga el nuevo del chat" ;;
 esac
 
