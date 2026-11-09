@@ -6,6 +6,10 @@
 #     catedra-deploy.bundle   deploy-catedra.sh
 #   y ejecuta:   bash deploy-catedra.sh
 #
+# Este paquete lleva a producción: rebranding CÁTEDRA + Pilar 2 (perfil
+# pre-partido) + Pilar 3 (telemetría en directo + ficha rápida 1-toque) + FIX
+# del toggle de la ficha (500 en /api/matches/[id]/evaluations).
+#
 # El script solo SUBE el código a GitHub (autenticación por navegador).
 # El DESPLIEGUE entero (migrar Neon + env vars + Vercel producción) lo hace
 # después GitHub Actions DENTRO de GitHub, usando TUS secrets cifradas
@@ -29,7 +33,7 @@ BUNDLE="$HERE/catedra-deploy.bundle"
 [ -f "$BUNDLE" ] || die "No encuentro catedra-deploy.bundle en esta carpeta — descárgalo del chat junto a este script (versión ACTUALIZADA de hoy)"
 DIGEST="$(sha256sum "$BUNDLE" 2>/dev/null | cut -d' ' -f1 || shasum -a 256 "$BUNDLE" | cut -d' ' -f1)"
 case "$DIGEST" in
-  bb0dc1b2fd787cfa769d0315*) ok "bundle verificado (sha256 correcto — unificación rebranding CÁTEDRA + perfil pre-partido + ficha rápida 1-toque)" ;;
+  bb836ce5da9b5b45dbc77717e*) ok "bundle verificado (sha256 correcto — rebranding + Pilar 2 + Pilar 3 + fix del toggle de la ficha)" ;;
   *) die "El bundle NO es la versión actualizada (descargaste el antiguo) → bórralo y descarga el nuevo del chat" ;;
 esac
 
@@ -50,7 +54,7 @@ else
   gh repo clone tpinilla81-sudo/catedra "$REPO_DIR" || die "No pude clonar tpinilla81-sudo/catedra (¿es el nombre exacto del repo?)"
 fi
 
-step "3/5  Incorporar los cambios del paquete (perfil pre-partido 5 métricas + ficha rápida 1-toque + workflow de deploy)"
+step "3/5  Incorporar los cambios del paquete (rebranding + Pilar 2 + Pilar 3 + fix toggle ficha)"
 git -C "$REPO_DIR" fetch "$BUNDLE" "+refs/heads/main:refs/heads/desde-chat" || die "No pude leer el bundle"
 if git -C "$REPO_DIR" rev-parse -q --verify main >/dev/null 2>&1; then
   git -C "$REPO_DIR" checkout main >/dev/null 2>&1 || die "No pude cambiar a la rama main"
@@ -86,7 +90,9 @@ echo ""
 echo "  Al terminar en verde, comprueba tu dominio de Vercel"
 echo "  (recarga fuerte: Ctrl+Shift+R):"
 echo "   • Logo y colores CATEDRA by Método"
-echo "   • Partidos → tarjeta con 'Pizarra en directo'"
+echo "   • Partidos → tarjeta con 'Pizarra en directo' → ficha rápida 1-toque"
+echo "     (prueba: pulsa 'Cargado / Al límite' y luego otra vez — debe" 
+echo "      marcarse y desmarcarse sin errores)"
 echo "   • Login: mister@cfmetodo.es / metodo2025"
 echo ""
 echo "  PARA SIEMPRE: cada 'git push' a main repite este despliegue solo."
