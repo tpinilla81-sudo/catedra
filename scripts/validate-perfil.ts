@@ -45,23 +45,23 @@ const raw = new PrismaClient({ datasources: { db: { url: PG } } });
 console.log("\n══ 1) Unit — saneo puro del perfil pre-partido ══");
 // ============================================================================
 {
-  const a = sanitizePlayerProfilePatch({ currentRpe: null, injuryHistory: "  ", strength: "" });
-  check("RPE null → null (borrar marcado)", a.data.currentRpe === null);
-  check("texto vacío → null (borrar)", a.data.injuryHistory === null && a.data.strength === null);
-  check("campos no enviados quedan fuera del patch", !("academicConstraints" in a.data));
+  const a = sanitizePlayerProfilePatch({ fatigueRPE: null, medicalNotes: "  ", tacticalStrength: "" });
+  check("RPE null → null (borrar marcado)", a.data.fatigueRPE === null);
+  check("texto vacío → borrado", a.data.medicalNotes === null && a.data.tacticalStrength === "");
+  check("campos no enviados quedan fuera del patch", !("academicStress" in a.data));
 
-  const b = sanitizePlayerProfilePatch({ currentRpe: 7 });
-  check("RPE 7 dentro de rango → 7 sin aviso", b.data.currentRpe === 7 && !b.rpeOutOfRange);
+  const b = sanitizePlayerProfilePatch({ fatigueRPE: 7 });
+  check("RPE 7 dentro de rango → 7 sin aviso", b.data.fatigueRPE === 7 && !b.rpeOutOfRange);
 
-  const c = sanitizePlayerProfilePatch({ currentRpe: 0 });
-  check("RPE 0 → acotado a 1 con aviso", c.data.currentRpe === 1 && c.rpeOutOfRange);
+  const c = sanitizePlayerProfilePatch({ fatigueRPE: 0 });
+  check("RPE 0 → acotado a 1 con aviso", c.data.fatigueRPE === 1 && c.rpeOutOfRange);
 
-  const d = sanitizePlayerProfilePatch({ currentRpe: 15 });
-  check("RPE 15 → acotado a 10 con aviso", d.data.currentRpe === 10 && d.rpeOutOfRange);
+  const d = sanitizePlayerProfilePatch({ fatigueRPE: 15 });
+  check("RPE 15 → acotado a 10 con aviso", d.data.fatigueRPE === 10 && d.rpeOutOfRange);
 
   const long = "x".repeat(700);
-  const e = sanitizePlayerProfilePatch({ injuryHistory: `  ${long}  ` });
-  check("texto de 700 → recortado a 500 sin espacios", e.data.injuryHistory?.length === 500);
+  const e = sanitizePlayerProfilePatch({ medicalNotes: `  ${long}  ` });
+  check("texto de 700 → recortado a 500 sin espacios", e.data.medicalNotes?.length === 500);
 
   check("nivel de carga: 1-4 FRESH", rpeLoadLevel(1) === "FRESH" && rpeLoadLevel(4) === "FRESH");
   check("nivel de carga: 5-7 TIGHT", rpeLoadLevel(5) === "TIGHT" && rpeLoadLevel(7) === "TIGHT");
@@ -76,9 +76,9 @@ console.log("\n══ 1) Unit — saneo puro del perfil pre-partido ══");
 
   const colMap = buildColumnMap(["Nombre", "Apellidos", "Posición", "RPE", "Lesiones", "Académico", "Fortaleza", "Estrés académico", "Punto fuerte"]);
   check("cabeceras nuevas detectadas (RPE/Lesiones/Académico/Fortaleza)",
-    colMap.rpe !== undefined && colMap.injuries !== undefined && colMap.academic !== undefined && colMap.strength !== undefined);
+    colMap.rpe !== undefined && colMap.injuries !== undefined && colMap.academic !== undefined && colMap.tacticalStrength !== undefined);
   check("alias académico alternativo (Estrés académico)", buildColumnMap(["Estrés académico"]).academic !== undefined);
-  check("alias fortaleza alternativo (Punto fuerte)", buildColumnMap(["Punto fuerte"]).strength !== undefined);
+  check("alias fortaleza alternativo (Punto fuerte)", buildColumnMap(["Punto fuerte"]).tacticalStrength !== undefined);
 }
 
 // ============================================================================
@@ -106,10 +106,10 @@ const teamA = await raw.team.create({ data: { clubId: clubA.id, seasonId: season
   const summary = await applySquadImport(raw, { id: teamA.id, clubId: clubA.id }, matrix);
   check("import CSV: fila creada sin errores", summary.created === 1 && summary.errors === 0, JSON.stringify(summary.rows));
   const kolo = await raw.player.findFirstOrThrow({ where: { teamId: teamA.id, firstName: "Kolo" } });
-  check("import CSV: RPE 6 persistido", kolo.currentRpe === 6);
-  check("import CSV: lesiones persistidas", kolo.injuryHistory === "Rodilla operada (prueba)");
-  check("import CSV: académico persistido", kolo.academicConstraints === "Tarde de clase (prueba)");
-  check("import CSV: fortaleza persistida", kolo.strength === "Pase largo (prueba)");
+  check("import CSV: RPE 6 persistido", kolo.fatigueRPE === 6);
+  check("import CSV: lesiones persistidas", kolo.medicalNotes === "Rodilla operada (prueba)");
+  check("import CSV: académico persistido", kolo.academicStress === "Tarde de clase (prueba)");
+  check("import CSV: fortaleza persistida", kolo.tacticalStrength === "Pase largo (prueba)");
 
   // Actualización por re-import: RPE fuera de rango se acota, textos cambian
   const matrix2 = [
@@ -119,9 +119,9 @@ const teamA = await raw.team.create({ data: { clubId: clubA.id, seasonId: season
   const summary2 = await applySquadImport(raw, { id: teamA.id, clubId: clubA.id }, matrix2);
   check("re-import: jugador actualizado (matching por nombre)", summary2.updated === 1 && summary2.errors === 0);
   const kolo2 = await raw.player.findFirstOrThrow({ where: { id: kolo.id } });
-  check("re-import: RPE 15 acotado a 10", kolo2.currentRpe === 10);
-  check("re-import: fortaleza actualizada", kolo2.strength === "Centro chroz (prueba)");
-  check("re-import: campos ausentes intactos", kolo2.injuryHistory === "Rodilla operada (prueba)");
+  check("re-import: RPE 15 acotado a 10", kolo2.fatigueRPE === 10);
+  check("re-import: fortaleza actualizada", kolo2.tacticalStrength === "Centro chroz (prueba)");
+  check("re-import: campos ausentes intactos", kolo2.medicalNotes === "Rodilla operada (prueba)");
 }
 
 // ============================================================================
@@ -134,23 +134,23 @@ console.log("\n══ 3) DB — round-trip de los 4 campos pre-partido ══");
       teamId: teamA.id,
       firstName: "Ronda",
       lastName: "Perfil",
-      mainPosition: "CB",
-      currentRpe: 8,
-      injuryHistory: "Pubalgia leve (prueba)",
-      academicConstraints: "Selectividad (prueba)",
-      strength: "Juego aéreo (prueba)",
+      primaryPosition: "CB",
+      fatigueRPE: 8,
+      medicalNotes: "Pubalgia leve (prueba)",
+      academicStress: "Selectividad (prueba)",
+      tacticalStrength: "Juego aéreo (prueba)",
       secondaryPositions: ["LB", "DM"],
     },
   });
   const back = await raw.player.findUniqueOrThrow({ where: { id: p.id } });
-  check("create+read: RPE 8", back.currentRpe === 8);
-  check("create+read: lesiones", back.injuryHistory === "Pubalgia leve (prueba)");
-  check("create+read: académico", back.academicConstraints === "Selectividad (prueba)");
-  check("create+read: fortaleza", back.strength === "Juego aéreo (prueba)");
+  check("create+read: RPE 8", back.fatigueRPE === 8);
+  check("create+read: lesiones", back.medicalNotes === "Pubalgia leve (prueba)");
+  check("create+read: académico", back.academicStress === "Selectividad (prueba)");
+  check("create+read: fortaleza", back.tacticalStrength === "Juego aéreo (prueba)");
   check("create+read: polivalencias [LB, DM]", back.secondaryPositions.join(",") === "LB,DM");
-  await raw.player.update({ where: { id: p.id }, data: { currentRpe: null, injuryHistory: null, academicConstraints: null, strength: null } });
+  await raw.player.update({ where: { id: p.id }, data: { fatigueRPE: null, medicalNotes: null, academicStress: null, tacticalStrength: "" } });
   const cleared = await raw.player.findUniqueOrThrow({ where: { id: p.id } });
-  check("update a null: 4 campos borrados", cleared.currentRpe === null && cleared.injuryHistory === null && cleared.academicConstraints === null && cleared.strength === null);
+  check("update a null/\"\": campos borrados", cleared.fatigueRPE === null && cleared.medicalNotes === null && cleared.academicStress === null && cleared.tacticalStrength === "");
 }
 
 // ============================================================================
@@ -200,12 +200,12 @@ try {
       firstName: "Zico",
       lastName: "PerfilQA",
       shirtNumber: 91,
-      mainPosition: "AM",
+      primaryPosition: "AM",
       secondaryPositions: ["CF", "CM"],
-      currentRpe: 9,
-      injuryHistory: "Esguince de tobillo (QA)",
-      academicConstraints: "Exámenes esta semana (QA)",
-      strength: "Desmarque al espacio (QA)",
+      fatigueRPE: 9,
+      medicalNotes: "Esguince de tobillo (QA)",
+      academicStress: "Exámenes esta semana (QA)",
+      tacticalStrength: "Desmarque al espacio (QA)",
     },
   });
   zicoId = zico.id;
@@ -216,8 +216,8 @@ try {
       firstName: "Zinedine",
       lastName: "PerfilQA",
       shirtNumber: 92,
-      mainPosition: "CM",
-      currentRpe: 3,
+      primaryPosition: "CM",
+      fatigueRPE: 3,
     },
   });
 

@@ -1,10 +1,12 @@
 // ============================================================================
 // PILAR 3 — TABLÓN EN DIRECTO /dashboard/match/live?g=<id>
 // ----------------------------------------------------------------------------
-// Server Component: carga el partido (con sus evaluaciones y tags previos) y
-// la plantilla activa. Toda la interacción vive en <LiveMatchBoard> (cliente):
-// pizarra con titulares, banqueta y ficha 1-clic por jugador. Igual que la
-// ingesta, la ruta se firma desde Partidos con ?g=<id> para máxima robustez.
+// Server Component: carga el partido (evaluaciones y tags previos), la
+// plantilla activa, la SESIÓN EN DIRECTO (reloj autoritativo del servidor) y
+// los eventos de telemetría ya grabados. Toda la interacción vive en
+// <LiveMatchBoard> (cliente): reloj de partido, pizarra con titulares,
+// banqueta, ficha 1-toque por jugador, hechos de juego y sync de vídeo.
+// La ruta se firma desde Partidos con ?g=<id> para máxima robustez.
 // ============================================================================
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -17,6 +19,11 @@ import {
   type LiveEvaluationData,
   type LivePlayerData,
 } from "@/components/match/live-match-board";
+import {
+  sessionElapsedSeconds,
+  type MatchSessionDTO,
+  type TelemetryEventDTO,
+} from "@/lib/pilar3";
 import { requireTenantContext } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -37,22 +44,40 @@ export default async function LiveMatchPage({
   });
   if (!match || match.teamId !== team.id) notFound();
 
-  const players = await db.player.findMany({
-    where: { teamId: team.id, isActive: true },
-    orderBy: [{ shirtNumber: "asc" }, { lastName: "asc" }],
-  });
+  const [players, session, events] = await Promise.all([
+    db.player.findMany({
+      where: { teamId: team.id, isActive: true },
+      orderBy: [{ shirtNumber: "asc" }, { lastName: "asc" }],
+    }),
+    db.matchSession.findUnique({ where: { matchId: match.id } }),
+    db.matchTelemetryEvent.findMany({
+      where: { matchId: match.id },
+      orderBy: [{ minute: "asc" }, { timestamp: "asc" }],
+      take: 300,
+      select: {
+        id: true,
+        playerId: true,
+        minute: true,
+        timestamp: true,
+        type: true,
+        value: true,
+        coordinatesX: true,
+        coordinatesY: true,
+      },
+    }),
+  ]);
 
   const playerData: LivePlayerData[] = players.map((p) => ({
     id: p.id,
     firstName: p.firstName,
     lastName: p.lastName,
     shirtNumber: p.shirtNumber,
-    mainPosition: p.mainPosition,
+    primaryPosition: p.primaryPosition,
     secondaryPositions: p.secondaryPositions,
-    currentRpe: p.currentRpe,
-    injuryHistory: p.injuryHistory,
-    academicConstraints: p.academicConstraints,
-    strength: p.strength,
+    fatigueRPE: p.fatigueRPE,
+    medicalNotes: p.medicalNotes,
+    academicStress: p.academicStress,
+    tacticalStrength: p.tacticalStrength || null,
     status: p.status,
     statusNote: p.statusNote,
   }));
@@ -70,6 +95,30 @@ export default async function LiveMatchPage({
       type: t.type,
       createdAt: t.createdAt.toISOString(),
     })),
+  }));
+
+  const sessionData: MatchSessionDTO | null = session
+    ? {
+        id: session.id,
+        matchId: session.matchId,
+        status: session.status,
+        clockBaseSeconds: session.clockBaseSeconds,
+        clockStartedAt: session.clockStartedAt?.toISOString() ?? null,
+        videoUrl: session.videoUrl,
+        videoOffsetSeconds: session.videoOffsetSeconds,
+        elapsedSeconds: sessionElapsedSeconds(session),
+      }
+    : null;
+
+  const eventData: TelemetryEventDTO[] = events.map((e) => ({
+    id: e.id,
+    playerId: e.playerId,
+    minute: e.minute,
+    timestamp: e.timestamp.toISOString(),
+    type: e.type,
+    value: e.value,
+    coordinatesX: e.coordinatesX,
+    coordinatesY: e.coordinatesY,
   }));
 
   return (
@@ -105,10 +154,13 @@ export default async function LiveMatchPage({
           matchId={match.id}
           players={playerData}
           initialEvaluations={evaluationData}
+          initialSession={sessionData}
+          initialEvents={eventData}
         />
         <p className="mt-3 text-xs text-[#6d8070] px-1">
-          Cada toque se guarda al instante. Tras el pitido, registra la ingesta
-          completa desde Partidos para alimentar al motor.
+          Cada toque se guarda al instante con el minuto del reloj. Tras el
+          pitido, registra la ingesta completa desde Partidos para alimentar al
+          motor.
         </p>
       </div>
 

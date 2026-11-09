@@ -26,7 +26,7 @@ async function main() {
   const teamA = await db.team.create({ data: { clubId: clubA.id, seasonId: seasonA.id, name: "TA" } });
   const seasonB = await db.season.create({ data: { clubId: clubB.id, name: "S", startDate: new Date(), endDate: new Date() } });
   const teamB = await db.team.create({ data: { clubId: clubB.id, seasonId: seasonB.id, name: "TB" } });
-  const playerB = await db.player.create({ data: { clubId: clubB.id, teamId: teamB.id, firstName: "P", lastName: "B", mainPosition: "CM" } });
+  const playerB = await db.player.create({ data: { clubId: clubB.id, teamId: teamB.id, firstName: "P", lastName: "B", primaryPosition: "CM" } });
   const matchB = await db.match.create({ data: { clubId: clubB.id, teamId: teamB.id, opponent: "Rival", kickoffAt: new Date() } });
 
   const A = createTenantClient(clubA.id) as unknown as PrismaClient;

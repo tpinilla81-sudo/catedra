@@ -50,6 +50,9 @@ const CLUB_SCOPED = new Set([
   "Microcycle",
   "EngineRun",
   "OpponentReport", /// Scouting del rival (P4.1): clubId propio + FK a team/match
+  "MatchSession", /// Telemetría en directo (P3): clubId propio para escrituras de alta frecuencia sin joins
+  "MatchTelemetryEvent", /// Eventos 1-toque (P3)
+  "VideoBookmark", /// Marcadores de vídeo (P3)
 ]);
 
 /** Modelos de la Biblioteca de Sabiduría: propios del club + Cátedra global (clubId = null) */
@@ -328,6 +331,12 @@ const FK = {
     { id: true, opponentReport: { select: { clubId: true } } },
     [(r) => (r.opponentReport as Row | undefined)?.clubId],
   ),
+  // Telemetría en directo (Pilar 3): todos CLUB_SCOPED (clubId propio),
+  // los checks validan las FKs desde escrituras anidadas (bookmark dentro
+  // del evento, evento dentro de la sesión, sesión dentro del partido...).
+  matchSession: clubOwned("matchSession", "matchSession"),
+  telemetryEvent: clubOwned("matchTelemetryEvent", "telemetryEvent"),
+  videoBookmark: clubOwned("videoBookmark", "videoBookmark"),
 };
 
 /** FKs escalares → check (nota: clubId se rechaza directamente en el walker) */
@@ -348,6 +357,8 @@ const FK_FIELDS: Record<string, FkCheck> = {
   acceptedById: FK.user,
   prescribedIssueId: FK.issue,
   opponentReportId: FK.opponentReport, /// Scouting P4.1
+  matchSessionId: FK.matchSession, /// Telemetría P3
+  telemetryEventId: FK.telemetryEvent, /// Marcadores de vídeo P3
 };
 
 /**
@@ -400,6 +411,14 @@ const RELATION_FIELDS: Record<string, FkCheck> = {
   opponentReports: FK.opponentReport,
   weaknesses: FK.opponentWeakness,
   scoutingEvents: FK.opponentTacticalEvent,
+  // Telemetría en directo (Pilar 3): sesión, eventos y marcadores (nested)
+  matchSession: FK.matchSession,
+  liveSession: FK.matchSession,
+  matchSessions: FK.matchSession,
+  telemetryEvent: FK.telemetryEvent,
+  telemetryEvents: FK.telemetryEvent,
+  bookmark: FK.videoBookmark,
+  videoBookmarks: FK.videoBookmark,
 };
 
 function isNestedWrite(v: Row): boolean {

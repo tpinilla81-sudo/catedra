@@ -21,7 +21,7 @@ const team = await raw.team.create({ data: { clubId: club.id, seasonId: season.i
 
 const mk = (shirt: number, first: string, last: string, pos: string, extra: object = {}) =>
   raw.player.create({
-    data: { clubId: club.id, teamId: team.id, firstName: first, lastName: last, shirtNumber: shirt, mainPosition: pos as never, ...extra },
+    data: { clubId: club.id, teamId: team.id, firstName: first, lastName: last, shirtNumber: shirt, primaryPosition: pos as never, ...extra },
   });
 
 const [gk, lb, cb1, cb2, rb, dm, cm1, cm2, lw, rw, cf, ...banqueta] = await Promise.all([
@@ -30,12 +30,12 @@ const [gk, lb, cb1, cb2, rb, dm, cm1, cm2, lw, rw, cf, ...banqueta] = await Prom
   mk(3, "Marc", "Vidal", "CB", { secondaryPositions: ["DM"] as never }),
   mk(4, "Pau", "Serra", "CB"),
   mk(5, "Ot", "Zabala", "RB"),
-  mk(6, "Rodri", "Cases", "DM", { strength: "Pase rompe líneas" }),
-  mk(7, "Gavi", "Molina", "CM", { currentRpe: 9, injuryHistory: "Sobrecarga isquios izquierdo" }),
-  mk(8, "Pedri", "Nogal", "AM", { academicConstraints: "Exámenes finales esta semana" }),
-  mk(9, "Ansu", "Pons", "LW", { currentRpe: 3, secondaryPositions: ["RW", "CF"] as never }),
-  mk(10, "Lamine", "Puig", "RW", { strength: "1vs1 desequilibrante" }),
-  mk(11, "Ferran", "Marí", "CF", { currentRpe: 6 }),
+  mk(6, "Rodri", "Cases", "DM", { tacticalStrength: "Pase rompe líneas" }),
+  mk(7, "Gavi", "Molina", "CM", { fatigueRPE: 9, medicalNotes: "Sobrecarga isquios izquierdo" }),
+  mk(8, "Pedri", "Nogal", "AM", { academicStress: "Exámenes finales esta semana" }),
+  mk(9, "Ansu", "Pons", "LW", { fatigueRPE: 3, secondaryPositions: ["RW", "CF"] as never }),
+  mk(10, "Lamine", "Puig", "RW", { tacticalStrength: "1vs1 desequilibrante" }),
+  mk(11, "Ferran", "Marí", "CF", { fatigueRPE: 6 }),
   mk(13, "Nil", "Fort", "GK"),
   mk(14, "Eric", "Busquets", "CB"),
   mk(15, "Dani", "Vergés", "CM"),

@@ -177,12 +177,12 @@ const rosterIds: string[] = [];
 const positions = ["GK", "CB", "CB", "CM", "LW"] as const;
 for (let i = 0; i < 5; i++) {
   const p = await dbA.player.create({
-    data: { teamId: testTeam.id, firstName: `Titular${i}`, lastName: "Test", shirtNumber: i + 1, mainPosition: positions[i], isActive: true },
+    data: { teamId: testTeam.id, firstName: `Titular${i}`, lastName: "Test", shirtNumber: i + 1, primaryPosition: positions[i], isActive: true },
   });
   rosterIds.push(p.id);
 }
 const injured = await dbA.player.create({
-  data: { teamId: testTeam.id, firstName: "Lesionado", lastName: "Test", shirtNumber: 6, mainPosition: "CM", status: "INJURED", isActive: true },
+  data: { teamId: testTeam.id, firstName: "Lesionado", lastName: "Test", shirtNumber: 6, primaryPosition: "CM", status: "INJURED", isActive: true },
 });
 
 // Partido programado (ingesta pendiente): miércoles de esta semana
@@ -375,7 +375,7 @@ const eventC = await raw.tacticalEvent.create({ data: { reportId: reportC.id, x:
 const noteC = await raw.playerMatchNote.create({
   data: {
     reportId: reportC.id,
-    playerId: (await raw.player.create({ data: { clubId: clubC.id, teamId: teamC.id, firstName: "Espía", lastName: "P3", mainPosition: "CM" } })).id,
+    playerId: (await raw.player.create({ data: { clubId: clubC.id, teamId: teamC.id, firstName: "Espía", lastName: "P3", primaryPosition: "CM" } })).id,
     flag: "RED",
   },
 });

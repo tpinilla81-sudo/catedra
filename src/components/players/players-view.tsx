@@ -46,7 +46,7 @@ export type PlayerCardData = {
   firstName: string;
   lastName: string;
   shirtNumber: number | null;
-  mainPosition: string;
+  primaryPosition: string;
   secondaryPositions: string[];
   technicalRating: number | null;
   tacticalRating: number | null;
@@ -54,10 +54,10 @@ export type PlayerCardData = {
   status: string;
   statusNote: string | null;
   // --- Perfil pre-partido (decisión del cuerpo técnico) ---
-  currentRpe: number | null;
-  injuryHistory: string | null;
-  academicConstraints: string | null;
-  strength: string | null;
+  fatigueRPE: number | null;
+  medicalNotes: string | null;
+  academicStress: string | null;
+  tacticalStrength: string | null;
 };
 
 type EditorDraft = {
@@ -66,12 +66,12 @@ type EditorDraft = {
   tacticalRating: number | null;
   physicalRating: number | null;
   statusNote: string;
-  mainPosition: string;
+  primaryPosition: string;
   secondary: string[];
-  currentRpe: number | null;
-  injuryHistory: string;
-  academicConstraints: string;
-  strength: string;
+  fatigueRPE: number | null;
+  medicalNotes: string;
+  academicStress: string;
+  tacticalStrength: string;
 };
 
 const STATUSES = ["AVAILABLE", "INJURED", "SUSPENDED", "RETURNING"] as const;
@@ -170,21 +170,21 @@ export function PlayersView({
   const counts = useMemo(() => {
     const map: Record<string, number> = {
       ALL: players.length,
-      FATIGUE: players.filter((p) => (p.currentRpe ?? 0) >= FATIGUE_THRESHOLD).length,
+      FATIGUE: players.filter((p) => (p.fatigueRPE ?? 0) >= FATIGUE_THRESHOLD).length,
     };
     for (const g of POSITION_GROUPS) {
-      map[g.key] = players.filter((p) => positionGroupKey(p.mainPosition) === g.key).length;
+      map[g.key] = players.filter((p) => positionGroupKey(p.primaryPosition) === g.key).length;
     }
     return map;
   }, [players]);
 
   const filtered = useMemo(() => {
     if (filter === "FATIGUE") {
-      return players.filter((p) => (p.currentRpe ?? 0) >= FATIGUE_THRESHOLD);
+      return players.filter((p) => (p.fatigueRPE ?? 0) >= FATIGUE_THRESHOLD);
     }
     return filter === "ALL"
       ? players
-      : players.filter((p) => positionGroupKey(p.mainPosition) === filter);
+      : players.filter((p) => positionGroupKey(p.primaryPosition) === filter);
   }, [players, filter]);
 
   const stats = useMemo(
@@ -192,7 +192,7 @@ export function PlayersView({
       available: players.filter((p) => p.status === "AVAILABLE").length,
       out: players.filter((p) => p.status === "INJURED" || p.status === "SUSPENDED").length,
       poly: players.filter((p) => p.secondaryPositions.length > 0).length,
-      fatigued: players.filter((p) => (p.currentRpe ?? 0) >= FATIGUE_THRESHOLD).length,
+      fatigued: players.filter((p) => (p.fatigueRPE ?? 0) >= FATIGUE_THRESHOLD).length,
     }),
     [players],
   );
@@ -205,12 +205,12 @@ export function PlayersView({
       tacticalRating: p.tacticalRating,
       physicalRating: p.physicalRating,
       statusNote: p.statusNote ?? "",
-      mainPosition: p.mainPosition,
+      primaryPosition: p.primaryPosition,
       secondary: p.secondaryPositions,
-      currentRpe: p.currentRpe,
-      injuryHistory: p.injuryHistory ?? "",
-      academicConstraints: p.academicConstraints ?? "",
-      strength: p.strength ?? "",
+      fatigueRPE: p.fatigueRPE,
+      medicalNotes: p.medicalNotes ?? "",
+      academicStress: p.academicStress ?? "",
+      tacticalStrength: p.tacticalStrength ?? "",
     });
   }
 
@@ -226,12 +226,12 @@ export function PlayersView({
       tacticalRating: draft.tacticalRating,
       physicalRating: draft.physicalRating,
       statusNote: draft.statusNote.trim() || null,
-      mainPosition: draft.mainPosition,
+      primaryPosition: draft.primaryPosition,
       secondaryPositions: draft.secondary,
-      currentRpe: draft.currentRpe,
-      injuryHistory: draft.injuryHistory.trim() || null,
-      academicConstraints: draft.academicConstraints.trim() || null,
-      strength: draft.strength.trim() || null,
+      fatigueRPE: draft.fatigueRPE,
+      medicalNotes: draft.medicalNotes.trim() || null,
+      academicStress: draft.academicStress.trim() || null,
+      tacticalStrength: draft.tacticalStrength.trim() || null,
     };
     // El estado optimista ya aplica el saneado del cliente (mismas reglas
     // que el servidor): lo que ve el míster es lo que queda guardado.
@@ -242,12 +242,12 @@ export function PlayersView({
       tacticalRating: draft.tacticalRating,
       physicalRating: draft.physicalRating,
       statusNote: draft.statusNote.trim() || null,
-      mainPosition: draft.mainPosition,
-      secondaryPositions: draft.secondary.filter((s) => s !== draft.mainPosition),
-      currentRpe: draft.currentRpe,
-      injuryHistory: draft.injuryHistory.trim() || null,
-      academicConstraints: draft.academicConstraints.trim() || null,
-      strength: draft.strength.trim() || null,
+      primaryPosition: draft.primaryPosition,
+      secondaryPositions: draft.secondary.filter((s) => s !== draft.primaryPosition),
+      fatigueRPE: draft.fatigueRPE,
+      medicalNotes: draft.medicalNotes.trim() || null,
+      academicStress: draft.academicStress.trim() || null,
+      tacticalStrength: draft.tacticalStrength.trim() || null,
     };
     setPlayers((prev) => prev.map((p) => (p.id === target.id ? optimistic : p)));
     startTransition(async () => {
@@ -399,9 +399,9 @@ export function PlayersView({
                         variant="outline"
                         className="rounded-lg bg-brand-600/10 text-brand-600 border-brand-600/30 font-black"
                       >
-                        {p.mainPosition}
+                        {p.primaryPosition}
                       </Badge>
-                      <span className="text-xs text-[#6c8070]">{POSITION_LABEL[p.mainPosition] ?? p.mainPosition}</span>
+                      <span className="text-xs text-[#6c8070]">{POSITION_LABEL[p.primaryPosition] ?? p.primaryPosition}</span>
                       {p.status !== "AVAILABLE" && (
                         <Badge variant="outline" className={`rounded-lg ${statusMeta.chip}`}>
                           {statusMeta.label}
@@ -434,38 +434,38 @@ export function PlayersView({
                 </div>
 
                 {/* ---------- Pre-partido de un vistazo ---------- */}
-                {(p.currentRpe !== null || p.injuryHistory || p.academicConstraints || p.strength) && (
+                {(p.fatigueRPE !== null || p.medicalNotes || p.academicStress || p.tacticalStrength) && (
                   <div className="mt-2.5 flex flex-wrap gap-1.5">
-                    {p.currentRpe !== null && (
+                    {p.fatigueRPE !== null && (
                       <span
-                        className={`rounded-lg px-2 py-0.5 text-xs font-black ${rpeChipClass(p.currentRpe)}`}
-                        title={`Carga física reciente: RPE ${p.currentRpe} de 10`}
+                        className={`rounded-lg px-2 py-0.5 text-xs font-black ${rpeChipClass(p.fatigueRPE)}`}
+                        title={`Carga física reciente: RPE ${p.fatigueRPE} de 10`}
                       >
-                        RPE {p.currentRpe}/10
+                        RPE {p.fatigueRPE}/10
                       </span>
                     )}
-                    {p.injuryHistory && (
+                    {p.medicalNotes && (
                       <span
                         className="rounded-lg bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 text-xs font-bold text-rose-300 max-w-full truncate"
-                        title={`Precaución médica: ${p.injuryHistory}`}
+                        title={`Precaución médica: ${p.medicalNotes}`}
                       >
                         ⚕ Precaución médica
                       </span>
                     )}
-                    {p.academicConstraints && (
+                    {p.academicStress && (
                       <span
                         className="rounded-lg bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 text-xs font-bold text-sky-300 max-w-full truncate"
-                        title={`Horarios / estrés académico: ${p.academicConstraints}`}
+                        title={`Horarios / estrés académico: ${p.academicStress}`}
                       >
                         🎓 Carga invisible
                       </span>
                     )}
-                    {p.strength && (
+                    {p.tacticalStrength && (
                       <span
                         className="rounded-lg bg-[#8a6206]/10 border border-[#8a6206]/30 px-2 py-0.5 text-xs font-bold text-[#8a6206] max-w-full truncate"
-                        title={`Fortaleza principal: ${p.strength}`}
+                        title={`Fortaleza principal: ${p.tacticalStrength}`}
                       >
-                        ★ {p.strength}
+                        ★ {p.tacticalStrength}
                       </span>
                     )}
                   </div>
@@ -488,7 +488,7 @@ export function PlayersView({
             </SheetTitle>
             <SheetDescription className="text-[#5d7263] text-sm">
               {editing?.shirtNumber != null ? `Dorsal ${editing.shirtNumber} · ` : ""}
-              {POSITION_LABEL[editing?.mainPosition ?? "CF"] ?? ""}
+              {POSITION_LABEL[editing?.primaryPosition ?? "CF"] ?? ""}
               {editing?.secondaryPositions.length
                 ? ` · polivalente: ${editing.secondaryPositions.join(", ")}`
                 : ""}
@@ -553,11 +553,11 @@ export function PlayersView({
           </p>
           {draft && (
             <PositionPicker
-              main={draft.mainPosition}
+              main={draft.primaryPosition}
               secondary={draft.secondary}
               onMainChange={(p) =>
                 setDraft((d) =>
-                  d ? { ...d, mainPosition: p, secondary: d.secondary.filter((s) => s !== p) } : d,
+                  d ? { ...d, primaryPosition: p, secondary: d.secondary.filter((s) => s !== p) } : d,
                 )
               }
               onToggleSecondary={(p) =>
@@ -582,8 +582,8 @@ export function PlayersView({
           <div className="space-y-3">
             <Stepper
               label={`Carga física reciente (RPE 1–10)`}
-              value={draft?.currentRpe ?? null}
-              onChange={(v) => setDraft((d) => (d ? { ...d, currentRpe: v } : d))}
+              value={draft?.fatigueRPE ?? null}
+              onChange={(v) => setDraft((d) => (d ? { ...d, fatigueRPE: v } : d))}
               max={10}
             />
             <div>
@@ -595,8 +595,8 @@ export function PlayersView({
                 className="mt-1 min-h-[64px] rounded-2xl bg-cream-dark/70 border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
                 placeholder="Ej.: esguince de tobillo derecho, alta prevista en 3 semanas"
                 maxLength={500}
-                value={draft?.injuryHistory ?? ""}
-                onChange={(e) => setDraft((d) => (d ? { ...d, injuryHistory: e.target.value } : d))}
+                value={draft?.medicalNotes ?? ""}
+                onChange={(e) => setDraft((d) => (d ? { ...d, medicalNotes: e.target.value } : d))}
               />
             </div>
             <div>
@@ -608,21 +608,21 @@ export function PlayersView({
                 className="mt-1 min-h-[64px] rounded-2xl bg-cream-dark/70 border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
                 placeholder="Ej.: exámenes esta semana, duerme poco por evaluaciones"
                 maxLength={500}
-                value={draft?.academicConstraints ?? ""}
-                onChange={(e) => setDraft((d) => (d ? { ...d, academicConstraints: e.target.value } : d))}
+                value={draft?.academicStress ?? ""}
+                onChange={(e) => setDraft((d) => (d ? { ...d, academicStress: e.target.value } : d))}
               />
             </div>
             <div>
-              <label htmlFor="ed-strength" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
+              <label htmlFor="ed-tacticalStrength" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
                 Fortaleza principal
               </label>
               <Input
-                id="ed-strength"
+                id="ed-tacticalStrength"
                 className="mt-1 min-h-[48px] rounded-2xl bg-cream-dark/70 border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
                 placeholder="Ej.: desmarque al espacio, golpeo de falta"
                 maxLength={500}
-                value={draft?.strength ?? ""}
-                onChange={(e) => setDraft((d) => (d ? { ...d, strength: e.target.value } : d))}
+                value={draft?.tacticalStrength ?? ""}
+                onChange={(e) => setDraft((d) => (d ? { ...d, tacticalStrength: e.target.value } : d))}
               />
             </div>
           </div>

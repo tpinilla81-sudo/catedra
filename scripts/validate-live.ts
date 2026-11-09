@@ -139,9 +139,9 @@ const neighborTeam = await raw.team.create({
   data: { clubId: clubA.id, seasonId: seasonA.id, name: "Equipo Vecino Directo TEST" },
 });
 
-const mkPlayer = (firstName: string, lastName: string, shirtNumber: number, mainPosition: string, teamId: string) =>
+const mkPlayer = (firstName: string, lastName: string, shirtNumber: number, primaryPosition: string, teamId: string) =>
   raw.player.create({
-    data: { clubId: clubA.id, teamId, firstName, lastName, shirtNumber, mainPosition: mainPosition as never },
+    data: { clubId: clubA.id, teamId, firstName, lastName, shirtNumber, primaryPosition: primaryPosition as never },
   });
 
 const [p9, p10, p11, pRival] = await Promise.all([

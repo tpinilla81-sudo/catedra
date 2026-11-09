@@ -67,17 +67,17 @@ export async function updatePlayerQuick(playerId: string, patch: PlayerQuickPatc
 
   // Perfil pre-partido: RPE acotado 1-10 y textos recortados (saneo puro).
   const profile = sanitizePlayerProfilePatch({
-    currentRpe: patch.currentRpe,
-    injuryHistory: patch.injuryHistory,
-    academicConstraints: patch.academicConstraints,
-    strength: patch.strength,
+    fatigueRPE: patch.fatigueRPE,
+    medicalNotes: patch.medicalNotes,
+    academicStress: patch.academicStress,
+    tacticalStrength: patch.tacticalStrength,
   });
 
   // Demarcaciones: normalizadas, secundarias ≠ principal y sin repetidos.
-  let positionData: { mainPosition?: Position; secondaryPositions?: Position[] } = {};
-  if (patch.mainPosition !== undefined || patch.secondaryPositions !== undefined) {
-    const main = patch.mainPosition !== undefined ? normalizePosition(patch.mainPosition ?? "") : null;
-    if (patch.mainPosition !== undefined && !main) {
+  let positionData: { primaryPosition?: Position; secondaryPositions?: Position[] } = {};
+  if (patch.primaryPosition !== undefined || patch.secondaryPositions !== undefined) {
+    const main = patch.primaryPosition !== undefined ? normalizePosition(patch.primaryPosition ?? "") : null;
+    if (patch.primaryPosition !== undefined && !main) {
       return { ok: false as const, error: "Demarcación principal no reconocida." };
     }
     const secondary =
@@ -88,7 +88,7 @@ export async function updatePlayerQuick(playerId: string, patch: PlayerQuickPatc
             .filter((p, i, arr) => arr.indexOf(p) === i)
         : undefined;
     positionData = {
-      ...(main ? { mainPosition: main as Position } : {}),
+      ...(main ? { primaryPosition: main as Position } : {}),
       ...(secondary !== undefined ? { secondaryPositions: secondary as Position[] } : {}),
     };
   }
@@ -116,12 +116,12 @@ export type NewPlayerInput = {
   firstName: string;
   lastName: string;
   shirtNumber?: number | null;
-  mainPosition: string;
+  primaryPosition: string;
   secondaryPositions?: string[];
-  currentRpe?: number | null;
-  injuryHistory?: string | null;
-  academicConstraints?: string | null;
-  strength?: string | null;
+  fatigueRPE?: number | null;
+  medicalNotes?: string | null;
+  academicStress?: string | null;
+  tacticalStrength?: string | null;
 };
 
 export type CreatePlayerResult =
@@ -137,15 +137,15 @@ export async function createPlayer(input: NewPlayerInput): Promise<CreatePlayerR
     return { ok: false, error: "El nombre es obligatorio." };
   }
 
-  const mainPosition = normalizePosition(input.mainPosition ?? "");
-  if (!mainPosition) {
+  const primaryPosition = normalizePosition(input.primaryPosition ?? "");
+  if (!primaryPosition) {
     return { ok: false, error: "Demarcación principal no reconocida." };
   }
 
   // Polivalencias: válidas, distintas de la principal y sin repetidos.
   const secondary = (input.secondaryPositions ?? [])
     .map((p) => normalizePosition(p))
-    .filter((p): p is Position => p !== null && p !== mainPosition)
+    .filter((p): p is Position => p !== null && p !== primaryPosition)
     .filter((p, i, arr) => arr.indexOf(p) === i) as Position[];
 
   // Dorsal: entero 0-999 y único dentro del equipo (unique teamId+shirt).
@@ -166,10 +166,10 @@ export async function createPlayer(input: NewPlayerInput): Promise<CreatePlayerR
   }
 
   const profile = sanitizePlayerProfilePatch({
-    currentRpe: input.currentRpe,
-    injuryHistory: input.injuryHistory,
-    academicConstraints: input.academicConstraints,
-    strength: input.strength,
+    fatigueRPE: input.fatigueRPE,
+    medicalNotes: input.medicalNotes,
+    academicStress: input.academicStress,
+    tacticalStrength: input.tacticalStrength,
   });
 
   try {
@@ -180,7 +180,7 @@ export async function createPlayer(input: NewPlayerInput): Promise<CreatePlayerR
         firstName,
         lastName,
         shirtNumber,
-        mainPosition: mainPosition as Position,
+        primaryPosition: primaryPosition as Position,
         secondaryPositions: secondary,
         ...profile.data,
       },

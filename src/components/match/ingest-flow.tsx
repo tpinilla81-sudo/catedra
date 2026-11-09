@@ -64,7 +64,7 @@ export type IngestPlayerData = {
   firstName: string;
   lastName: string;
   shirtNumber: number | null;
-  mainPosition: string;
+  primaryPosition: string;
 };
 
 export type IngestReportData = {

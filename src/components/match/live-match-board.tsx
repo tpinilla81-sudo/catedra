@@ -23,7 +23,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { Loader2, Radio } from "lucide-react";
+import {
+  Flag,
+  Loader2,
+  Pause,
+  Pin,
+  Play,
+  Radio,
+  Square,
+  Video,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   CLINICAL_FLAG_META,
@@ -36,6 +45,13 @@ import {
   TACTICAL_TAG_META,
   rpeLoadLevel,
 } from "@/lib/taxonomy";
+import {
+  ACTION_PRESETS,
+  formatClock,
+  minuteOfElapsed,
+  type MatchSessionDTO,
+  type TelemetryEventDTO,
+} from "@/lib/pilar3";
 
 // ---------- Tipos ----------
 
@@ -44,13 +60,13 @@ export type LivePlayerData = {
   firstName: string;
   lastName: string;
   shirtNumber: number | null;
-  mainPosition: string;
+  primaryPosition: string;
   /// Perfil pre-partido (Pilar 2) — la ficha del día en la tarjeta rápida
   secondaryPositions: string[];
-  currentRpe: number | null;
-  injuryHistory: string | null;
-  academicConstraints: string | null;
-  strength: string | null;
+  fatigueRPE: number | null;
+  medicalNotes: string | null;
+  academicStress: string | null;
+  tacticalStrength: string | null;
   status: string;
   statusNote: string | null;
 };
@@ -78,6 +94,40 @@ type PlayerStatuses = {
   tacticalFlag: string | null;
   statusUpdatedAt: string | null;
 };
+
+/// Presets de hechos de juego con responsable claro (ficha del jugador)
+const PLAYER_ACTIONS = ACTION_PRESETS;
+/// Hechos colectivos sin responsable (barra rápida bajo el reloj)
+const TEAM_ACTION_VALUES = ["GOAL_FOR", "GOAL_AGAINST", "OPP_CHANCE", "CORNER_FOR"] as const;
+const TEAM_ACTIONS = TEAM_ACTION_VALUES.map(
+  (v) => ACTION_PRESETS.find((a) => a.value === v)!,
+);
+
+/// Emoji + tono por valor de evento de estado (para la línea temporal)
+const STATE_EMOJI: Record<string, string> = {
+  FRESH: "🟢", HEAVY: "🟡", EXHAUSTED: "🔴",
+  MINOR: "⚠️", FORCED_SUB: "❌",
+  EXPLOITING: "⭐", STRUGGLING: "⚠️",
+};
+
+function eventEmoji(e: TelemetryEventDTO): string {
+  if (e.type === "ACTION") {
+    return ACTION_PRESETS.find((a) => a.value === e.value)?.emoji ?? "📌";
+  }
+  return STATE_EMOJI[e.value] ?? "•";
+}
+
+function eventLabel(e: TelemetryEventDTO): string {
+  if (e.type === "ACTION") {
+    return ACTION_PRESETS.find((a) => a.value === e.value)?.label ?? e.value;
+  }
+  const metas = {
+    FATIGUE: FATIGUE_FLAG_META,
+    CLINICAL: CLINICAL_FLAG_META,
+    TACTICAL: TACTICAL_FLAG_META,
+  } as const;
+  return metas[e.type][e.value]?.label ?? e.value;
+}
 
 const EMPTY_STATUSES: PlayerStatuses = {
   fatigueFlag: null,
@@ -179,26 +229,26 @@ export function computePitchSlots(players: LivePlayerData[]): Map<string, PitchS
   const slots = new Map<string, PitchSlot>();
   const lanes = new Map<string, LivePlayerData[]>();
   for (const p of players) {
-    const lane = LANE_OF[p.mainPosition] ?? "MID";
+    const lane = LANE_OF[p.primaryPosition] ?? "MID";
     if (!lanes.has(lane)) lanes.set(lane, []);
     lanes.get(lane)!.push(p);
   }
   for (const [lane, group] of lanes) {
     const { y, win, gap } = PITCH_LANES[lane];
     const ordered = [...group].sort((a, b) => {
-      const dx = (BASE_X[a.mainPosition] ?? 50) - (BASE_X[b.mainPosition] ?? 50);
+      const dx = (BASE_X[a.primaryPosition] ?? 50) - (BASE_X[b.primaryPosition] ?? 50);
       if (dx !== 0) return dx;
       return (a.shirtNumber ?? 99) - (b.shirtNumber ?? 99);
     });
     const n = ordered.length;
     if (n === 1) {
-      slots.set(ordered[0].id, { x: BASE_X[ordered[0].mainPosition] ?? 50, y });
+      slots.set(ordered[0].id, { x: BASE_X[ordered[0].primaryPosition] ?? 50, y });
       continue;
     }
     // Resuelve colisiones de izquierda a derecha con el gap del carril
     const xs: number[] = [];
     for (let i = 0; i < n; i++) {
-      const base = BASE_X[ordered[i].mainPosition] ?? 50;
+      const base = BASE_X[ordered[i].primaryPosition] ?? 50;
       xs.push(i === 0 ? base : Math.max(base, xs[i - 1] + gap));
     }
     // Si se sale por la derecha, desplaza el grupo hacia la izquierda
@@ -264,13 +314,51 @@ export function LiveMatchBoard({
   matchId,
   players,
   initialEvaluations,
+  initialSession,
+  initialEvents,
 }: {
   matchId: string;
   players: LivePlayerData[];
   initialEvaluations: LiveEvaluationData[];
+  initialSession: MatchSessionDTO | null;
+  initialEvents: TelemetryEventDTO[];
 }) {
   const { toast } = useToast();
   const [selected, setSelected] = useState<LivePlayerData | null>(null);
+
+  // ---------- Reloj autoritativo (el servidor manda; el tick solo repinta) ----------
+  const [session, setSession] = useState<MatchSessionDTO | null>(initialSession);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick((v) => v + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const elapsedSeconds = useMemo(() => {
+    void tick; // re-calcula cada tick del intervalo
+    if (!session) return 0;
+    if (session.status !== "LIVE" || !session.clockStartedAt) {
+      return session.clockBaseSeconds;
+    }
+    return (
+      session.clockBaseSeconds +
+      Math.max(0, (Date.now() - new Date(session.clockStartedAt).getTime()) / 1000)
+    );
+  }, [session, tick]);
+  const currentMinute = minuteOfElapsed(elapsedSeconds);
+  const isLive = session?.status === "LIVE";
+
+  // ---------- Telemetría: línea temporal de eventos grabados ----------
+  const [events, setEvents] = useState<TelemetryEventDTO[]>(initialEvents);
+  const [bookmarked, setBookmarked] = useState<Set<string>>(new Set());
+  const [pendingClock, setPendingClock] = useState(false);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [videoOpen, setVideoOpen] = useState(false);
+
+  const playerName = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of players) map.set(p.id, `#${p.shirtNumber ?? "·"} ${p.firstName}`);
+    return map;
+  }, [players]);
   const [starterIds, setStarterIds] = useState<Set<string>>(
     () => new Set(initialEvaluations.filter((e) => e.isStarter).map((e) => e.playerId)),
   );
@@ -293,6 +381,28 @@ export function LiveMatchBoard({
   });
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [savingLineup, setSavingLineup] = useState(false);
+
+  // Marca los eventos que ya tienen clip de vídeo (restaurar tras recarga)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/pilar3/matches/${matchId}/telemetry`);
+        const data = (await res.json().catch(() => null)) as {
+          ok?: boolean;
+          bookmarks?: Array<{ telemetryEventId: string }>;
+        } | null;
+        if (!cancelled && res.ok && data?.ok && data.bookmarks) {
+          setBookmarked(new Set(data.bookmarks.map((b) => b.telemetryEventId)));
+        }
+      } catch {
+        // sin marcadores previos: silencio, el tablón ya funciona
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [matchId]);
 
   const { starters, bench } = useMemo(() => {
     const ordered = [...players].sort(
@@ -333,7 +443,9 @@ export function LiveMatchBoard({
     [matchId],
   );
 
-  /** Estado de la ficha rápida: 1 toque = guarda ya (optimista, revierte si falla) */
+  /** Estado de la ficha rápida: 1 toque = guarda ya (optimista, revierte si falla).
+   *  Con valor → telemetría (evento minute-stamped + estado del tablón en una
+   *  sola llamada). Repetir el mismo valor lo apaga (toggle) sin evento. */
   const handleSetStatus = async (
     playerId: string,
     axis: StatusAxis,
@@ -341,11 +453,45 @@ export function LiveMatchBoard({
     label: string,
   ) => {
     const prev = statuses[playerId] ?? EMPTY_STATUSES;
-    const optimistic: PlayerStatuses = { ...prev, [axis]: value, statusUpdatedAt: new Date().toISOString() };
     setPendingKey(`${axis}:${value ?? "off"}`);
-    setStatuses((m) => ({ ...m, [playerId]: optimistic }));
+    setStatuses((m) => ({
+      ...m,
+      [playerId]: { ...prev, [axis]: value, statusUpdatedAt: new Date().toISOString() },
+    }));
+
+    if (value !== null) {
+      const type =
+        axis === "fatigueFlag"
+          ? "FATIGUE"
+          : axis === "clinicalFlag"
+            ? "CLINICAL"
+            : "TACTICAL";
+      try {
+        const data = await postTelemetry({
+          events: [{ playerId, type, value }],
+        });
+        const stamp = data.created?.[0]?.timestamp ?? new Date().toISOString();
+        setStatuses((m) => ({
+          ...m,
+          [playerId]: { ...prev, [axis]: value, statusUpdatedAt: stamp },
+        }));
+      } catch (err) {
+        console.error("Error guardando estado en directo:", err);
+        setStatuses((m) => ({ ...m, [playerId]: prev }));
+        toast({
+          title: "No se pudo actualizar el estado",
+          description: err instanceof Error ? err.message : `${label}: inténtalo de nuevo.`,
+          variant: "destructive",
+        });
+      } finally {
+        setPendingKey(null);
+      }
+      return;
+    }
+
+    // Toggle OFF (apagar el eje): estado del tablón, sin evento nuevo
     const payload: PostEvalPayload = { playerId, isStarter: starterIds.has(playerId) };
-    payload[axis] = value;
+    payload[axis] = null;
     try {
       const evaluation = await postEvaluation(payload);
       setStatuses((m) => ({
@@ -367,6 +513,93 @@ export function LiveMatchBoard({
       });
     } finally {
       setPendingKey(null);
+    }
+  };
+
+  // ---------- Telemetría en directo (POST /api/pilar3/events) ----------
+
+  /** Llamada genérica: devuelve el reloj actualizado y los eventos creados */
+  const postTelemetry = useCallback(
+    async (payload: Record<string, unknown>) => {
+      const res = await fetch("/api/pilar3/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ matchId, ...payload }),
+      });
+      const data = (await res.json().catch(() => null)) as
+        | { ok: boolean; error?: string; session?: MatchSessionDTO; created?: TelemetryEventDTO[] }
+        | null;
+      if (!res.ok || !data?.ok || !data.session) {
+        throw new Error(data?.error ?? "No se pudo registrar el toque.");
+      }
+      setSession(data.session);
+      if (data.created?.length) {
+        setEvents((prev) => [...prev, ...data.created!]);
+      }
+      return data;
+    },
+    [matchId],
+  );
+
+  /** Control del cronómetro: START / PAUSE / RESUME / FINISH (idempotente) */
+  const handleClock = async (action: "START" | "PAUSE" | "RESUME" | "FINISH") => {
+    setPendingClock(true);
+    try {
+      await postTelemetry({ action });
+    } catch (err) {
+      console.error("Error del reloj en directo:", err);
+      toast({
+        title: "El reloj no respondió",
+        description: err instanceof Error ? err.message : "Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setPendingClock(false);
+    }
+  };
+
+  /** Hecho de juego 1-toque (con o sin responsable) — el minuto lo sella el reloj */
+  const handleAction = async (value: string, label: string, playerId?: string) => {
+    setPendingAction(value);
+    try {
+      await postTelemetry({
+        events: [{ playerId: playerId ?? null, type: "ACTION", value }],
+      });
+    } catch (err) {
+      console.error("Error registrando el hecho de juego:", err);
+      toast({
+        title: "No se pudo registrar",
+        description: err instanceof Error ? err.message : `${label}: inténtalo de nuevo.`,
+        variant: "destructive",
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
+  /** Pincha un evento en el vídeo: bookmark automático con el offset de la sesión */
+  const handleBookmark = async (telemetryEventId: string) => {
+    try {
+      const res = await fetch("/api/pilar3/video-bookmarks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ telemetryEventId }),
+      });
+      const data = (await res.json().catch(() => null)) as
+        | { ok: boolean; error?: string; bookmark?: { telemetryEventId: string } }
+        | null;
+      if (!res.ok || !data?.ok || !data.bookmark) {
+        throw new Error(data?.error ?? "No se pudo crear el clip.");
+      }
+      setBookmarked((prev) => new Set(prev).add(data.bookmark!.telemetryEventId));
+      toast({ title: "Clip marcado en el vídeo 🎬" });
+    } catch (err) {
+      console.error("Error creando el marcador de vídeo:", err);
+      toast({
+        title: "No se pudo marcar el clip",
+        description: err instanceof Error ? err.message : "Inténtalo de nuevo.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -416,7 +649,7 @@ export function LiveMatchBoard({
   };
 
   const chipBadge = (p: LivePlayerData) =>
-    p.shirtNumber ?? POSITION_SHORT[p.mainPosition] ?? "·";
+    p.shirtNumber ?? POSITION_SHORT[p.primaryPosition] ?? "·";
 
   const currentStatuses = selected ? statuses[selected.id] ?? EMPTY_STATUSES : null;
 
@@ -473,7 +706,125 @@ export function LiveMatchBoard({
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 p-4 rounded-3xl border border-[#1c3a26] bg-[#0a1a10]">
+    <div className="space-y-4">
+      {/* ---------- RELOJ AUTORITATIVO + HECHOS COLECTIVOS ---------- */}
+      <section
+        className="rounded-3xl border border-[#1c3a26] bg-[#0f2317] p-4"
+        aria-label="Reloj de partido y hechos colectivos"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span
+              className={`font-black tabular-nums leading-none text-5xl sm:text-6xl ${
+                session?.status === "LIVE"
+                  ? "text-cream"
+                  : session?.status === "PAUSED"
+                    ? "text-amber-400"
+                    : session?.status === "FINISHED"
+                      ? "text-[#6d8070]"
+                      : "text-[#6d8070]"
+              }`}
+              aria-label={`Reloj ${formatClock(elapsedSeconds)}`}
+            >
+              {formatClock(elapsedSeconds)}
+            </span>
+            <span className="flex flex-col gap-1 min-w-0">
+              <span className="text-[11px] uppercase tracking-widest text-[#8aa28d] font-bold">
+                {session === null
+                  ? "Reloj sin arrancar"
+                  : session.status === "LIVE"
+                    ? `Minuto ${currentMinute} · en juego`
+                    : session.status === "PAUSED"
+                      ? `Minuto ${currentMinute} · parado`
+                      : `Final · minuto ${currentMinute}`}
+              </span>
+              {isLive && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-brand-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse" aria-hidden />
+                  en directo
+                </span>
+              )}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {session === null && (
+              <button
+                onClick={() => handleClock("START")}
+                disabled={pendingClock}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-black text-[#0a1a10] hover:bg-brand-500 transition-colors disabled:opacity-60 active:scale-95"
+              >
+                {pendingClock ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Play className="w-4 h-4" aria-hidden />}
+                Arrancar reloj
+              </button>
+            )}
+            {session?.status === "LIVE" && (
+              <button
+                onClick={() => handleClock("PAUSE")}
+                disabled={pendingClock}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/60 bg-amber-500/10 px-3.5 py-2.5 text-sm font-bold text-amber-300 hover:bg-amber-500/20 transition-colors disabled:opacity-60 active:scale-95"
+              >
+                <Pause className="w-4 h-4" aria-hidden /> Descanso
+              </button>
+            )}
+            {session?.status === "PAUSED" && (
+              <button
+                onClick={() => handleClock("RESUME")}
+                disabled={pendingClock}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-3.5 py-2.5 text-sm font-black text-[#0a1a10] hover:bg-brand-500 transition-colors disabled:opacity-60 active:scale-95"
+              >
+                <Play className="w-4 h-4" aria-hidden /> Reanudar
+              </button>
+            )}
+            {session && session.status !== "FINISHED" && (
+              <button
+                onClick={() => handleClock("FINISH")}
+                disabled={pendingClock}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#2a4a34] bg-[#0a1a10] px-3.5 py-2.5 text-sm font-bold text-[#a9bca9] hover:bg-[#1c3a26] transition-colors disabled:opacity-60 active:scale-95"
+              >
+                <Square className="w-4 h-4" aria-hidden /> Final
+              </button>
+            )}
+            <button
+              onClick={() => setVideoOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#2a4a34] bg-[#0a1a10] px-3.5 py-2.5 text-sm font-bold text-[#dfe9d8] hover:bg-[#1c3a26] transition-colors active:scale-95"
+              aria-label="Sincronizar vídeo de la grabación"
+            >
+              <Video className="w-4 h-4" aria-hidden />
+              {session?.videoUrl ? "Vídeo ✓" : "Vídeo"}
+            </button>
+          </div>
+        </div>
+
+        {/* Hechos colectivos 1-toque (sin responsable claro) */}
+        {session && session.status !== "FINISHED" && (
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-[#1c3a26] pt-3">
+            {TEAM_ACTIONS.map((a) => (
+              <button
+                key={a.value}
+                onClick={() => handleAction(a.value, a.label)}
+                disabled={pendingAction !== null}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold transition-all active:scale-95 disabled:opacity-50 ${
+                  a.tone === "negative"
+                    ? "border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20"
+                    : "border-brand-600/50 bg-brand-600/10 text-lime-brand hover:bg-brand-600/20"
+                }`}
+                aria-label={`Registrar ${a.label}`}
+              >
+                <span aria-hidden>{a.emoji}</span> {a.label}
+                {pendingAction === a.value && (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
+                )}
+              </button>
+            ))}
+            <span className="self-center text-[10px] text-[#6d8070] ml-1">
+              se sellan con el minuto {currentMinute}&prime;
+            </span>
+          </div>
+        )}
+      </section>
+
+      <div className="flex flex-col lg:flex-row gap-4 p-4 rounded-3xl border border-[#1c3a26] bg-[#0a1a10]">
       {/* ---------- Terreno de juego (titulares colocados por demarcación) ---------- */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-3">
@@ -526,7 +877,7 @@ export function LiveMatchBoard({
                     className={`absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center transition-transform active:scale-90 ${
                       selected?.id === player.id ? "scale-110" : ""
                     }`}
-                    aria-label={`${player.firstName} ${player.lastName}, ${POSITION_LABEL[player.mainPosition] ?? player.mainPosition}, ${tagCounts[player.id] ?? 0} anotaciones`}
+                    aria-label={`${player.firstName} ${player.lastName}, ${POSITION_LABEL[player.primaryPosition] ?? player.primaryPosition}, ${tagCounts[player.id] ?? 0} anotaciones`}
                   >
                     <span
                       className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-black border-2 shadow-lg transition-colors ${
@@ -581,7 +932,7 @@ export function LiveMatchBoard({
                     {player.firstName} {player.lastName}
                   </span>
                   <span className="block text-[10px] uppercase tracking-wide opacity-60">
-                    {POSITION_SHORT[player.mainPosition] ?? player.mainPosition}
+                    {POSITION_SHORT[player.primaryPosition] ?? player.primaryPosition}
                   </span>
                 </span>
                 <span className="ml-auto flex items-center gap-1.5 shrink-0">
@@ -627,8 +978,11 @@ export function LiveMatchBoard({
                     {selected.firstName} {selected.lastName}
                   </h3>
                   <span className="text-xs text-[#a9bca9]">
-                    {POSITION_LABEL[selected.mainPosition] ?? selected.mainPosition} ·{" "}
+                    {POSITION_LABEL[selected.primaryPosition] ?? selected.primaryPosition} ·{" "}
                     {starterIds.has(selected.id) ? "Titular" : "Suplente"}
+                    {session && session.status !== "FINISHED"
+                      ? ` · minuto ${currentMinute}\u2032`
+                      : ""}
                     {currentStatuses.statusUpdatedAt
                       ? ` · estado ${format(new Date(currentStatuses.statusUpdatedAt), "HH:mm'h'")}`
                       : ""}
@@ -645,21 +999,21 @@ export function LiveMatchBoard({
             </div>
 
             {/* Ficha de hoy (Pilar 2 · pre-partido) */}
-            {(selected.currentRpe !== null ||
+            {(selected.fatigueRPE !== null ||
               selected.status !== "AVAILABLE" ||
-              selected.injuryHistory ||
-              selected.academicConstraints ||
-              selected.strength) && (
+              selected.medicalNotes ||
+              selected.academicStress ||
+              selected.tacticalStrength) && (
               <div className="rounded-xl bg-[#071509]/60 border border-[#1c3a26] p-3">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-[#8aa28d] mb-2">
                   Ficha de hoy · antes del pitido
                 </p>
                 <div className="flex flex-wrap gap-1.5">
-                  {selected.currentRpe !== null && rpeLoadLevel(selected.currentRpe) && (
+                  {selected.fatigueRPE !== null && rpeLoadLevel(selected.fatigueRPE) && (
                     <PreMatchChip
-                      label={`RPE ${selected.currentRpe}`}
-                      text={`Carga reciente: ${RPE_LOAD_META[rpeLoadLevel(selected.currentRpe)!].label}`}
-                      chipClass={RPE_LOAD_META[rpeLoadLevel(selected.currentRpe)!].chip}
+                      label={`RPE ${selected.fatigueRPE}`}
+                      text={`Carga reciente: ${RPE_LOAD_META[rpeLoadLevel(selected.fatigueRPE)!].label}`}
+                      chipClass={RPE_LOAD_META[rpeLoadLevel(selected.fatigueRPE)!].chip}
                     />
                   )}
                   {selected.status !== "AVAILABLE" && PLAYER_STATUS_META[selected.status] && (
@@ -669,16 +1023,16 @@ export function LiveMatchBoard({
                       chipClass={PLAYER_STATUS_META[selected.status].chip}
                     />
                   )}
-                  {selected.injuryHistory && (
-                    <PreMatchChip label="Clínico" text={selected.injuryHistory} />
+                  {selected.medicalNotes && (
+                    <PreMatchChip label="Clínico" text={selected.medicalNotes} />
                   )}
-                  {selected.academicConstraints && (
-                    <PreMatchChip label="Académico" text={selected.academicConstraints} />
+                  {selected.academicStress && (
+                    <PreMatchChip label="Académico" text={selected.academicStress} />
                   )}
-                  {selected.strength && (
+                  {selected.tacticalStrength && (
                     <PreMatchChip
                       label="Fortaleza"
-                      text={selected.strength}
+                      text={selected.tacticalStrength}
                       chipClass="bg-violet-500/15 text-violet-300 border-violet-500/40"
                     />
                   )}
@@ -707,6 +1061,38 @@ export function LiveMatchBoard({
               "tacticalFlag",
               TACTICAL_FLAG_META,
               Object.keys(TACTICAL_FLAG_META),
+            )}
+
+            {/* Hechos de juego 1-toque con responsable (el minuto lo sella el reloj) */}
+            {session && session.status !== "FINISHED" && (
+              <div className="space-y-2 border-t border-[#1c3a26] pt-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#8aa28d]">
+                  Hechos de juego · minuto {currentMinute}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {PLAYER_ACTIONS.map((a) => (
+                    <button
+                      key={a.value}
+                      disabled={pendingAction !== null}
+                      onClick={() => handleAction(a.value, a.label, selected.id)}
+                      className={`flex items-center gap-2 p-2.5 text-xs rounded-lg border transition-all active:scale-95 disabled:opacity-50 ${
+                        a.tone === "positive"
+                          ? "bg-brand-600/10 hover:bg-brand-600/20 border-brand-600/40 text-lime-brand"
+                          : a.tone === "negative"
+                            ? "bg-red-500/10 hover:bg-red-500/20 border-red-500/40 text-red-300"
+                            : "bg-[#1c3a26]/60 border-[#2a4a34] text-[#dfe9d8]"
+                      }`}
+                      aria-label={`Registrar ${a.label} para ${selected.firstName} ${selected.lastName}`}
+                    >
+                      <span className="text-base shrink-0" aria-hidden>{a.emoji}</span>
+                      <span className="truncate">{a.label}</span>
+                      {pendingAction === a.value && (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin ml-auto shrink-0" aria-hidden />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
 
             {/* Anotaciones tácticas acumulativas (tags) */}
@@ -766,6 +1152,211 @@ export function LiveMatchBoard({
           </div>
         </div>
       )}
+      </div>
+
+      {/* ---------- Línea temporal de la telemetría (clip-review) ---------- */}
+      {events.length > 0 && (
+        <section
+          className="rounded-3xl border border-[#1c3a26] bg-[#0f2317] p-4"
+          aria-label="Línea temporal de eventos grabados"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-semibold uppercase tracking-wider text-[#a9bca9] flex items-center gap-2">
+              <Flag className="w-4 h-4 text-brand-400" aria-hidden />
+              Línea del partido · {events.length} toque{events.length === 1 ? "" : "s"}
+            </h4>
+            {session?.videoUrl && (
+              <span className="text-[10px] text-[#6d8070]">
+                📌 marca el instante exacto del vídeo
+              </span>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5 max-h-64 overflow-y-auto pr-1">
+            {[...events].reverse().slice(0, 40).map((e) => (
+              <div
+                key={e.id}
+                className={`flex items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-xs ${
+                  bookmarked.has(e.id)
+                    ? "border-brand-600/60 bg-brand-600/10"
+                    : "border-[#1c3a26] bg-[#0a1a10]"
+                }`}
+              >
+                <span className="font-black tabular-nums text-cream shrink-0 w-9 text-right">
+                  {e.minute}&prime;
+                </span>
+                <span aria-hidden>{eventEmoji(e)}</span>
+                <span className="truncate text-[#dfe9d8]">
+                  {eventLabel(e)}
+                  {e.playerId && playerName.get(e.playerId) && (
+                    <span className="text-[#8aa28d]"> · {playerName.get(e.playerId)}</span>
+                  )}
+                </span>
+                <button
+                  onClick={() => handleBookmark(e.id)}
+                  disabled={bookmarked.has(e.id)}
+                  className={`ml-auto shrink-0 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-colors ${
+                    bookmarked.has(e.id)
+                      ? "bg-brand-600/25 text-brand-400"
+                      : "bg-[#1c3a26] text-[#a9bca9] hover:bg-[#2a4a34]"
+                  }`}
+                  aria-label={bookmarked.has(e.id) ? "Ya marcado en el vídeo" : "Marcar instante en el vídeo"}
+                >
+                  <Pin className="w-3 h-3" aria-hidden />
+                  {bookmarked.has(e.id) ? "en vídeo" : "clip"}
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ---------- Panel de sincronización de vídeo ---------- */}
+      {videoOpen && (
+        <VideoSyncPanel
+          session={session}
+          elapsedSeconds={elapsedSeconds}
+          onSave={async (videoUrl, offset) => {
+            await postTelemetry({
+              action: "SET_VIDEO",
+              videoUrl,
+              videoOffsetSeconds: offset,
+            });
+            setVideoOpen(false);
+          }}
+          onClose={() => setVideoOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------- Panel: sincronizar la grabación con el reloj del partido ----------
+
+/**
+ * El míster pone el vídeo en el instante en que está el reloj AHORA, escribe
+ * el segundo del vídeo y pulsa guardar: offset = segundo_vídeo − reloj.
+ * A partir de ahí, TODO evento queda enlazable a su timecode:
+ * segundo_vídeo = (minuto · 60) + offset. Sincronizar una vez, servir siempre.
+ */
+function VideoSyncPanel({
+  session,
+  elapsedSeconds,
+  onSave,
+  onClose,
+}: {
+  session: MatchSessionDTO | null;
+  elapsedSeconds: number;
+  onSave: (videoUrl: string | null, offsetSeconds: number) => Promise<void>;
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const [url, setUrl] = useState(session?.videoUrl ?? "");
+  const [videoSecond, setVideoSecond] = useState<string>(() => {
+    // Precarga el segundo de vídeo que correspondería AHORA con el offset guardado
+    if (!session) return "";
+    return String(Math.round(elapsedSeconds + session.videoOffsetSeconds));
+  });
+  const [saving, setSaving] = useState(false);
+
+  const parsedSecond = Number(videoSecond);
+  const secondValid =
+    videoSecond === "" || (Number.isFinite(parsedSecond) && parsedSecond >= 0);
+
+  const handleSave = async () => {
+    if (!secondValid) return;
+    setSaving(true);
+    try {
+      const offset =
+        videoSecond === ""
+          ? session?.videoOffsetSeconds ?? 0
+          : Math.max(-7200, Math.min(7200, parsedSecond - Math.floor(elapsedSeconds)));
+      await onSave(url.trim() ? url.trim() : null, offset);
+      toast({ title: "Vídeo sincronizado 🎬", description: "Los clips se marcarán con el timecode exacto." });
+    } catch (err) {
+      console.error("Error guardando el vídeo:", err);
+      toast({
+        title: "No se pudo guardar el vídeo",
+        description: err instanceof Error ? err.message : "Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-[#071509]/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 z-50"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Sincronizar vídeo"
+    >
+      <div
+        className="bg-[#0f2317] border border-[#1c3a26] rounded-2xl p-5 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center border-b border-[#1c3a26] pb-3">
+          <h3 className="text-lg font-bold text-cream flex items-center gap-2">
+            <Video className="w-5 h-5 text-brand-400" aria-hidden /> Vídeo de la grabación
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-[#a9bca9] hover:text-cream text-xl font-bold p-1"
+            aria-label="Cerrar panel de vídeo"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="video-url" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
+            Enlace del vídeo (mp4 o plataforma)
+          </label>
+          <input
+            id="video-url"
+            type="url"
+            inputMode="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://…"
+            className="w-full rounded-lg border border-[#2a4a34] bg-[#0a1a10] px-3 py-2.5 text-sm text-cream placeholder:text-[#4a5f4c] focus:outline-none focus:border-brand-500"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="video-second" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
+            El vídeo está ahora en el segundo…
+          </label>
+          <input
+            id="video-second"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={videoSecond}
+            onChange={(e) => setVideoSecond(e.target.value)}
+            placeholder="p. ej. 540"
+            className={`w-full rounded-lg border bg-[#0a1a10] px-3 py-2.5 text-sm text-cream placeholder:text-[#4a5f4c] focus:outline-none ${
+              secondValid ? "border-[#2a4a34] focus:border-brand-500" : "border-red-500/70"
+            }`}
+          />
+          <p className="text-[11px] leading-snug text-[#8aa28d]">
+            Pon el vídeo en el mismo instante que el reloj{" "}
+            <span className="font-bold text-cream">{formatClock(elapsedSeconds)}</span> y escribe
+            el segundo del vídeo. Así cada toque quedará enlazado a su timecode exacto
+            para el clip-review.
+          </p>
+        </div>
+
+        <button
+          onClick={handleSave}
+          disabled={saving || !secondValid}
+          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-3 text-sm font-black text-[#0a1a10] hover:bg-brand-500 transition-colors disabled:opacity-60 active:scale-[0.98]"
+        >
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Video className="w-4 h-4" aria-hidden />}
+          Guardar sincronización
+        </button>
+      </div>
     </div>
   );
 }

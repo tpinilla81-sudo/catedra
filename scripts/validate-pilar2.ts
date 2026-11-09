@@ -151,7 +151,7 @@ const testTeam = await raw.team.create({
 
 // Jugador preexistente (para el camino "updated" por matching de nombre)
 const preExisting = await dbA.player.create({
-  data: { teamId: testTeam.id, firstName: "Iker", lastName: "Mendoza", shirtNumber: 20, mainPosition: "RW", isActive: true },
+  data: { teamId: testTeam.id, firstName: "Iker", lastName: "Mendoza", shirtNumber: 20, primaryPosition: "RW", isActive: true },
 });
 
 // CSV mixto (columna "Jugador" = nombre completo): 2 nuevos + 1 existente
@@ -185,20 +185,20 @@ check(
 const aitor = await dbA.player.findFirstOrThrow({ where: { teamId: testTeam.id, firstName: "Aitor" } });
 check(
   "metadata: posición principal CB + secundarias [CM, LB] (array nativo)",
-  aitor.mainPosition === "CB" && JSON.stringify(aitor.secondaryPositions) === JSON.stringify(["CM", "LB"]),
-  JSON.stringify({ m: aitor.mainPosition, s: aitor.secondaryPositions }),
+  aitor.primaryPosition === "CB" && JSON.stringify(aitor.secondaryPositions) === JSON.stringify(["CM", "LB"]),
+  JSON.stringify({ m: aitor.primaryPosition, s: aitor.secondaryPositions }),
 );
 check("metadata: rating técnico clamped '3,5' → 4", aitor.technicalRating === 4 && aitor.tacticalRating === 4 && aitor.physicalRating === 2);
 check("metadata: dorsal 4 asignado", aitor.shirtNumber === 4);
 
 const markel = await dbA.player.findFirstOrThrow({ where: { teamId: testTeam.id, firstName: "Markel" } });
-check("metadata: portero GK con nota 'Sin problemas'", markel.mainPosition === "GK" && markel.statusNote === "Sin problemas");
+check("metadata: portero GK con nota 'Sin problemas'", markel.primaryPosition === "GK" && markel.statusNote === "Sin problemas");
 
 const iker = await dbA.player.findFirstOrThrow({ where: { id: preExisting.id } });
 check(
   "actualización: RW → LW, dorsal 20 → 11, estado INJURED con nota",
-  iker.mainPosition === "LW" && iker.shirtNumber === 11 && iker.status === "INJURED" && iker.statusNote === "Molestias tobillo izq.",
-  JSON.stringify({ p: iker.mainPosition, d: iker.shirtNumber, st: iker.status }),
+  iker.primaryPosition === "LW" && iker.shirtNumber === 11 && iker.status === "INJURED" && iker.statusNote === "Molestias tobillo izq.",
+  JSON.stringify({ p: iker.primaryPosition, d: iker.shirtNumber, st: iker.status }),
 );
 check("actualización: ratings sobrescritos 5/3/3", iker.technicalRating === 5 && iker.tacticalRating === 3 && iker.physicalRating === 3);
 
@@ -217,7 +217,7 @@ const CSV_DOS_COL = "Nombre,Apellidos,Posición,Dorsal\nXavi,Guardiola,DM,6";
 const summaryCols = await applySquadImport(dbA, testTeam, parseCsv(CSV_DOS_COL));
 check("import 2 columnas: nombre y apellidos separados", summaryCols.created === 1 && summaryCols.errors === 0, JSON.stringify(summaryCols.rows));
 const xavi = await dbA.player.findFirstOrThrow({ where: { teamId: testTeam.id, firstName: "Xavi" } });
-check("import 2 columnas: lastName 'Guardiola' + pivote DM", xavi.lastName === "Guardiola" && xavi.mainPosition === "DM");
+check("import 2 columnas: lastName 'Guardiola' + pivote DM", xavi.lastName === "Guardiola" && xavi.primaryPosition === "DM");
 
 // Importación XLSX real (buffer → File → fileToMatrix → applySquadImport)
 const wb = XLSX.utils.book_new();
@@ -237,7 +237,7 @@ if (!("matrix" in parsedXlsx)) throw new Error(parsedXlsx.error);
 const summaryX = await applySquadImport(dbA, testTeam, parsedXlsx.matrix);
 check("import XLSX: jugador creado con alias ingleses", summaryX.created === 1 && summaryX.errors === 0, JSON.stringify(summaryX.rows));
 const unai = await dbA.player.findFirstOrThrow({ where: { teamId: testTeam.id, firstName: "Unai" } });
-check("import XLSX: GK con dorsal 13 persistido", unai.mainPosition === "GK" && unai.shirtNumber === 13);
+check("import XLSX: GK con dorsal 13 persistido", unai.primaryPosition === "GK" && unai.shirtNumber === 13);
 
 const csvFile = new File([new TextEncoder().encode(CSV_MIXTO)], "plantilla.csv");
 check("fileToMatrix: acepta .csv con BOM", "matrix" in (await fileToMatrix(new File([new Uint8Array([0xef, 0xbb, 0xbf]), new TextEncoder().encode("Nombre,Posición\nX,CM")], "a.csv"))));
@@ -263,7 +263,7 @@ const intruderTeam = await raw.team.create({
   data: { clubId: clubB.id, seasonId: (await raw.season.create({ data: { clubId: clubB.id, name: "S1", startDate: new Date(), endDate: new Date() } })).id, name: "Intruso" },
 });
 const intruderPlayer = await raw.player.create({
-  data: { clubId: clubB.id, teamId: intruderTeam.id, firstName: "Espía", lastName: "Intruso", mainPosition: "CM", isActive: true },
+  data: { clubId: clubB.id, teamId: intruderTeam.id, firstName: "Espía", lastName: "Intruso", primaryPosition: "CM", isActive: true },
 });
 
 const visible = await dbA.player.findMany();
@@ -271,14 +271,14 @@ check("club A NO ve jugadores del intruso", !visible.some((p: any) => p.clubId =
 
 let blocked = false;
 try {
-  await dbA.player.create({ data: { clubId: clubB.id, teamId: intruderTeam.id, firstName: "hack", lastName: "hack", mainPosition: "CM" } as any });
+  await dbA.player.create({ data: { clubId: clubB.id, teamId: intruderTeam.id, firstName: "hack", lastName: "hack", primaryPosition: "CM" } as any });
 } catch (e: any) {
   blocked = /Tenant Guard/.test(e?.message ?? "");
 }
 check("Tenant Guard bloquea create de jugador cross-tenant", blocked);
 
 let injected = false;
-const injectedPlayer = await dbA.player.create({ data: { teamId: testTeam.id, firstName: "Auto", lastName: "Club", mainPosition: "CM" } as any });
+const injectedPlayer = await dbA.player.create({ data: { teamId: testTeam.id, firstName: "Auto", lastName: "Club", primaryPosition: "CM" } as any });
 injected = injectedPlayer.clubId === clubA.id;
 check("create de jugador sin clubId → inyecta clubId del tenant", injected);
 

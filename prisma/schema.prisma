@@ -113,6 +113,21 @@ enum MatchStatus {
   ANALYZED /// Ingesta post-partido completada
 }
 
+/// Tipo de evento de telemetría en directo (Pilar 3 · marcado exprés)
+enum TelemetryType {
+  FATIGUE /// Semáforo de fatiga del jugador
+  CLINICAL /// Aviso clínico (molestia / golpe fuerte)
+  TACTICAL /// Lectura táctica del plan sobre el jugador
+  ACTION /// Hecho de juego (gol, remate, pérdida, recuperación...)
+}
+
+/// Estado del cronómetro de la sesión en directo
+enum MatchSessionStatus {
+  LIVE /// Cronómetro corriendo
+  PAUSED /// Descanso / pausa manual
+  FINISHED /// Partido terminado
+}
+
 /// Ciclo de vida del microciclo semanal ("cero pantallas en blanco")
 enum MicrocycleStatus {
   PROPOSED /// Cocinado por el motor — el míster lo encuentra el lunes listo
@@ -159,6 +174,9 @@ model Club {
   microcycles     Microcycle[]
   engineRuns      EngineRun[]
   opponentReports OpponentReport[] /// Scouting de rival (P4.1)
+  matchSessions   MatchSession[] /// Sesiones en directo (Pilar 3)
+  telemetryEvents MatchTelemetryEvent[] /// Telemetría en directo (Pilar 3)
+  videoBookmarks  VideoBookmark[] /// Marcadores de vídeo (Pilar 3)
 }
 
 /// Usuario autenticado (email + contraseña, sesión JWT con NextAuth).
@@ -223,6 +241,9 @@ model Team {
   microcycles     Microcycle[]
   engineRuns      EngineRun[]
   opponentReports OpponentReport[] /// Scouting de rival (P4.1)
+  matchSessions   MatchSession[] /// Sesiones en directo (Pilar 3)
+  telemetryEvents MatchTelemetryEvent[] /// Telemetría en directo (Pilar 3)
+  videoBookmarks  VideoBookmark[] /// Marcadores de vídeo (Pilar 3)
   openByUsers     User[]           @relation("UserLastTeam")
 
   @@unique([seasonId, name])
@@ -230,7 +251,8 @@ model Team {
 }
 
 /// Ficha ágil de jugador — nombre, dorsal, demarcación y polivalencias.
-/// Los ratings cualitativos (1-5) se editan con un toque; sin formularios largos.
+/// El perfil PRE-PARTIDO (Pilar 2) se reduce a las 5 métricas esenciales que
+/// el cuerpo técnico mira antes de alinear; se editan con un toque.
 model Player {
   id                 String       @id @default(cuid())
   clubId             String
@@ -238,8 +260,8 @@ model Player {
   firstName          String
   lastName           String
   shirtNumber        Int? /// Dorsal
-  mainPosition       Position /// Demarcación principal (vital para el motor)
-  secondaryPositions Position[] /// Polivalencias — array nativo de PostgreSQL
+  primaryPosition    String /// Demarcación principal (código: GK, CB, DM, LW...) — String para admitir demarcaciones propias del fútbol base
+  secondaryPositions String[] /// Polivalencias — array nativo de PostgreSQL
   technicalRating    Int? /// Perfil técnico 1-5
   tacticalRating     Int? /// Perfil táctico 1-5
   physicalRating     Int? /// Perfil físico 1-5
@@ -247,13 +269,13 @@ model Player {
   status             PlayerStatus @default(AVAILABLE)
   statusNote         String? /// Apunte corto: "molestias tobillo izq."
 
-  /// ---- PERFIL PRE-PARTIDO (Pilar 2 · decisión del cuerpo técnico) ----
+  /// ---- PERFIL PRE-PARTIDO (Pilar 2 · las 5 métricas esenciales) ----
   /// Lo que el míster mira antes de alinear: frescura muscular, riesgo
-  /// médico, carga invisible y el atributo que desequilibra el plan.
-  currentRpe          Int?    /// Carga física / fatiga reciente (RPE 1-10)
-  injuryHistory       String? /// Lesiones activas o precauciones médicas
-  academicConstraints String? /// Disponibilidad por horarios / estrés académico
-  strength            String? /// Atributo o fortaleza principal destacada
+  /// médico, carga académica y el atributo que desequilibra el plan.
+  fatigueRPE         Int?    /// Carga física / fatiga reciente (RPE 1-10)
+  medicalNotes       String? /// Precauciones médicas / lesiones activas
+  academicStress     String? /// Estrés académico / disponibilidad por estudios
+  tacticalStrength   String  @default("") /// Fortaleza táctica principal del jugador
 
   isActive           Boolean      @default(true) /// Baja lógica: nunca se borra historia
   createdAt          DateTime     @default(now())
@@ -265,10 +287,11 @@ model Player {
   matchNotes        PlayerMatchNote[] /// Notas individuales post-partido
   attendanceRecords AttendanceRecord[] /// Asistencia y carga por sesión (fútbol base)
   liveEvaluations   LiveMatchEvaluation[] /// Evaluaciones en directo desde la pizarra
+  telemetryEvents   MatchTelemetryEvent[] /// Telemetría en directo (Pilar 3)
 
   @@unique([teamId, shirtNumber])
   @@index([clubId, teamId])
-  @@index([mainPosition])
+  @@index([primaryPosition])
 }
 
 /// Pulso Colectivo del vestuario — se captura en segundos tras el partido.
@@ -319,6 +342,8 @@ model Match {
   usedInMicrocycles MicrocycleMatch[] /// Partidos que alimentaron cada microciclo
   opponentReport    OpponentReport? /// Informe de scouting de este rival (1:1 opcional, P4.1)
   liveEvaluations   LiveMatchEvaluation[] /// Evaluación en directo de cada jugador
+  liveSession       MatchSession? /// Sesión en directo (cronómetro + vídeo, 1:1)
+  telemetryEvents   MatchTelemetryEvent[] /// Telemetría en directo (Pilar 3)
 
   @@index([teamId, kickoffAt])
   @@index([clubId, status])
@@ -754,4 +779,92 @@ enum ClinicalFlag {
 enum TacticalFlag {
   EXPLOITING /// ⭐ Explotando su fortaleza — el plan le beneficia
   STRUGGLING /// ⚠️ Sufriendo / Necesita ajuste — revisar el plan
+}
+
+// ============================================================================
+// PILAR 3 · TELEMETRÍA EN DIRECTO — sesión, eventos 1-toque y vídeo sincronizado
+// ----------------------------------------------------------------------------
+// Capa de alta frecuencia del día de partido: cronómetro autoritativo en el
+// servidor (sobrevive a recargas y a cambios de dispositivo), eventos
+// minute-stamped con coordenadas opcionales de campo y marcadores que enlazan
+// cada evento con su instante exacto del vídeo para el clip-review posterior.
+// Todos los modelos llevan clubId propio (CLUB_SCOPED en el Tenant Guard) para
+// que las escrituras de alta frecuencia no paguen joins de aislamiento.
+// ============================================================================
+
+/// Sesión en directo de un partido (1:1 con Match, se crea al arrancar el reloj).
+/// Reloj autoritativo: segundos acumulados (pausas) + instante de arranque.
+/// elapsedSeconds = clockBaseSeconds + (status LIVE ? ahora − clockStartedAt : 0)
+model MatchSession {
+  id                  String             @id @default(cuid())
+  clubId              String
+  teamId              String
+  matchId             String             @unique
+  status              MatchSessionStatus @default(LIVE)
+  clockBaseSeconds    Float              @default(0) /// Segundos acumulados en pausas/descanso
+  clockStartedAt      DateTime?          /// null = reloj parado; instante del arranque/resume
+  videoUrl            String?            /// Vídeo de la grabación (mp4 directo o enlace externo)
+  videoOffsetSeconds  Float              @default(0) /// vídeo(s) = partido(s) + offset (sincro 1 vez)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  club    Club                  @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  team    Team                  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  match   Match                 @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  telemetryEvents MatchTelemetryEvent[] /// Eventos loggeados durante la sesión
+
+  @@index([clubId, teamId])
+}
+
+/// Evento de telemetría en directo — un toque = una fila. Alta frecuencia,
+/// minute-stamped por el reloj de la sesión y con coordenadas opcionales
+/// (0-100) para el mapa de calor post-partido. Los ejes FATIGUE / CLINICAL /
+/// TACTICAL actualizan a la vez el ESTADO (LiveMatchEvaluation) del tablón;
+/// ACTION son hechos que se acumulan.
+model MatchTelemetryEvent {
+  id             String        @id @default(cuid())
+  clubId         String
+  teamId         String
+  matchId        String
+  matchSessionId String
+  playerId       String? /// null = hecho colectivo sin responsable claro
+  minute         Int /// Minuto de partido según el reloj de la sesión
+  timestamp      DateTime      @default(now()) /// Hora real del toque
+  type           TelemetryType
+  value          String /// "FRESH" · "MINOR" · "GOAL_FOR"... o texto libre ≤ 140
+  coordinatesX   Float? /// 0-100 (ancho del campo)
+  coordinatesY   Float? /// 0-100 (profundidad del campo)
+  createdAt      DateTime      @default(now())
+
+  club         Club                 @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  team         Team                 @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  match        Match                @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  matchSession MatchSession         @relation(fields: [matchSessionId], references: [id], onDelete: Cascade)
+  player       Player?              @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  bookmark     VideoBookmark?       /// Instante de vídeo enlazado (1:1)
+
+  @@index([matchId, playerId]) /// Historia por jugador → clip-review
+  @@index([matchId, minute]) /// Línea temporal del partido
+  @@index([matchSessionId, minute])
+}
+
+/// Marcador de vídeo: enlaza un evento en directo con el instante exacto del
+/// vídeo de la grabación (1:1 por evento, upsert). Con el offset de la sesión,
+/// videoTimestampSeconds = (minute·60) + videoOffsetSeconds salvo ajuste manual.
+model VideoBookmark {
+  id                    String   @id @default(cuid())
+  clubId                String
+  teamId                String
+  telemetryEventId      String   @unique
+  videoTimestampSeconds Float /// Segundo exacto del vídeo para el clip
+  videoUrl              String? /// Permite sobreescribir el vídeo del evento concreto
+  notes                 String? /// Apunte corto para el clip-review
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  club           Club                @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  team           Team                @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  telemetryEvent MatchTelemetryEvent @relation(fields: [telemetryEventId], references: [id], onDelete: Cascade)
+
+  @@index([clubId])
 }

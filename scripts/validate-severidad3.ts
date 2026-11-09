@@ -251,7 +251,7 @@ async function feasibilityTeam(name: string, players: number, pulseFatigue: numb
         firstName: `J${i}`,
         lastName: "S3",
         shirtNumber: i + 1,
-        mainPosition: "CM",
+        primaryPosition: "CM",
         status: "AVAILABLE",
         isActive: true,
       },

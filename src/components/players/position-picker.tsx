@@ -24,11 +24,11 @@ export function PositionPicker({
   return (
     <div className="space-y-2">
       <div>
-        <label htmlFor="main-position" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
+        <label htmlFor="primary-position" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
           Demarcación principal
         </label>
         <select
-          id="main-position"
+          id="primary-position"
           value={main}
           onChange={(e) => onMainChange(e.target.value)}
           className="mt-1 w-full min-h-[48px] rounded-2xl bg-cream-dark/70 border border-cream-border-strong text-peel px-3 text-sm font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-600"

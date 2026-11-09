@@ -59,7 +59,7 @@ export default async function MatchIngestPage({
     firstName: p.firstName,
     lastName: p.lastName,
     shirtNumber: p.shirtNumber,
-    mainPosition: p.mainPosition,
+    primaryPosition: p.primaryPosition,
   }));
 
   const initialReport: IngestReportData | null = match.report

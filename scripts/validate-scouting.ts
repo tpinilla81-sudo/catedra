@@ -289,7 +289,7 @@ for (let i = 0; i < 6; i++) {
       firstName: `J${i}`,
       lastName: "P41",
       shirtNumber: i + 1,
-      mainPosition: "CM",
+      primaryPosition: "CM",
       status: "AVAILABLE",
       isActive: true,
     },

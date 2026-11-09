@@ -6,12 +6,12 @@ const mk = (n: number, first: string, last: string, pos: string): LivePlayerData
   firstName: first,
   lastName: last,
   shirtNumber: n,
-  mainPosition: pos,
+  primaryPosition: pos,
   secondaryPositions: [],
-  currentRpe: null,
-  injuryHistory: null,
-  academicConstraints: null,
-  strength: null,
+  fatigueRPE: null,
+  medicalNotes: null,
+  academicStress: null,
+  tacticalStrength: null,
   status: "AVAILABLE",
   statusNote: null,
 });
@@ -40,7 +40,7 @@ for (const p of once) {
   const key = `${s.x},${s.y}`;
   if (seen.has(key)) { console.log(`❌ SOLAPE: ${seen.get(key)} y ${p.firstName} en ${key}`); failures++; }
   seen.set(key, p.firstName);
-  console.log(`${p.firstName.padEnd(7)} ${p.mainPosition.padEnd(3)} → x=${String(s.x).padStart(5)} y=${String(s.y).padStart(4)}`);
+  console.log(`${p.firstName.padEnd(7)} ${p.primaryPosition.padEnd(3)} → x=${String(s.x).padStart(5)} y=${String(s.y).padStart(4)}`);
 }
 
 const gk = slots.get("p1")!;

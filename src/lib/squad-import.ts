@@ -41,22 +41,22 @@ export type PlayerQuickPatch = {
   tacticalRating?: number | null;
   physicalRating?: number | null;
   statusNote?: string | null;
-  mainPosition?: string | null;
+  primaryPosition?: string | null;
   secondaryPositions?: string[] | null;
   // --- Perfil pre-partido (decisión del cuerpo técnico) ---
-  currentRpe?: number | null;
-  injuryHistory?: string | null;
-  academicConstraints?: string | null;
-  strength?: string | null;
+  fatigueRPE?: number | null;
+  medicalNotes?: string | null;
+  academicStress?: string | null;
+  tacticalStrength?: string | null;
 };
 
 // ---------- Perfil pre-partido: saneado puro (testable sin servidor) ----------
 
 export type PlayerProfilePatch = {
-  currentRpe?: number | null;
-  injuryHistory?: string | null;
-  academicConstraints?: string | null;
-  strength?: string | null;
+  fatigueRPE?: number | null;
+  medicalNotes?: string | null;
+  academicStress?: string | null;
+  tacticalStrength?: string | null;
 };
 
 export const RPE_MIN = 1;
@@ -80,39 +80,39 @@ function cleanProfileText(raw: string | null | undefined, max = PROFILE_TEXT_MAX
  */
 export function sanitizePlayerProfilePatch(raw: PlayerProfilePatch): {
   data: {
-    currentRpe?: number | null;
-    injuryHistory?: string | null;
-    academicConstraints?: string | null;
-    strength?: string | null;
+    fatigueRPE?: number | null;
+    medicalNotes?: string | null;
+    academicStress?: string | null;
+    tacticalStrength?: string; /// NOT NULL en la base: "" = borrar (sin null)
   };
   rpeOutOfRange: boolean;
 } {
   let rpeOutOfRange = false;
-  let currentRpe: number | null | undefined;
-  if (raw.currentRpe !== undefined) {
-    if (raw.currentRpe === null) {
-      currentRpe = null;
+  let fatigueRPE: number | null | undefined;
+  if (raw.fatigueRPE !== undefined) {
+    if (raw.fatigueRPE === null) {
+      fatigueRPE = null;
     } else {
-      const n = Math.round(Number(raw.currentRpe));
+      const n = Math.round(Number(raw.fatigueRPE));
       if (!Number.isFinite(n) || n < RPE_MIN || n > RPE_MAX) {
         rpeOutOfRange = true;
-        currentRpe = Math.min(RPE_MAX, Math.max(RPE_MIN, Number.isFinite(n) ? n : RPE_MIN));
+        fatigueRPE = Math.min(RPE_MAX, Math.max(RPE_MIN, Number.isFinite(n) ? n : RPE_MIN));
       } else {
-        currentRpe = n;
+        fatigueRPE = n;
       }
     }
   }
 
   const data: {
-    currentRpe?: number | null;
-    injuryHistory?: string | null;
-    academicConstraints?: string | null;
-    strength?: string | null;
+    fatigueRPE?: number | null;
+    medicalNotes?: string | null;
+    academicStress?: string | null;
+    tacticalStrength?: string; /// NOT NULL en la base: "" = borrar (sin null)
   } = {};
-  if (currentRpe !== undefined) data.currentRpe = currentRpe;
-  if (raw.injuryHistory !== undefined) data.injuryHistory = cleanProfileText(raw.injuryHistory);
-  if (raw.academicConstraints !== undefined) data.academicConstraints = cleanProfileText(raw.academicConstraints);
-  if (raw.strength !== undefined) data.strength = cleanProfileText(raw.strength);
+  if (fatigueRPE !== undefined) data.fatigueRPE = fatigueRPE;
+  if (raw.medicalNotes !== undefined) data.medicalNotes = cleanProfileText(raw.medicalNotes);
+  if (raw.academicStress !== undefined) data.academicStress = cleanProfileText(raw.academicStress);
+  if (raw.tacticalStrength !== undefined) data.tacticalStrength = cleanProfileText(raw.tacticalStrength) ?? "";
 
   return { data, rpeOutOfRange };
 }
@@ -227,7 +227,7 @@ export const HEADER_ALIASES: Record<string, string[]> = {
   rpe: ["rpe", "rpe actual", "carga", "fatiga", "carga fisica", "esfuerzo", "percepcion de esfuerzo"],
   injuries: ["lesiones", "lesion", "lesiones activas", "historial de lesiones", "precauciones medicas", "clinico", "medical"],
   academic: ["horarios", "horario", "academico", "estres academico", "restricciones academicas", "disponibilidad academica", "examenes", "examen"],
-  strength: ["fortaleza", "fortaleza principal", "punto fuerte", "atributo", "atributo principal", "strength"],
+  tacticalStrength: ["fortaleza", "fortaleza principal", "punto fuerte", "atributo", "atributo principal", "tacticalStrength"],
 };
 
 export function buildColumnMap(headerRow: string[]): Record<string, number> {
@@ -370,13 +370,13 @@ export async function applySquadImport(
     const displayName = `${firstName} ${lastName}`.trim();
 
     const posRaw = cell(row, "position");
-    const mainPosition = normalizePosition(posRaw);
+    const primaryPosition = normalizePosition(posRaw);
 
     if (!firstName) {
       rows.push({ row: rowNo, name: displayName || "(sin nombre)", ok: false, action: "error", error: "Falta el nombre del jugador." });
       continue;
     }
-    if (!mainPosition) {
+    if (!primaryPosition) {
       rows.push({ row: rowNo, name: displayName, ok: false, action: "error", error: `Posición "${posRaw}" no reconocida (usa GK, CB, LB, RB, DM, CM, AM, LM, RM, LW, RW, SS, CF o su nombre castellano).` });
       continue;
     }
@@ -397,7 +397,7 @@ export async function applySquadImport(
 
     const existing = byName.get(key);
 
-    const secondary = parseSecondary(cell(row, "secondary"), mainPosition);
+    const secondary = parseSecondary(cell(row, "secondary"), primaryPosition);
     const technical = clampRating(cell(row, "technical"));
     const tactical = clampRating(cell(row, "tactical"));
     const physical = clampRating(cell(row, "physical"));
@@ -406,10 +406,10 @@ export async function applySquadImport(
 
     // Perfil pre-partido (columnas opcionales del CSV)
     const profileRaw: PlayerProfilePatch = {
-      currentRpe: cell(row, "rpe") ? parseRpeValue(cell(row, "rpe")) : undefined,
-      injuryHistory: cell(row, "injuries") ? cell(row, "injuries") : undefined,
-      academicConstraints: cell(row, "academic") ? cell(row, "academic") : undefined,
-      strength: cell(row, "strength") ? cell(row, "strength") : undefined,
+      fatigueRPE: cell(row, "rpe") ? parseRpeValue(cell(row, "rpe")) : undefined,
+      medicalNotes: cell(row, "injuries") ? cell(row, "injuries") : undefined,
+      academicStress: cell(row, "academic") ? cell(row, "academic") : undefined,
+      tacticalStrength: cell(row, "tacticalStrength") ? cell(row, "tacticalStrength") : undefined,
     };
     const profile = sanitizePlayerProfilePatch(profileRaw);
 
@@ -421,7 +421,7 @@ export async function applySquadImport(
             firstName,
             lastName,
             ...(shirtNumber !== null ? { shirtNumber } : {}),
-            mainPosition: mainPosition as Position,
+            primaryPosition: primaryPosition as Position,
             secondaryPositions: secondary as Position[],
             ...(technical !== null ? { technicalRating: technical } : {}),
             ...(tactical !== null ? { tacticalRating: tactical } : {}),
@@ -441,7 +441,7 @@ export async function applySquadImport(
             firstName,
             lastName,
             shirtNumber,
-            mainPosition: mainPosition as Position,
+            primaryPosition: primaryPosition as Position,
             secondaryPositions: secondary as Position[],
             technicalRating: technical,
             tacticalRating: tactical,

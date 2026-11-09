@@ -37,12 +37,12 @@ export function NewPlayerDialog() {
     firstName: "",
     lastName: "",
     shirtNumber: "",
-    mainPosition: "CM",
+    primaryPosition: "CM",
     secondary: [] as string[],
-    currentRpe: "",
-    injuryHistory: "",
-    academicConstraints: "",
-    strength: "",
+    fatigueRPE: "",
+    medicalNotes: "",
+    academicStress: "",
+    tacticalStrength: "",
   });
   const { toast } = useToast();
 
@@ -51,12 +51,12 @@ export function NewPlayerDialog() {
       firstName: "",
       lastName: "",
       shirtNumber: "",
-      mainPosition: "CM",
+      primaryPosition: "CM",
       secondary: [],
-      currentRpe: "",
-      injuryHistory: "",
-      academicConstraints: "",
-      strength: "",
+      fatigueRPE: "",
+      medicalNotes: "",
+      academicStress: "",
+      tacticalStrength: "",
     });
     setError(null);
   }
@@ -64,18 +64,18 @@ export function NewPlayerDialog() {
   function submit() {
     if (pending) return;
     setError(null);
-    const rpeTrim = form.currentRpe.trim();
+    const rpeTrim = form.fatigueRPE.trim();
     startTransition(async () => {
       const res = await createPlayer({
         firstName: form.firstName,
         lastName: form.lastName,
         shirtNumber: form.shirtNumber.trim() === "" ? null : Number(form.shirtNumber),
-        mainPosition: form.mainPosition,
+        primaryPosition: form.primaryPosition,
         secondaryPositions: form.secondary,
-        currentRpe: rpeTrim === "" ? null : Number(rpeTrim),
-        injuryHistory: form.injuryHistory.trim() || null,
-        academicConstraints: form.academicConstraints.trim() || null,
-        strength: form.strength.trim() || null,
+        fatigueRPE: rpeTrim === "" ? null : Number(rpeTrim),
+        medicalNotes: form.medicalNotes.trim() || null,
+        academicStress: form.academicStress.trim() || null,
+        tacticalStrength: form.tacticalStrength.trim() || null,
       });
       if (res.ok) {
         toast({
@@ -174,17 +174,17 @@ export function NewPlayerDialog() {
                 className="mt-1 min-h-[48px] rounded-2xl bg-cream-dark/70 border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
                 placeholder={`1-${RPE_MAX}, vacío = sin marcar`}
                 maxLength={2}
-                value={form.currentRpe}
-                onChange={(e) => setForm((f) => ({ ...f, currentRpe: e.target.value.replace(/\D/g, "") }))}
+                value={form.fatigueRPE}
+                onChange={(e) => setForm((f) => ({ ...f, fatigueRPE: e.target.value.replace(/\D/g, "") }))}
               />
             </div>
           </div>
 
           <PositionPicker
-            main={form.mainPosition}
+            main={form.primaryPosition}
             secondary={form.secondary}
             onMainChange={(p) =>
-              setForm((f) => ({ ...f, mainPosition: p, secondary: f.secondary.filter((s) => s !== p) }))
+              setForm((f) => ({ ...f, primaryPosition: p, secondary: f.secondary.filter((s) => s !== p) }))
             }
             onToggleSecondary={(p) =>
               setForm((f) => ({
@@ -205,8 +205,8 @@ export function NewPlayerDialog() {
               className="mt-1 min-h-[64px] rounded-2xl bg-cream-dark/70 border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
               placeholder="Ej.: esguince de tobillo derecho, alta prevista en 3 semanas"
               maxLength={500}
-              value={form.injuryHistory}
-              onChange={(e) => setForm((f) => ({ ...f, injuryHistory: e.target.value }))}
+              value={form.medicalNotes}
+              onChange={(e) => setForm((f) => ({ ...f, medicalNotes: e.target.value }))}
             />
           </div>
 
@@ -219,22 +219,22 @@ export function NewPlayerDialog() {
               className="mt-1 min-h-[64px] rounded-2xl bg-cream-dark/70 border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
               placeholder="Ej.: exámenes esta semana, llega tarde los martes"
               maxLength={500}
-              value={form.academicConstraints}
-              onChange={(e) => setForm((f) => ({ ...f, academicConstraints: e.target.value }))}
+              value={form.academicStress}
+              onChange={(e) => setForm((f) => ({ ...f, academicStress: e.target.value }))}
             />
           </div>
 
           <div>
-            <Label htmlFor="np-strength" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
+            <Label htmlFor="np-tacticalStrength" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
               Fortaleza principal
             </Label>
             <Input
-              id="np-strength"
+              id="np-tacticalStrength"
               className="mt-1 min-h-[48px] rounded-2xl bg-cream-dark/70 border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
               placeholder="Ej.: desmarque al espacio"
               maxLength={500}
-              value={form.strength}
-              onChange={(e) => setForm((f) => ({ ...f, strength: e.target.value }))}
+              value={form.tacticalStrength}
+              onChange={(e) => setForm((f) => ({ ...f, tacticalStrength: e.target.value }))}
             />
           </div>
 

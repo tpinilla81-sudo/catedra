@@ -63,10 +63,10 @@ async function main() {
     data: { clubId: clubB.id, seasonId: seasonB.id, name: "Audit Team B" },
   });
   const playerA = await db.player.create({
-    data: { clubId: clubA.id, teamId: teamA.id, firstName: "Probe", lastName: "Uno", mainPosition: "CM" },
+    data: { clubId: clubA.id, teamId: teamA.id, firstName: "Probe", lastName: "Uno", primaryPosition: "CM" },
   });
   const playerB = await db.player.create({
-    data: { clubId: clubB.id, teamId: teamB.id, firstName: "Probe", lastName: "Dos", mainPosition: "CM" },
+    data: { clubId: clubB.id, teamId: teamB.id, firstName: "Probe", lastName: "Dos", primaryPosition: "CM" },
   });
   const matchA = await db.match.create({
     data: { clubId: clubA.id, teamId: teamA.id, opponent: "Rival A", kickoffAt: new Date(Date.now() - 86400_000 * 3), status: "PLAYED", goalsFor: 1, goalsAgainst: 2 },
@@ -232,7 +232,7 @@ async function main() {
     try {
       await clientA.player.upsert({
         where: { id: playerA.id },
-        create: { clubId: clubA.id, teamId: teamA.id, firstName: "x", lastName: "x", mainPosition: "CM" },
+        create: { clubId: clubA.id, teamId: teamA.id, firstName: "x", lastName: "x", primaryPosition: "CM" },
         update: { clubId: clubB.id } as never,
       });
       const after = await db.player.findUnique({ where: { id: playerA.id } });

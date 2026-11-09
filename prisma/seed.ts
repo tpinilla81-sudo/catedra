@@ -140,7 +140,7 @@ async function main() {
         firstName: p.first,
         lastName: p.last,
         shirtNumber: p.shirt,
-        mainPosition: p.pos,
+        primaryPosition: p.pos,
         secondaryPositions: p.poly,
         technicalRating: p.tec,
         tacticalRating: p.tac,
@@ -171,7 +171,7 @@ async function main() {
         firstName: p.first,
         lastName: p.last,
         shirtNumber: p.shirt,
-        mainPosition: p.pos,
+        primaryPosition: p.pos,
         secondaryPositions: [],
       },
     });

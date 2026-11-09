@@ -24,7 +24,7 @@ export default async function PlayersPage() {
     firstName: p.firstName,
     lastName: p.lastName,
     shirtNumber: p.shirtNumber,
-    mainPosition: p.mainPosition,
+    primaryPosition: p.primaryPosition,
     secondaryPositions: p.secondaryPositions,
     technicalRating: p.technicalRating,
     tacticalRating: p.tacticalRating,
@@ -32,10 +32,10 @@ export default async function PlayersPage() {
     status: p.status,
     statusNote: p.statusNote,
     // --- Perfil pre-partido (decisión del cuerpo técnico) ---
-    currentRpe: p.currentRpe,
-    injuryHistory: p.injuryHistory,
-    academicConstraints: p.academicConstraints,
-    strength: p.strength,
+    fatigueRPE: p.fatigueRPE,
+    medicalNotes: p.medicalNotes,
+    academicStress: p.academicStress,
+    tacticalStrength: p.tacticalStrength,
   }));
 
   return (

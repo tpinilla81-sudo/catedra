@@ -239,7 +239,7 @@ for (let i = 0; i < 5; i++) {
       firstName: `Jugador${i}`,
       lastName: "Test",
       shirtNumber: i + 1,
-      mainPosition: "CM",
+      primaryPosition: "CM",
       status: "AVAILABLE",
       isActive: true,
     },
