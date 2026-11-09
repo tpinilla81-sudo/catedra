@@ -3,6 +3,7 @@
   "version": "0.2.1",
   "private": true,
   "scripts": {
+    "postinstall": "prisma generate",
     "dev": "node scripts/dev-postgres.mjs & node -e \"require('@prisma/client')\" 2>/dev/null || prisma generate; next dev -p 3000 2>&1 | tee dev.log",
     "local:up": "node scripts/dev-postgres.mjs",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",

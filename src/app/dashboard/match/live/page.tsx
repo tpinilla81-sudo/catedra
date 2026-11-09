@@ -11,7 +11,7 @@ import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ArrowLeft, Radio } from "lucide-react";
-import { AppNav } from "@/components/dashboard/app-nav";
+import { AppShell } from "@/components/dashboard/app-shell";
 import {
   LiveMatchBoard,
   type LiveEvaluationData,
@@ -27,7 +27,7 @@ export default async function LiveMatchPage({
   searchParams: Promise<{ g?: string }>;
 }) {
   const { g } = await searchParams;
-  const { db, team } = await requireTenantContext();
+  const { db, team, user } = await requireTenantContext();
 
   if (!g) notFound();
 
@@ -73,26 +73,27 @@ export default async function LiveMatchPage({
   }));
 
   return (
-    <main className="min-h-screen bg-zinc-950 pb-28">
-      <header className="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
+    <AppShell active="matches" userName={user.name} role={user.role}>
+    <main className="min-h-screen bg-[#0a1a10] pb-28">
+      <header className="sticky top-0 z-20 border-b border-[#1c3a26] bg-[#071509]/90 backdrop-blur">
         <div className="mx-auto max-w-5xl px-4 py-4">
           <Link
             href="/dashboard/matches"
-            className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs text-[#8aa28d] hover:text-[#c3d2c2] transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" aria-hidden /> Partidos
           </Link>
           <div className="mt-1.5 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-xs text-zinc-500 leading-tight truncate">
+              <p className="text-xs text-[#8aa28d] leading-tight truncate">
                 {format(match.kickoffAt, "EEE d MMM · HH:mm'h'", { locale: es })}
                 {match.competition ? ` · ${match.competition}` : ""}
               </p>
-              <h1 className="text-2xl font-black text-zinc-50 leading-tight truncate">
+              <h1 className="text-2xl font-black text-cream leading-tight truncate">
                 {match.isHome ? "vs" : "@"} {match.opponent}
               </h1>
             </div>
-            <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-emerald-500/50 bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-300">
+            <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-brand-600/50 bg-brand-600/10 px-3 py-1 text-xs font-bold text-brand-400">
               <Radio className="w-3.5 h-3.5 animate-pulse" aria-hidden /> Directo
             </span>
           </div>
@@ -105,13 +106,13 @@ export default async function LiveMatchPage({
           players={playerData}
           initialEvaluations={evaluationData}
         />
-        <p className="mt-3 text-xs text-zinc-600 px-1">
+        <p className="mt-3 text-xs text-[#6d8070] px-1">
           Cada toque se guarda al instante. Tras el pitido, registra la ingesta
           completa desde Partidos para alimentar al motor.
         </p>
       </div>
 
-      <AppNav active="matches" />
     </main>
+    </AppShell>
   );
 }

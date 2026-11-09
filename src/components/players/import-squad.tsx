@@ -82,19 +82,19 @@ export function ImportSquadDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button
-          className="min-h-[48px] rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700 font-bold"
+          className="min-h-[48px] rounded-2xl bg-cream-dark hover:bg-cream-border-strong text-peel border border-cream-border-strong font-bold"
           aria-label="Importar plantilla desde CSV o Excel"
         >
           <UploadCloud className="w-5 h-5" aria-hidden />
           <span>Importar</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="bg-zinc-900 border-zinc-800 rounded-3xl max-w-lg gap-4">
+      <DialogContent className="bg-white border-cream-border rounded-3xl max-w-lg gap-4">
         <DialogHeader>
-          <DialogTitle className="text-zinc-50 text-lg font-black">
+          <DialogTitle className="text-peel text-lg font-black">
             Importar plantilla
           </DialogTitle>
-          <DialogDescription className="text-zinc-400 text-sm">
+          <DialogDescription className="text-[#5d7263] text-sm">
             Arrastra un CSV o Excel con tus jugadores. Los que ya existan (por
             nombre) se actualizan; los nuevos se crean al instante.
           </DialogDescription>
@@ -121,15 +121,15 @@ export function ImportSquadDialog() {
           }}
           className={`flex flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed px-6 py-8 text-center transition cursor-pointer min-h-[160px] ${
             dragOver
-              ? "border-emerald-400 bg-emerald-500/10"
-              : "border-zinc-700 bg-zinc-950/60"
+              ? "border-brand-600 bg-brand-600/10"
+              : "border-cream-border-strong bg-cream-dark/70"
           }`}
         >
           {file ? (
             <>
-              <FileSpreadsheet className="w-8 h-8 text-emerald-300" aria-hidden />
-              <p className="font-bold text-zinc-100 break-all max-w-full">{file.name}</p>
-              <p className="text-xs text-zinc-500">{(file.size / 1024).toFixed(0)} KB</p>
+              <FileSpreadsheet className="w-8 h-8 text-brand-600" aria-hidden />
+              <p className="font-bold text-peel break-all max-w-full">{file.name}</p>
+              <p className="text-xs text-[#6c8070]">{(file.size / 1024).toFixed(0)} KB</p>
               <button
                 type="button"
                 onClick={(e) => {
@@ -137,16 +137,16 @@ export function ImportSquadDialog() {
                   setFile(null);
                   setSummary(null);
                 }}
-                className="mt-1 text-xs text-zinc-400 hover:text-zinc-200 inline-flex items-center gap-1 min-h-[44px] px-3"
+                className="mt-1 text-xs text-[#5d7263] hover:text-[#2a4630] inline-flex items-center gap-1 min-h-[44px] px-3"
               >
                 <X className="w-3 h-3" aria-hidden /> Quitar archivo
               </button>
             </>
           ) : (
             <>
-              <UploadCloud className="w-10 h-10 text-zinc-500" aria-hidden />
-              <p className="font-bold text-zinc-200">Arrastra aquí el archivo</p>
-              <p className="text-sm text-zinc-500">o toca para elegir (.csv, .xlsx, .xls)</p>
+              <UploadCloud className="w-10 h-10 text-[#6c8070]" aria-hidden />
+              <p className="font-bold text-[#2a4630]">Arrastra aquí el archivo</p>
+              <p className="text-sm text-[#6c8070]">o toca para elegir (.csv, .xlsx, .xls)</p>
             </>
           )}
           <input
@@ -163,14 +163,14 @@ export function ImportSquadDialog() {
           <button
             type="button"
             onClick={downloadTemplate}
-            className="text-sm font-semibold text-emerald-300 hover:text-emerald-200 inline-flex items-center gap-1.5 min-h-[44px] px-1"
+            className="text-sm font-semibold text-brand-600 hover:text-brand inline-flex items-center gap-1.5 min-h-[44px] px-1"
           >
             <Download className="w-4 h-4" aria-hidden /> Descargar plantilla CSV
           </button>
           <Button
             onClick={process}
             disabled={!file || pending}
-            className="min-h-[52px] rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black px-6"
+            className="min-h-[52px] rounded-2xl bg-brand-600 hover:bg-brand text-white font-black px-6"
           >
             {pending ? (
               <>
@@ -184,7 +184,7 @@ export function ImportSquadDialog() {
 
         {/* ---------- Resultado ---------- */}
         {summary?.error && (
-          <p className="rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-200 text-sm px-4 py-3">
+          <p className="rounded-2xl bg-[#c62f32]/15 border border-rose-500/40 text-[#8f1d22] text-sm px-4 py-3">
             {summary.error}
           </p>
         )}
@@ -192,17 +192,17 @@ export function ImportSquadDialog() {
         {summary && !summary.error && (
           <div className="space-y-2">
             <div className="flex gap-2 text-center">
-              <span className="flex-1 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 px-3 py-2 text-sm font-bold text-emerald-300">
+              <span className="flex-1 rounded-2xl bg-brand-600/15 border border-emerald-500/40 px-3 py-2 text-sm font-bold text-brand-600">
                 {summary.created} creados
               </span>
-              <span className="flex-1 rounded-2xl bg-sky-500/15 border border-sky-500/40 px-3 py-2 text-sm font-bold text-sky-300">
+              <span className="flex-1 rounded-2xl bg-sky-500/15 border border-sky-500/40 px-3 py-2 text-sm font-bold text-[#0369a1]">
                 {summary.updated} actualizados
               </span>
               <span
                 className={`flex-1 rounded-2xl px-3 py-2 text-sm font-bold border ${
                   summary.errors
-                    ? "bg-rose-500/15 border-rose-500/40 text-rose-300"
-                    : "bg-zinc-800 border-zinc-700 text-zinc-400"
+                    ? "bg-[#c62f32]/15 border-rose-500/40 text-[#b4232a]"
+                    : "bg-cream-dark border-cream-border-strong text-[#5d7263]"
                 }`}
               >
                 {summary.errors} errores
@@ -210,15 +210,15 @@ export function ImportSquadDialog() {
             </div>
 
             {failedRows.length > 0 && (
-              <div className="max-h-40 overflow-y-auto rounded-2xl border border-zinc-800 divide-y divide-zinc-800">
+              <div className="max-h-40 overflow-y-auto rounded-2xl border border-cream-border divide-y divide-cream-border">
                 {failedRows.map((r) => (
                   <div key={`${r.row}-${r.name}`} className="flex items-start gap-2 px-3 py-2 text-xs">
-                    <TriangleAlert className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" aria-hidden />
+                    <TriangleAlert className="w-4 h-4 text-[#8a6206] shrink-0 mt-0.5" aria-hidden />
                     <div>
-                      <p className="font-bold text-zinc-300">
+                      <p className="font-bold text-[#3d5844]">
                         Fila {r.row} · {r.name}
                       </p>
-                      <p className="text-zinc-500">{r.error}</p>
+                      <p className="text-[#6c8070]">{r.error}</p>
                     </div>
                   </div>
                 ))}
@@ -226,7 +226,7 @@ export function ImportSquadDialog() {
             )}
 
             {summary.errors === 0 && (
-              <p className="flex items-center gap-2 text-sm text-emerald-300 px-1">
+              <p className="flex items-center gap-2 text-sm text-brand-600 px-1">
                 <CheckCircle2 className="w-4 h-4" aria-hidden /> Plantilla al día.
               </p>
             )}

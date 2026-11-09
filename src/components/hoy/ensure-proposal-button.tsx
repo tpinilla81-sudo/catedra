@@ -31,7 +31,7 @@ export function EnsureProposalButton() {
     <Button
       onClick={handleCook}
       disabled={pending}
-      className="w-full h-20 text-xl font-bold rounded-3xl bg-amber-400 hover:bg-amber-300 text-zinc-950 shadow-lg shadow-amber-400/20 min-h-[44px]"
+      className="w-full h-20 text-xl font-bold rounded-3xl bg-[#e3a93c] hover:bg-[#d69a2d] text-peel shadow-lg shadow-[#e3a93c]/30 min-h-[44px]"
     >
       <ChefHat className="w-7 h-7 mr-3" aria-hidden />
       {pending ? "Cocinando la semana…" : "Cocinar propuesta del lunes"}

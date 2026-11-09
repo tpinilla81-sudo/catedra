@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Goal, LockKeyhole, Mail, UserRound } from "lucide-react";
+import { LockKeyhole, Mail, UserRound } from "lucide-react";
 
 export function LoginView() {
   const router = useRouter();
@@ -38,30 +38,35 @@ export function LoginView() {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4 bg-zinc-950">
+    <main className="min-h-screen flex items-center justify-center p-4 bg-cream">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-3">
-          <div className="mx-auto w-20 h-20 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
-            <Goal className="w-10 h-10 text-emerald-400" aria-hidden />
-          </div>
-          <h1 className="text-4xl font-black tracking-tight text-zinc-50">
-            MÉTODO
+          <img
+            src="/logo.svg"
+            alt="Logotipo de CATEDRA by Método"
+            className="mx-auto w-24 h-24 drop-shadow-sm"
+          />
+          <h1 className="text-4xl font-black tracking-tight text-peel leading-none">
+            CÁTEDRA
           </h1>
-          <p className="text-zinc-400">
+          <p className="text-xs font-bold uppercase tracking-[0.35em] text-brand-600">
+            by Método
+          </p>
+          <p className="text-[#5d7263]">
             El ecosistema del cuerpo técnico
           </p>
         </div>
 
         <form
-          className="space-y-5 rounded-3xl border border-zinc-800 bg-zinc-900 p-6"
+          className="space-y-5 rounded-3xl border border-cream-border bg-white p-6"
           onSubmit={(e) => {
             e.preventDefault();
             handleLogin();
           }}
         >
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-zinc-300 flex items-center gap-2">
-              <Mail className="w-4 h-4 text-zinc-500" aria-hidden />
+            <Label htmlFor="email" className="text-[#3d5844] flex items-center gap-2">
+              <Mail className="w-4 h-4 text-[#6c8070]" aria-hidden />
               Email del cuerpo técnico
             </Label>
             <Input
@@ -71,13 +76,13 @@ export function LoginView() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="h-14 text-lg rounded-2xl bg-zinc-950 border-zinc-700"
+              className="h-14 text-lg rounded-2xl bg-cream border-cream-border-strong"
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password" className="text-zinc-300 flex items-center gap-2">
-              <LockKeyhole className="w-4 h-4 text-zinc-500" aria-hidden />
+            <Label htmlFor="password" className="text-[#3d5844] flex items-center gap-2">
+              <LockKeyhole className="w-4 h-4 text-[#6c8070]" aria-hidden />
               Contraseña
             </Label>
             <Input
@@ -86,7 +91,7 @@ export function LoginView() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="h-14 text-lg rounded-2xl bg-zinc-950 border-zinc-700"
+              className="h-14 text-lg rounded-2xl bg-cream border-cream-border-strong"
               required
             />
           </div>
@@ -94,15 +99,15 @@ export function LoginView() {
           <Button
             type="submit"
             disabled={pending}
-            className="w-full h-16 text-xl font-bold rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 min-h-[44px]"
+            className="w-full h-16 text-xl font-bold rounded-2xl bg-brand-600 hover:bg-brand text-white min-h-[44px]"
           >
             <UserRound className="w-6 h-6 mr-2" aria-hidden />
             {pending ? "Entrando…" : "Entrar al vestuario"}
           </Button>
         </form>
 
-        <div className="text-center text-sm text-zinc-500 space-y-1 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
-          <p className="font-semibold text-zinc-400">Acceso demo (Fase 1)</p>
+        <div className="text-center text-sm text-[#6c8070] space-y-1 rounded-2xl border border-cream-border bg-white/80 p-4">
+          <p className="font-semibold text-[#5d7263]">Acceso demo (Fase 1)</p>
           <p>Míster · mister@cfmetodo.es · metodo2025</p>
           <p>Analista · analista@cfmetodo.es · metodo2025</p>
         </div>

@@ -82,20 +82,20 @@ const FATIGUE_THRESHOLD = 8;
 /** Color del chip RPE según la carga (fresco / justo / fatigado) */
 function rpeChipClass(rpe: number): string {
   const level = rpeLoadLevel(rpe);
-  if (level === "FRESH") return "bg-emerald-500/15 text-emerald-300 border border-emerald-500/40";
+  if (level === "FRESH") return "bg-brand-600/15 text-brand-400 border border-brand-600/40";
   if (level === "TIGHT") return "bg-amber-500/15 text-amber-300 border border-amber-500/40";
   return "bg-rose-500/15 text-rose-300 border border-rose-500/40";
 }
 
 function RatingBar({ label, value }: { label: string; value: number | null }) {
   return (
-    <div className="rounded-xl bg-zinc-800/50 px-2 py-1.5">
-      <p className="text-[10px] font-bold text-zinc-500 tracking-widest">{label}</p>
+    <div className="rounded-xl bg-cream-dark/60 px-2 py-1.5">
+      <p className="text-[10px] font-bold text-[#6c8070] tracking-widest">{label}</p>
       <div className="flex gap-0.5 mt-1" aria-label={`${label}: ${value ?? "sin valorar"} de 5`}>
         {[1, 2, 3, 4, 5].map((i) => (
           <span
             key={i}
-            className={`h-1.5 flex-1 rounded-full ${value && i <= value ? "bg-emerald-400" : "bg-zinc-700"}`}
+            className={`h-1.5 flex-1 rounded-full ${value && i <= value ? "bg-brand-400" : "bg-cream-border-strong"}`}
           />
         ))}
       </div>
@@ -115,27 +115,27 @@ function Stepper({
   max?: number;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl bg-zinc-800/60 px-3 py-2">
-      <span className="text-sm font-semibold text-zinc-300">{label}</span>
+    <div className="flex items-center justify-between rounded-2xl bg-cream-dark/70 px-3 py-2">
+      <span className="text-sm font-semibold text-[#3d5844]">{label}</span>
       <div className="flex items-center gap-2">
         <Button
           type="button"
           variant="outline"
           size="icon"
-          className="h-11 w-11 rounded-2xl border-zinc-700 bg-zinc-950 text-zinc-200 hover:bg-zinc-800"
+          className="h-11 w-11 rounded-2xl border-cream-border-strong bg-cream text-[#2a4630] hover:bg-cream-dark"
           onClick={() => onChange(Math.max(1, (value ?? Math.min(5, max)) - 1))}
           aria-label={`Bajar ${label}`}
         >
           <Minus className="w-5 h-5" aria-hidden />
         </Button>
-        <span className="w-8 text-center text-xl font-black text-zinc-50" aria-live="polite">
+        <span className="w-8 text-center text-xl font-black text-peel" aria-live="polite">
           {value ?? "–"}
         </span>
         <Button
           type="button"
           variant="outline"
           size="icon"
-          className="h-11 w-11 rounded-2xl border-zinc-700 bg-zinc-950 text-zinc-200 hover:bg-zinc-800"
+          className="h-11 w-11 rounded-2xl border-cream-border-strong bg-cream text-[#2a4630] hover:bg-cream-dark"
           onClick={() => onChange(Math.min(max, (value ?? Math.min(5, max)) + 1))}
           aria-label={`Subir ${label}`}
         >
@@ -285,11 +285,11 @@ export function PlayersView({
   return (
     <div>
       {/* ---------- Cabecera ---------- */}
-      <header className="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
+      <header className="border-b border-cream-border bg-white/60">
         <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs text-zinc-500 leading-tight truncate">Pilar 2 · {teamName}</p>
-            <h1 className="text-2xl font-black text-zinc-50 leading-tight">Plantilla</h1>
+            <p className="text-xs text-[#6c8070] leading-tight truncate">Pilar 2 · {teamName}</p>
+            <h1 className="text-2xl font-black text-peel leading-tight">Plantilla</h1>
           </div>
           <div className="flex items-center gap-2">
             <NewPlayerDialog />
@@ -301,25 +301,25 @@ export function PlayersView({
       <div className="mx-auto max-w-5xl px-4 space-y-5 pt-5">
         {/* ---------- Pulso de plantilla ---------- */}
         <section aria-label="Resumen de plantilla" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <div className="rounded-3xl bg-zinc-900 border border-zinc-800 p-4">
-            <p className="text-xs font-semibold text-zinc-400">JUGADORES</p>
-            <p className="text-2xl font-black text-zinc-50 mt-1">{players.length}</p>
+          <div className="rounded-3xl bg-white border border-cream-border p-4">
+            <p className="text-xs font-semibold text-[#5d7263]">JUGADORES</p>
+            <p className="text-2xl font-black text-peel mt-1">{players.length}</p>
           </div>
-          <div className="rounded-3xl bg-zinc-900 border border-zinc-800 p-4">
-            <p className="text-xs font-semibold text-zinc-400">DISPONIBLES</p>
-            <p className="text-2xl font-black text-emerald-400 mt-1">{stats.available}</p>
+          <div className="rounded-3xl bg-white border border-cream-border p-4">
+            <p className="text-xs font-semibold text-[#5d7263]">DISPONIBLES</p>
+            <p className="text-2xl font-black text-brand-600 mt-1">{stats.available}</p>
           </div>
-          <div className="rounded-3xl bg-zinc-900 border border-zinc-800 p-4">
-            <p className="text-xs font-semibold text-zinc-400">BAJAS</p>
-            <p className="text-2xl font-black text-rose-400 mt-1">{stats.out}</p>
+          <div className="rounded-3xl bg-white border border-cream-border p-4">
+            <p className="text-xs font-semibold text-[#5d7263]">BAJAS</p>
+            <p className="text-2xl font-black text-[#b4232a] mt-1">{stats.out}</p>
           </div>
-          <div className="rounded-3xl bg-zinc-900 border border-zinc-800 p-4">
-            <p className="text-xs font-semibold text-zinc-400">POLIVALENTES</p>
-            <p className="text-2xl font-black text-amber-300 mt-1">{stats.poly}</p>
+          <div className="rounded-3xl bg-white border border-cream-border p-4">
+            <p className="text-xs font-semibold text-[#5d7263]">POLIVALENTES</p>
+            <p className="text-2xl font-black text-[#8a6206] mt-1">{stats.poly}</p>
           </div>
-          <div className="rounded-3xl bg-zinc-900 border border-zinc-800 p-4">
-            <p className="text-xs font-semibold text-zinc-400">CARGA ALTA</p>
-            <p className="text-2xl font-black text-rose-300 mt-1">{stats.fatigued}</p>
+          <div className="rounded-3xl bg-white border border-cream-border p-4">
+            <p className="text-xs font-semibold text-[#5d7263]">CARGA ALTA</p>
+            <p className="text-2xl font-black text-[#b4232a] mt-1">{stats.fatigued}</p>
           </div>
         </section>
 
@@ -341,17 +341,17 @@ export function PlayersView({
                   className={`shrink-0 min-h-[44px] px-4 py-2 rounded-full border text-sm font-bold transition ${
                     active
                       ? fatigue
-                        ? "bg-rose-500/15 border-rose-500/50 text-rose-300"
-                        : "bg-emerald-500/15 border-emerald-500/50 text-emerald-300"
+                        ? "bg-rose-500/15 border-rose-500/50 text-[#b4232a]"
+                        : "bg-brand-600/15 border-brand-600/50 text-brand-600"
                       : fatigue
-                        ? "bg-zinc-900 border-rose-500/30 text-rose-300/80 hover:text-rose-200"
-                        : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                        ? "bg-white border-rose-500/30 text-[#b4232a]/80 hover:text-[#b4232a]"
+                        : "bg-white border-cream-border text-[#5d7263] hover:text-[#2a4630]"
                   }`}
                 >
                   {chip.label}
                   <span
                     className={`ml-1.5 text-xs font-black ${
-                      active ? (fatigue ? "text-rose-300/90" : "text-emerald-400/80") : "text-zinc-600"
+                      active ? (fatigue ? "text-[#b4232a]/90" : "text-brand-600/90") : "text-[#8a9a8d]"
                     }`}
                   >
                     {counts[chip.key] ?? 0}
@@ -365,9 +365,9 @@ export function PlayersView({
         {/* ---------- Tarjetas ---------- */}
         <section aria-label="Listado de jugadores" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.length === 0 && (
-            <p className="col-span-full rounded-3xl border border-dashed border-zinc-800 px-6 py-10 text-center text-zinc-500">
+            <p className="col-span-full rounded-3xl border border-dashed border-cream-border px-6 py-10 text-center text-[#6c8070]">
               No hay jugadores en esta demarcación.{" "}
-              <span className="text-zinc-400">Importa la plantilla con el botón de arriba.</span>
+              <span className="text-[#5d7263]">Importa la plantilla con el botón de arriba.</span>
             </p>
           )}
           {filtered.map((p) => {
@@ -376,16 +376,16 @@ export function PlayersView({
               <button
                 key={p.id}
                 onClick={() => openEditor(p)}
-                className="w-full rounded-3xl border border-zinc-800 bg-zinc-900 p-4 text-left transition hover:border-zinc-600 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+                className="w-full rounded-3xl border border-cream-border bg-white p-4 text-left transition hover:border-[#b9b49c] active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-600"
                 aria-label={`Editar ficha de ${p.firstName} ${p.lastName}`}
               >
                 <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center text-lg font-black text-zinc-100 shrink-0">
+                  <div className="w-12 h-12 rounded-2xl bg-cream-dark flex items-center justify-center text-lg font-black text-peel shrink-0">
                     {p.shirtNumber ?? "–"}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-bold text-zinc-50 truncate">
+                      <p className="font-bold text-peel truncate">
                         {p.firstName} {p.lastName}
                       </p>
                       <span
@@ -397,11 +397,11 @@ export function PlayersView({
                     <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                       <Badge
                         variant="outline"
-                        className="rounded-lg bg-emerald-500/10 text-emerald-300 border-emerald-500/30 font-black"
+                        className="rounded-lg bg-brand-600/10 text-brand-600 border-brand-600/30 font-black"
                       >
                         {p.mainPosition}
                       </Badge>
-                      <span className="text-xs text-zinc-500">{POSITION_LABEL[p.mainPosition] ?? p.mainPosition}</span>
+                      <span className="text-xs text-[#6c8070]">{POSITION_LABEL[p.mainPosition] ?? p.mainPosition}</span>
                       {p.status !== "AVAILABLE" && (
                         <Badge variant="outline" className={`rounded-lg ${statusMeta.chip}`}>
                           {statusMeta.label}
@@ -410,12 +410,12 @@ export function PlayersView({
                     </div>
                     {p.secondaryPositions.length > 0 && (
                       <p className="text-xs mt-1.5 flex items-center gap-1 flex-wrap">
-                        <span className="text-zinc-500 font-semibold">Polivalente:</span>
+                        <span className="text-[#6c8070] font-semibold">Polivalente:</span>
                         {p.secondaryPositions.map((s) => (
                           <span
                             key={s}
                             title={POSITION_LABEL[s] ?? s}
-                            className="rounded-md bg-zinc-800 px-1.5 py-0.5 font-bold text-amber-200/90"
+                            className="rounded-md bg-cream-dark px-1.5 py-0.5 font-bold text-[#7c5606]"
                           >
                             {s}
                           </span>
@@ -423,7 +423,7 @@ export function PlayersView({
                       </p>
                     )}
                     {p.statusNote && (
-                      <p className="text-xs italic text-amber-300/80 mt-1 truncate">{p.statusNote}</p>
+                      <p className="text-xs italic text-[#8a6206]/90 mt-1 truncate">{p.statusNote}</p>
                     )}
                   </div>
                 </div>
@@ -462,7 +462,7 @@ export function PlayersView({
                     )}
                     {p.strength && (
                       <span
-                        className="rounded-lg bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 text-xs font-bold text-amber-200 max-w-full truncate"
+                        className="rounded-lg bg-[#8a6206]/10 border border-[#8a6206]/30 px-2 py-0.5 text-xs font-bold text-[#8a6206] max-w-full truncate"
                         title={`Fortaleza principal: ${p.strength}`}
                       >
                         ★ {p.strength}
@@ -480,13 +480,13 @@ export function PlayersView({
       <Sheet open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <SheetContent
           side="bottom"
-          className="bg-zinc-900 border-zinc-800 rounded-t-3xl max-h-[92vh] overflow-y-auto px-4 pb-10 pt-2"
+          className="bg-white border-cream-border rounded-t-3xl max-h-[92vh] overflow-y-auto px-4 pb-10 pt-2"
         >
           <SheetHeader className="text-left pb-1">
-            <SheetTitle className="text-xl font-black text-zinc-50">
+            <SheetTitle className="text-xl font-black text-peel">
               {editing?.firstName} {editing?.lastName}
             </SheetTitle>
-            <SheetDescription className="text-zinc-400 text-sm">
+            <SheetDescription className="text-[#5d7263] text-sm">
               {editing?.shirtNumber != null ? `Dorsal ${editing.shirtNumber} · ` : ""}
               {POSITION_LABEL[editing?.mainPosition ?? "CF"] ?? ""}
               {editing?.secondaryPositions.length
@@ -495,7 +495,7 @@ export function PlayersView({
             </SheetDescription>
           </SheetHeader>
 
-          <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mt-3 mb-2">
+          <p className="text-xs font-bold text-[#6c8070] uppercase tracking-widest mt-3 mb-2">
             Estado de disponibilidad
           </p>
           <div className="grid grid-cols-2 gap-2">
@@ -509,7 +509,7 @@ export function PlayersView({
                   onClick={() => setDraft((d) => (d ? { ...d, status: s } : d))}
                   aria-pressed={selected}
                   className={`min-h-[52px] rounded-2xl border px-3 py-2.5 text-sm font-bold transition ${
-                    selected ? meta.chip : "bg-zinc-800/60 border-zinc-800 text-zinc-400"
+                    selected ? meta.chip : "bg-cream-dark/70 border-cream-border text-[#5d7263]"
                   }`}
                 >
                   {meta.label}
@@ -518,7 +518,7 @@ export function PlayersView({
             })}
           </div>
 
-          <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mt-5 mb-2">
+          <p className="text-xs font-bold text-[#6c8070] uppercase tracking-widest mt-5 mb-2">
             Perfiles (1–5)
           </p>
           <div className="space-y-2">
@@ -540,7 +540,7 @@ export function PlayersView({
           </div>
 
           <Input
-            className="mt-4 min-h-[48px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+            className="mt-4 min-h-[48px] rounded-2xl bg-cream-dark/70 border-cream-border text-peel placeholder:text-[#6c8070]"
             placeholder="Apunte corto (molestias, rol esta semana…)"
             maxLength={200}
             value={draft?.statusNote ?? ""}
@@ -548,7 +548,7 @@ export function PlayersView({
           />
 
           {/* ---------- Demarcaciones (principal + polivalencia) ---------- */}
-          <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mt-5 mb-2">
+          <p className="text-xs font-bold text-[#6c8070] uppercase tracking-widest mt-5 mb-2">
             Demarcaciones
           </p>
           {draft && (
@@ -576,7 +576,7 @@ export function PlayersView({
           )}
 
           {/* ---------- Perfil pre-partido ---------- */}
-          <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mt-5 mb-2">
+          <p className="text-xs font-bold text-[#6c8070] uppercase tracking-widest mt-5 mb-2">
             Pre-partido · decisión del cuerpo técnico
           </p>
           <div className="space-y-3">
@@ -587,12 +587,12 @@ export function PlayersView({
               max={10}
             />
             <div>
-              <label htmlFor="ed-injury" className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+              <label htmlFor="ed-injury" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
                 Lesiones activas / precauciones médicas
               </label>
               <Textarea
                 id="ed-injury"
-                className="mt-1 min-h-[64px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+                className="mt-1 min-h-[64px] rounded-2xl bg-cream-dark/70 border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
                 placeholder="Ej.: esguince de tobillo derecho, alta prevista en 3 semanas"
                 maxLength={500}
                 value={draft?.injuryHistory ?? ""}
@@ -600,12 +600,12 @@ export function PlayersView({
               />
             </div>
             <div>
-              <label htmlFor="ed-academic" className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+              <label htmlFor="ed-academic" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
                 Horarios / estrés académico
               </label>
               <Textarea
                 id="ed-academic"
-                className="mt-1 min-h-[64px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+                className="mt-1 min-h-[64px] rounded-2xl bg-cream-dark/70 border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
                 placeholder="Ej.: exámenes esta semana, duerme poco por evaluaciones"
                 maxLength={500}
                 value={draft?.academicConstraints ?? ""}
@@ -613,12 +613,12 @@ export function PlayersView({
               />
             </div>
             <div>
-              <label htmlFor="ed-strength" className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+              <label htmlFor="ed-strength" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
                 Fortaleza principal
               </label>
               <Input
                 id="ed-strength"
-                className="mt-1 min-h-[48px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+                className="mt-1 min-h-[48px] rounded-2xl bg-cream-dark/70 border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
                 placeholder="Ej.: desmarque al espacio, golpeo de falta"
                 maxLength={500}
                 value={draft?.strength ?? ""}
@@ -630,7 +630,7 @@ export function PlayersView({
           <Button
             onClick={saveEditor}
             disabled={saving}
-            className="mt-4 w-full min-h-[56px] rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-base"
+            className="mt-4 w-full min-h-[56px] rounded-2xl bg-brand-600 hover:bg-brand text-white font-black text-base"
           >
             {saving ? (
               <Loader2 className="w-5 h-5 animate-spin" aria-hidden />

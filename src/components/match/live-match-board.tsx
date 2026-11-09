@@ -248,7 +248,7 @@ function PreMatchChip({ label, text, chipClass }: { label: string; text: string;
   return (
     <span
       className={`inline-flex max-w-full items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] leading-tight ${
-        chipClass ?? "bg-zinc-800/70 border-zinc-700 text-zinc-200"
+        chipClass ?? "bg-[#1c3a26]/70 border-[#2a4a34] text-[#dfe9d8]"
       }`}
       title={text}
     >
@@ -443,7 +443,7 @@ export function LiveMatchBoard({
                 disabled={pendingKey !== null}
                 onClick={() => selected && handleSetStatus(selected.id, axis, isActive ? null : code, m.label)}
                 className={`flex items-center justify-between gap-2 min-h-[46px] px-3 rounded-xl border text-left transition-all active:scale-[0.97] disabled:opacity-60 ${
-                  isActive ? `${m.btn} border-2 font-bold shadow-md` : "bg-zinc-800/60 border-zinc-700/80 text-zinc-300 hover:bg-zinc-800"
+                  isActive ? `${m.btn} border-2 font-bold shadow-md` : "bg-[#1c3a26]/60 border-[#2a4a34]/80 text-[#c3d2c2] hover:bg-[#1c3a26]"
                 }`}
                 aria-pressed={isActive}
                 aria-label={`${m.label} — ${m.hint}`}
@@ -473,43 +473,43 @@ export function LiveMatchBoard({
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 p-4 rounded-3xl border border-zinc-800 bg-zinc-950">
+    <div className="flex flex-col lg:flex-row gap-4 p-4 rounded-3xl border border-[#1c3a26] bg-[#0a1a10]">
       {/* ---------- Terreno de juego (titulares colocados por demarcación) ---------- */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-xs uppercase tracking-widest text-emerald-200 font-bold flex items-center gap-2">
-            <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" aria-hidden />
+          <div className="text-xs uppercase tracking-widest text-lime-brand font-bold flex items-center gap-2">
+            <Radio className="w-3.5 h-3.5 text-brand-400 animate-pulse" aria-hidden />
             Terreno de juego · Directo
           </div>
-          <span className="text-[11px] text-emerald-200/70">
+          <span className="text-[11px] text-lime-brand/70">
             {starters.length} titulares · {bench.length} en la banqueta
           </span>
         </div>
 
         {players.length === 0 ? (
-          <div className="rounded-2xl border-4 border-emerald-500/30 bg-emerald-900/40 px-6 py-10 text-center text-sm text-emerald-100/70">
+          <div className="rounded-2xl border-4 border-brand-600/30 bg-brand/30 px-6 py-10 text-center text-sm text-lime-soft/70">
             Aún no hay jugadores en la plantilla. Da de alta al equipo en
             &ldquo;Plantilla&rdquo; para poder evaluar en directo.
           </div>
         ) : (
-          <div className="relative w-full max-w-[430px] mx-auto aspect-[2/3] rounded-2xl border-4 border-emerald-500/40 bg-emerald-900/50 overflow-hidden shadow-inner">
+          <div className="relative w-full max-w-[430px] mx-auto aspect-[2/3] rounded-2xl border-4 border-brand-600/40 bg-brand/40 overflow-hidden shadow-inner">
             {/* Marcas del campo */}
-            <div className="absolute left-0 right-0 top-1/2 border-t-2 border-emerald-200/20" aria-hidden />
+            <div className="absolute left-0 right-0 top-1/2 border-t-2 border-lime-brand/20" aria-hidden />
             <div
-              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[26%] aspect-square rounded-full border-2 border-emerald-200/20"
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[26%] aspect-square rounded-full border-2 border-lime-brand/20"
               aria-hidden
             />
             <div
-              className="absolute left-1/2 -translate-x-1/2 top-0 w-[46%] h-[12%] border-x-2 border-b-2 border-emerald-200/20 rounded-b-lg"
+              className="absolute left-1/2 -translate-x-1/2 top-0 w-[46%] h-[12%] border-x-2 border-b-2 border-lime-brand/20 rounded-b-lg"
               aria-hidden
             />
             <div
-              className="absolute left-1/2 -translate-x-1/2 bottom-0 w-[46%] h-[12%] border-x-2 border-t-2 border-emerald-200/20 rounded-t-lg"
+              className="absolute left-1/2 -translate-x-1/2 bottom-0 w-[46%] h-[12%] border-x-2 border-t-2 border-lime-brand/20 rounded-t-lg"
               aria-hidden
             />
 
             {starters.length === 0 ? (
-              <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 rounded-2xl border border-dashed border-emerald-500/40 bg-zinc-950/60 px-4 py-6 text-center text-xs text-emerald-100/70">
+              <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 rounded-2xl border border-dashed border-brand-600/40 bg-[#071509]/60 px-4 py-6 text-center text-xs text-lime-soft/70">
                 Toca un jugador de la banqueta y márcalo como titular para sacarlo
                 al terreno de juego. Los titulares se colocan solos según su
                 demarcación.
@@ -531,13 +531,13 @@ export function LiveMatchBoard({
                     <span
                       className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-black border-2 shadow-lg transition-colors ${
                         selected?.id === player.id
-                          ? "bg-amber-400 border-amber-200 text-zinc-950"
-                          : "bg-zinc-950/85 border-emerald-400/70 text-zinc-50"
+                          ? "bg-amber-400 border-[#e3a93c] text-[#0a1a10]"
+                          : "bg-[#071509]/85 border-brand-400/70 text-cream"
                       }`}
                     >
                       {chipBadge(player)}
                     </span>
-                    <span className="mt-0.5 px-1 rounded bg-zinc-950/80 text-[10px] leading-tight font-semibold text-zinc-100 max-w-[78px] truncate">
+                    <span className="mt-0.5 px-1 rounded bg-[#071509]/80 text-[10px] leading-tight font-semibold text-[#eef2e0] max-w-[78px] truncate">
                       {player.firstName}
                     </span>
                     <StatusDots s={s} />
@@ -549,15 +549,15 @@ export function LiveMatchBoard({
         )}
 
         {players.length > 0 && (
-          <p className="mt-2 text-center text-[10px] text-emerald-100/50" aria-hidden>
+          <p className="mt-2 text-center text-[10px] text-lime-soft/50" aria-hidden>
             🟢 arriba · 🟡 al límite · 🔴 pide cambio · ⚠️/❌ clínico · ⭐ plan claro
           </p>
         )}
       </div>
 
       {/* ---------- Banqueta de suplentes ---------- */}
-      <div className="w-full lg:w-72 bg-zinc-900 p-4 rounded-2xl border border-zinc-800 flex flex-col">
-        <h4 className="text-sm font-semibold uppercase tracking-wider text-zinc-400 mb-3">
+      <div className="w-full lg:w-72 bg-[#0f2317] p-4 rounded-2xl border border-[#1c3a26] flex flex-col">
+        <h4 className="text-sm font-semibold uppercase tracking-wider text-[#a9bca9] mb-3">
           Banqueta de suplentes
         </h4>
         <div className="flex flex-wrap lg:flex-col lg:flex-nowrap gap-2 overflow-y-auto max-h-[460px]">
@@ -569,11 +569,11 @@ export function LiveMatchBoard({
                 onClick={() => setSelected(player)}
                 className={`flex items-center gap-2.5 p-2.5 rounded-lg text-left transition-all ${
                   selected?.id === player.id
-                    ? "bg-amber-400 text-zinc-950 font-bold"
-                    : "bg-zinc-800/60 hover:bg-zinc-800 text-zinc-200"
+                    ? "bg-amber-400 text-[#0a1a10] font-bold"
+                    : "bg-[#1c3a26]/60 hover:bg-[#1c3a26] text-[#dfe9d8]"
                 }`}
               >
-                <span className="w-8 h-8 rounded-full bg-zinc-700 text-zinc-50 font-bold flex items-center justify-center text-xs shrink-0">
+                <span className="w-8 h-8 rounded-full bg-[#2a4a34] text-cream font-bold flex items-center justify-center text-xs shrink-0">
                   {chipBadge(player)}
                 </span>
                 <span className="min-w-0">
@@ -587,7 +587,7 @@ export function LiveMatchBoard({
                 <span className="ml-auto flex items-center gap-1.5 shrink-0">
                   <StatusDots s={s} size="xs" />
                   {(tagCounts[player.id] ?? 0) > 0 && (
-                    <span className="flex h-5 min-w-5 px-1 items-center justify-center rounded-full bg-amber-400 text-zinc-950 text-[10px] font-black">
+                    <span className="flex h-5 min-w-5 px-1 items-center justify-center rounded-full bg-amber-400 text-[#0a1a10] text-[10px] font-black">
                       {tagCounts[player.id]}
                     </span>
                   )}
@@ -596,7 +596,7 @@ export function LiveMatchBoard({
             );
           })}
           {bench.length === 0 && players.length > 0 && (
-            <p className="text-xs text-zinc-500 px-1 py-2">
+            <p className="text-xs text-[#8aa28d] px-1 py-2">
               Todo el equipo está sobre el césped.
             </p>
           )}
@@ -606,27 +606,27 @@ export function LiveMatchBoard({
       {/* ---------- Ficha rápida flotante del jugador seleccionado ---------- */}
       {selected && currentStatuses && (
         <div
-          className="fixed inset-0 bg-zinc-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 z-50"
+          className="fixed inset-0 bg-[#071509]/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 z-50"
           onClick={() => setSelected(null)}
           role="dialog"
           aria-modal="true"
           aria-label={`Evaluar a ${selected.firstName} ${selected.lastName}`}
         >
           <div
-            className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-200 max-h-[90vh] overflow-y-auto"
+            className="bg-[#0f2317] border border-[#1c3a26] rounded-2xl p-5 w-full max-w-md shadow-2xl space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-200 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Cabecera de la ficha */}
-            <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+            <div className="flex justify-between items-center border-b border-[#1c3a26] pb-3">
               <div className="flex items-center gap-3 min-w-0">
-                <span className="w-10 h-10 rounded-full bg-emerald-500 text-zinc-950 font-black text-lg flex items-center justify-center shrink-0">
+                <span className="w-10 h-10 rounded-full bg-brand-600 text-[#0a1a10] font-black text-lg flex items-center justify-center shrink-0">
                   {chipBadge(selected)}
                 </span>
                 <div className="min-w-0">
-                  <h3 className="text-lg font-bold text-zinc-50 truncate">
+                  <h3 className="text-lg font-bold text-cream truncate">
                     {selected.firstName} {selected.lastName}
                   </h3>
-                  <span className="text-xs text-zinc-400">
+                  <span className="text-xs text-[#a9bca9]">
                     {POSITION_LABEL[selected.mainPosition] ?? selected.mainPosition} ·{" "}
                     {starterIds.has(selected.id) ? "Titular" : "Suplente"}
                     {currentStatuses.statusUpdatedAt
@@ -637,7 +637,7 @@ export function LiveMatchBoard({
               </div>
               <button
                 onClick={() => setSelected(null)}
-                className="text-zinc-400 hover:text-zinc-50 text-xl font-bold p-1"
+                className="text-[#a9bca9] hover:text-cream text-xl font-bold p-1"
                 aria-label="Cerrar ficha"
               >
                 ✕
@@ -650,8 +650,8 @@ export function LiveMatchBoard({
               selected.injuryHistory ||
               selected.academicConstraints ||
               selected.strength) && (
-              <div className="rounded-xl bg-zinc-950/60 border border-zinc-800 p-3">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">
+              <div className="rounded-xl bg-[#071509]/60 border border-[#1c3a26] p-3">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[#8aa28d] mb-2">
                   Ficha de hoy · antes del pitido
                 </p>
                 <div className="flex flex-wrap gap-1.5">
@@ -689,7 +689,7 @@ export function LiveMatchBoard({
             {/* Estado en directo (1 toque — el último toque gana, repetir apaga) */}
             {renderStatusGroup(
               "Semáforo de fatiga",
-              "text-emerald-400",
+              "text-brand-400",
               "fatigueFlag",
               FATIGUE_FLAG_META,
               Object.keys(FATIGUE_FLAG_META),
@@ -710,13 +710,13 @@ export function LiveMatchBoard({
             )}
 
             {/* Anotaciones tácticas acumulativas (tags) */}
-            <div className="space-y-4 border-t border-zinc-800 pt-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            <div className="space-y-4 border-t border-[#1c3a26] pt-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#8aa28d]">
                 Anotaciones tácticas · se acumulan
               </p>
               {(["POSITIVE", "CORRECTIVE"] as const).map((tone) => {
                 const items = tone === "POSITIVE" ? POSITIVE_CODES : CORRECTIVE_CODES;
-                const accent = tone === "POSITIVE" ? "text-emerald-400" : "text-amber-400";
+                const accent = tone === "POSITIVE" ? "text-brand-400" : "text-amber-400";
                 return (
                   <div key={tone} className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {items.map((tag) => (
@@ -726,12 +726,12 @@ export function LiveMatchBoard({
                         onClick={() => handleAddTag(selected, tag.code, tag.label)}
                         className={`flex items-center justify-between p-2.5 text-xs rounded-lg transition-all active:scale-95 disabled:opacity-50 ${
                           tone === "POSITIVE"
-                            ? "bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/40 text-emerald-200"
-                            : "bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-200"
+                            ? "bg-brand-600/10 hover:bg-brand-600/20 border border-brand-600/40 text-lime-brand"
+                            : "bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-[#e3a93c]"
                         }`}
                       >
                         <span>{tag.label}</span>
-                        <span className={`font-bold ${tone === "POSITIVE" ? "text-emerald-400" : "text-amber-400"}`}>
+                        <span className={`font-bold ${tone === "POSITIVE" ? "text-brand-400" : "text-amber-400"}`}>
                           {pendingKey === `tag:${tag.code}` ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
                           ) : (
@@ -746,15 +746,15 @@ export function LiveMatchBoard({
             </div>
 
             {/* Contadores de la sesión + alineación */}
-            <div className="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800 text-xs text-zinc-400 flex items-center justify-between gap-3">
+            <div className="bg-[#0a1a10] p-2.5 rounded-lg border border-[#1c3a26] text-xs text-[#a9bca9] flex items-center justify-between gap-3">
               <span>
                 Anotaciones en este partido:{" "}
-                <span className="font-bold text-zinc-50">{tagCounts[selected.id] ?? 0} registro(s)</span>
+                <span className="font-bold text-cream">{tagCounts[selected.id] ?? 0} registro(s)</span>
               </span>
               <button
                 onClick={() => handleToggleStarter(selected)}
                 disabled={savingLineup}
-                className="shrink-0 rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-[11px] font-semibold text-zinc-200 hover:bg-zinc-800 disabled:opacity-50"
+                className="shrink-0 rounded-md border border-[#2a4a34] bg-[#0f2317] px-2.5 py-1.5 text-[11px] font-semibold text-[#dfe9d8] hover:bg-[#1c3a26] disabled:opacity-50"
               >
                 {savingLineup
                   ? "Guardando…"

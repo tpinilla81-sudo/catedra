@@ -8,7 +8,6 @@
 // para máxima robustez de rutas; el enlace se firma desde la página Partidos.
 // ============================================================================
 import { notFound } from "next/navigation";
-import { AppNav } from "@/components/dashboard/app-nav";
 import {
   IngestFlow,
   type IngestMatchData,
@@ -86,9 +85,8 @@ export default async function MatchIngestPage({
     : null;
 
   return (
-    <main className="min-h-screen bg-zinc-950 pb-28">
+    <main className="min-h-screen bg-cream pb-6">
       <IngestFlow match={matchData} players={playerData} initialReport={initialReport} />
-      <AppNav active="matches" />
     </main>
   );
 }

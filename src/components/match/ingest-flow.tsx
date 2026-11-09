@@ -101,27 +101,27 @@ function GoalStepper({
   tone: "ours" | "theirs";
 }) {
   return (
-    <div className={`rounded-3xl border p-4 flex flex-col items-center gap-2 ${tone === "ours" ? "border-emerald-500/40 bg-emerald-500/5" : "border-zinc-800 bg-zinc-900"}`}>
-      <p className="text-xs font-black tracking-widest text-zinc-400">{label}</p>
+    <div className={`rounded-3xl border p-4 flex flex-col items-center gap-2 ${tone === "ours" ? "border-emerald-500/40 bg-brand-600/5" : "border-cream-border bg-white"}`}>
+      <p className="text-xs font-black tracking-widest text-[#5d7263]">{label}</p>
       <div className="flex items-center gap-3">
         <Button
           type="button"
           variant="outline"
           size="icon"
-          className="h-12 w-12 rounded-2xl border-zinc-700 bg-zinc-950 text-zinc-200 hover:bg-zinc-800"
+          className="h-12 w-12 rounded-2xl border-cream-border-strong bg-cream text-[#2a4630] hover:bg-cream-dark"
           onClick={() => onChange(Math.max(0, value - 1))}
           aria-label={`Restar gol ${label}`}
         >
           <Minus className="w-5 h-5" aria-hidden />
         </Button>
-        <span className="w-14 text-center text-4xl font-black text-zinc-50" aria-live="polite">
+        <span className="w-14 text-center text-4xl font-black text-peel" aria-live="polite">
           {value}
         </span>
         <Button
           type="button"
           variant="outline"
           size="icon"
-          className="h-12 w-12 rounded-2xl border-zinc-700 bg-zinc-950 text-zinc-200 hover:bg-zinc-800"
+          className="h-12 w-12 rounded-2xl border-cream-border-strong bg-cream text-[#2a4630] hover:bg-cream-dark"
           onClick={() => onChange(Math.min(20, value + 1))}
           aria-label={`Sumar gol ${label}`}
         >
@@ -147,22 +147,22 @@ function SliderRow({
 }) {
   const colorCls = invert
     ? value >= 7
-      ? "bg-rose-500/20 border-rose-500/50 text-rose-300"
+      ? "bg-[#c62f32]/20 border-rose-500/50 text-[#b4232a]"
       : value >= 4
-        ? "bg-amber-500/20 border-amber-500/50 text-amber-300"
-        : "bg-emerald-500/20 border-emerald-500/50 text-emerald-300"
+        ? "bg-amber-500/20 border-amber-500/50 text-[#8a6206]"
+        : "bg-brand-600/20 border-emerald-500/50 text-brand-600"
     : value <= 4
-      ? "bg-rose-500/20 border-rose-500/50 text-rose-300"
+      ? "bg-[#c62f32]/20 border-rose-500/50 text-[#b4232a]"
       : value <= 6
-        ? "bg-amber-500/20 border-amber-500/50 text-amber-300"
-        : "bg-emerald-500/20 border-emerald-500/50 text-emerald-300";
+        ? "bg-amber-500/20 border-amber-500/50 text-[#8a6206]"
+        : "bg-brand-600/20 border-emerald-500/50 text-brand-600";
 
   return (
-    <div className="rounded-3xl bg-zinc-900 border border-zinc-800 px-4 py-3">
+    <div className="rounded-3xl bg-white border border-cream-border px-4 py-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-bold text-zinc-100">{label}</p>
-          <p className="text-xs text-zinc-500">{hint}</p>
+          <p className="text-sm font-bold text-peel">{label}</p>
+          <p className="text-xs text-[#6c8070]">{hint}</p>
         </div>
         <span className={`min-w-[52px] text-center rounded-xl border px-2 py-1 text-lg font-black ${colorCls}`} aria-live="polite">
           {value}
@@ -185,7 +185,7 @@ function RatingDots({ value }: { value: number | null }) {
   return (
     <span className="inline-flex items-center gap-1" aria-hidden>
       {[1, 2, 3, 4, 5].map((i) => (
-        <span key={i} className={`w-1.5 h-1.5 rounded-full ${value && i <= value ? "bg-amber-300" : "bg-zinc-700"}`} />
+        <span key={i} className={`w-1.5 h-1.5 rounded-full ${value && i <= value ? "bg-[#d69a2d]" : "bg-cream-border-strong"}`} />
       ))}
     </span>
   );
@@ -289,22 +289,22 @@ export function IngestFlow({
   return (
     <div>
       {/* ---------- Cabecera ---------- */}
-      <header className="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-cream-border bg-white/90 backdrop-blur">
         <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <Link href="/dashboard/matches" className="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 min-h-[44px]">
+            <Link href="/dashboard/matches" className="inline-flex items-center gap-1 text-xs text-[#6c8070] hover:text-[#3d5844] min-h-[44px]">
               <ArrowLeft className="w-3.5 h-3.5" aria-hidden /> Partidos
             </Link>
-            <h1 className="text-xl font-black text-zinc-50 leading-tight truncate">
+            <h1 className="text-xl font-black text-peel leading-tight truncate">
               {match.isHome ? "vs" : "@"} {match.opponent}
             </h1>
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-[#6c8070]">
               {kickoffLabel}
               {match.competition ? ` · ${match.competition}` : ""}
             </p>
           </div>
           {match.status === "ANALYZED" && (
-            <Badge variant="outline" className="rounded-full bg-zinc-800 text-zinc-300 border-zinc-700 shrink-0">
+            <Badge variant="outline" className="rounded-full bg-cream-dark text-[#3d5844] border-cream-border-strong shrink-0">
               Editando ingesta
             </Badge>
           )}
@@ -320,16 +320,16 @@ export function IngestFlow({
                   key={s.n}
                   className={`rounded-2xl border px-3 py-2 flex items-center gap-2 transition ${
                     active
-                      ? "border-emerald-500/50 bg-emerald-500/10"
+                      ? "border-emerald-500/50 bg-brand-600/10"
                       : done
-                        ? "border-emerald-500/30 bg-emerald-500/5"
-                        : "border-zinc-800 bg-zinc-900"
+                        ? "border-emerald-500/30 bg-brand-600/5"
+                        : "border-cream-border bg-white"
                   }`}
                 >
-                  <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-black ${active ? "bg-emerald-500 text-zinc-950" : done ? "bg-emerald-500/30 text-emerald-300" : "bg-zinc-800 text-zinc-500"}`}>
+                  <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-black ${active ? "bg-brand-600 text-white" : done ? "bg-brand-600/30 text-brand-600" : "bg-cream-dark text-[#6c8070]"}`}>
                     {done ? "✓" : s.n}
                   </span>
-                  <span className={`text-xs font-bold ${active ? "text-emerald-300" : done ? "text-emerald-400/70" : "text-zinc-500"}`}>
+                  <span className={`text-xs font-bold ${active ? "text-brand-600" : done ? "text-brand-600/90" : "text-[#6c8070]"}`}>
                     {s.label}
                   </span>
                 </div>
@@ -350,8 +350,8 @@ export function IngestFlow({
               <GoalStepper label={match.opponent.toUpperCase()} value={goalsAgainst} onChange={setGoalsAgainst} tone="theirs" />
             </div>
 
-            <p className="text-sm text-zinc-400">
-              ¿Cómo quedó el grupo? <span className="text-zinc-600">Un toque:</span>
+            <p className="text-sm text-[#5d7263]">
+              ¿Cómo quedó el grupo? <span className="text-[#8a9a8d]">Un toque:</span>
             </p>
             <div className="grid grid-cols-3 gap-2">
               {SENSATIONS.map((s) => {
@@ -363,11 +363,11 @@ export function IngestFlow({
                     type="button"
                     onClick={() => setSensation(s)}
                     aria-pressed={selected}
-                    className={`min-h-[76px] rounded-3xl border px-3 py-3 flex flex-col items-center justify-center gap-1.5 transition ${selected ? meta.btn : "bg-zinc-900 border-zinc-800 text-zinc-400"}`}
+                    className={`min-h-[76px] rounded-3xl border px-3 py-3 flex flex-col items-center justify-center gap-1.5 transition ${selected ? meta.btn : "bg-white border-cream-border text-[#5d7263]"}`}
                   >
                     <span className={`w-5 h-5 rounded-full ${meta.dot}`} aria-hidden />
                     <span className="text-sm font-black">{meta.label}</span>
-                    <span className="text-[11px] text-zinc-500 text-center leading-tight">{meta.hint}</span>
+                    <span className="text-[11px] text-[#6c8070] text-center leading-tight">{meta.hint}</span>
                   </button>
                 );
               })}
@@ -380,7 +380,7 @@ export function IngestFlow({
             </div>
 
             <Input
-              className="min-h-[48px] rounded-2xl bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+              className="min-h-[48px] rounded-2xl bg-white border-cream-border text-peel placeholder:text-[#6c8070]"
               placeholder="Nota global opcional (contexto rival, bajas…)"
               maxLength={500}
               value={globalNotes}
@@ -390,12 +390,12 @@ export function IngestFlow({
             <Button
               onClick={() => setStep(2)}
               disabled={sensation === null}
-              className="w-full min-h-[60px] rounded-3xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-base"
+              className="w-full min-h-[60px] rounded-3xl bg-brand-600 hover:bg-brand text-white font-black text-base"
             >
               Siguiente: pizarra táctica <ArrowRight className="w-5 h-5" aria-hidden />
             </Button>
             {sensation === null && (
-              <p className="text-center text-xs text-zinc-600">Elige el semáforo global para continuar</p>
+              <p className="text-center text-xs text-[#8a9a8d]">Elige el semáforo global para continuar</p>
             )}
           </section>
         )}
@@ -405,8 +405,8 @@ export function IngestFlow({
         {/* ============================================================ */}
         {step === 2 && (
           <section aria-label="Paso 2: pizarra táctica" className="space-y-4">
-            <p className="text-sm text-zinc-400">
-              Elige el tipo de evento y <span className="font-bold text-zinc-200">toca el campo</span> donde ocurrió.
+            <p className="text-sm text-[#5d7263]">
+              Elige el tipo de evento y <span className="font-bold text-[#2a4630]">toca el campo</span> donde ocurrió.
               Toca un punto para borrarlo.
             </p>
 
@@ -422,12 +422,12 @@ export function IngestFlow({
                     type="button"
                     onClick={() => setActiveType(type)}
                     aria-pressed={selected}
-                    className={`relative min-h-[68px] rounded-2xl border px-1.5 py-2 flex flex-col items-center justify-center gap-1 transition ${selected ? meta.btn : "bg-zinc-900 border-zinc-800 text-zinc-400"}`}
+                    className={`relative min-h-[68px] rounded-2xl border px-1.5 py-2 flex flex-col items-center justify-center gap-1 transition ${selected ? meta.btn : "bg-white border-cream-border text-[#5d7263]"}`}
                   >
                     <Icon className="w-5 h-5" aria-hidden />
                     <span className="text-[11px] font-bold leading-tight text-center">{meta.label}</span>
                     {(counts[type] ?? 0) > 0 && (
-                      <span className={`absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full text-[11px] font-black flex items-center justify-center ${meta.text} bg-zinc-950 border border-zinc-700`}>
+                      <span className={`absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full text-[11px] font-black flex items-center justify-center ${meta.text} bg-cream border border-cream-border-strong`}>
                         {counts[type]}
                       </span>
                     )}
@@ -438,7 +438,7 @@ export function IngestFlow({
 
             {/* Responsable del evento */}
             <div>
-              <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">
+              <p className="text-xs font-bold text-[#6c8070] uppercase tracking-widest mb-2">
                 Responsable {activePlayerId ? "(toca «Sin responsable» para quitar)" : "(opcional)"}
               </p>
               <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
@@ -446,7 +446,7 @@ export function IngestFlow({
                   type="button"
                   onClick={() => setActivePlayerId(null)}
                   aria-pressed={activePlayerId === null}
-                  className={`shrink-0 min-h-[44px] px-4 py-2 rounded-full border text-sm font-bold transition ${activePlayerId === null ? "bg-zinc-700 border-zinc-500 text-zinc-100" : "bg-zinc-900 border-zinc-800 text-zinc-400"}`}
+                  className={`shrink-0 min-h-[44px] px-4 py-2 rounded-full border text-sm font-bold transition ${activePlayerId === null ? "bg-cream-border-strong border-[#a8a389] text-peel" : "bg-white border-cream-border text-[#5d7263]"}`}
                 >
                   Sin responsable
                 </button>
@@ -458,7 +458,7 @@ export function IngestFlow({
                       type="button"
                       onClick={() => setActivePlayerId(selected ? null : p.id)}
                       aria-pressed={selected}
-                      className={`shrink-0 min-h-[44px] px-3.5 py-2 rounded-full border text-sm font-bold transition ${selected ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300" : "bg-zinc-900 border-zinc-800 text-zinc-400"}`}
+                      className={`shrink-0 min-h-[44px] px-3.5 py-2 rounded-full border text-sm font-bold transition ${selected ? "bg-brand-600/15 border-emerald-500/50 text-brand-600" : "bg-white border-cream-border text-[#5d7263]"}`}
                     >
                       <span className="font-black mr-1">{p.shirtNumber ?? "–"}</span>
                       {p.lastName}
@@ -470,7 +470,7 @@ export function IngestFlow({
 
             {/* Campo táctil */}
             <div
-              className="relative rounded-3xl overflow-hidden border border-zinc-800 select-none"
+              className="relative rounded-3xl overflow-hidden border border-cream-border select-none"
               role="application"
               aria-label="Pizarra táctica: toca para marcar eventos. Campo propio a la izquierda."
             >
@@ -552,8 +552,8 @@ export function IngestFlow({
             </div>
 
             <div className="flex items-center justify-between gap-3 text-sm">
-              <p className="text-zinc-400">
-                <span className="font-black text-zinc-100">{events.length}</span> eventos marcados
+              <p className="text-[#5d7263]">
+                <span className="font-black text-peel">{events.length}</span> eventos marcados
               </p>
               <div className="flex gap-2">
                 <Button
@@ -561,7 +561,7 @@ export function IngestFlow({
                   variant="outline"
                   onClick={() => setEvents((prev) => prev.slice(0, -1))}
                   disabled={events.length === 0}
-                  className="min-h-[44px] rounded-2xl border-zinc-700 bg-zinc-900 text-zinc-300"
+                  className="min-h-[44px] rounded-2xl border-cream-border-strong bg-white text-[#3d5844]"
                 >
                   <RotateCcw className="w-4 h-4" aria-hidden /> Deshacer
                 </Button>
@@ -570,7 +570,7 @@ export function IngestFlow({
                   variant="outline"
                   onClick={() => setEvents([])}
                   disabled={events.length === 0}
-                  className="min-h-[44px] rounded-2xl border-zinc-700 bg-zinc-900 text-zinc-300"
+                  className="min-h-[44px] rounded-2xl border-cream-border-strong bg-white text-[#3d5844]"
                 >
                   <Eraser className="w-4 h-4" aria-hidden /> Vaciar
                 </Button>
@@ -582,13 +582,13 @@ export function IngestFlow({
                 type="button"
                 variant="outline"
                 onClick={() => setStep(1)}
-                className="min-h-[56px] rounded-3xl border-zinc-700 bg-zinc-900 text-zinc-300 px-5"
+                className="min-h-[56px] rounded-3xl border-cream-border-strong bg-white text-[#3d5844] px-5"
               >
                 <ArrowLeft className="w-5 h-5" aria-hidden /> Atrás
               </Button>
               <Button
                 onClick={() => setStep(3)}
-                className="min-h-[56px] rounded-3xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-base px-6"
+                className="min-h-[56px] rounded-3xl bg-brand-600 hover:bg-brand text-white font-black text-base px-6"
               >
                 Siguiente: vestuario <ArrowRight className="w-5 h-5" aria-hidden />
               </Button>
@@ -601,21 +601,21 @@ export function IngestFlow({
         {/* ============================================================ */}
         {step === 3 && (
           <section aria-label="Paso 3: cuaderno del vestuario" className="space-y-4">
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-[#5d7263]">
               Un semáforo por jugador y, si quieres, un apunte corto.{" "}
-              <span className="font-bold text-zinc-200">
+              <span className="font-bold text-[#2a4630]">
                 {notesFilled} de {players.length} anotados
               </span>
             </p>
 
-            <div className="space-y-2 max-h-[52vh] overflow-y-auto rounded-3xl border border-zinc-800 p-2">
+            <div className="space-y-2 max-h-[52vh] overflow-y-auto rounded-3xl border border-cream-border p-2">
               {players.map((p) => {
                 const st = notes[p.id] ?? { flag: null, note: "" };
                 return (
-                  <div key={p.id} className="rounded-2xl bg-zinc-900 border border-zinc-800 p-3 space-y-2">
+                  <div key={p.id} className="rounded-2xl bg-white border border-cream-border p-3 space-y-2">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <p className="font-bold text-zinc-100 text-sm">
-                        <span className="text-zinc-500 font-black mr-1.5">{p.shirtNumber ?? "–"}</span>
+                      <p className="font-bold text-peel text-sm">
+                        <span className="text-[#6c8070] font-black mr-1.5">{p.shirtNumber ?? "–"}</span>
                         {p.firstName} {p.lastName}
                       </p>
                       <div className="flex gap-1.5">
@@ -634,16 +634,16 @@ export function IngestFlow({
                               }
                               aria-pressed={selected}
                               aria-label={`${p.firstName} ${p.lastName}: ${meta.label}`}
-                              className={`h-11 w-11 rounded-xl border flex items-center justify-center transition ${selected ? meta.btn : "bg-zinc-800/60 border-zinc-800"}`}
+                              className={`h-11 w-11 rounded-xl border flex items-center justify-center transition ${selected ? meta.btn : "bg-cream-dark/70 border-cream-border"}`}
                             >
-                              <span className={`w-4 h-4 rounded-full ${selected ? meta.dot : "bg-zinc-600"}`} aria-hidden />
+                              <span className={`w-4 h-4 rounded-full ${selected ? meta.dot : "bg-[#b9b49c]"}`} aria-hidden />
                             </button>
                           );
                         })}
                       </div>
                     </div>
                     <Input
-                      className="min-h-[44px] rounded-xl bg-zinc-950 border-zinc-800 text-zinc-100 text-sm placeholder:text-zinc-600"
+                      className="min-h-[44px] rounded-xl bg-cream border-cream-border text-peel text-sm placeholder:text-[#8a9a8d]"
                       placeholder="Apunte corto…"
                       maxLength={140}
                       value={st.note}
@@ -664,14 +664,14 @@ export function IngestFlow({
                 type="button"
                 variant="outline"
                 onClick={() => setStep(2)}
-                className="min-h-[56px] rounded-3xl border-zinc-700 bg-zinc-900 text-zinc-300 px-5"
+                className="min-h-[56px] rounded-3xl border-cream-border-strong bg-white text-[#3d5844] px-5"
               >
                 <ArrowLeft className="w-5 h-5" aria-hidden /> Atrás
               </Button>
               <Button
                 onClick={save}
                 disabled={saving}
-                className="min-h-[56px] rounded-3xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-base px-6"
+                className="min-h-[56px] rounded-3xl bg-brand-600 hover:bg-brand text-white font-black text-base px-6"
               >
                 {saving ? (
                   <>
@@ -682,7 +682,7 @@ export function IngestFlow({
                 )}
               </Button>
             </div>
-            <p className="text-center text-xs text-zinc-600 flex items-center justify-center gap-1.5">
+            <p className="text-center text-xs text-[#8a9a8d] flex items-center justify-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" aria-hidden />
               Al guardar, el motor cocinará el diagnóstico del microciclo con estos datos.
             </p>
@@ -694,32 +694,32 @@ export function IngestFlow({
         {/* ============================================================ */}
         {step === 4 && result?.ok && (
           <section aria-label="Ingesta guardada" className="space-y-5">
-            <div className="rounded-3xl border border-emerald-500/40 bg-emerald-500/10 p-6 text-center space-y-2">
-              <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" aria-hidden />
-              <p className="text-xl font-black text-emerald-300">Ingesta guardada</p>
-              <p className="text-sm text-emerald-200/80">
+            <div className="rounded-3xl border border-emerald-500/40 bg-brand-600/10 p-6 text-center space-y-2">
+              <CheckCircle2 className="w-12 h-12 text-brand-600 mx-auto" aria-hidden />
+              <p className="text-xl font-black text-brand-600">Ingesta guardada</p>
+              <p className="text-sm text-brand/90">
                 {result.eventsSaved} eventos en la pizarra · {result.notesSaved} notas del vestuario
               </p>
             </div>
 
-            <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-5 space-y-3">
-              <p className="text-sm font-black uppercase tracking-widest text-zinc-400 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-300" aria-hidden /> El motor ya está cocinando
+            <div className="rounded-3xl border border-cream-border bg-white p-5 space-y-3">
+              <p className="text-sm font-black uppercase tracking-widest text-[#5d7263] flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#8a6206]" aria-hidden /> El motor ya está cocinando
               </p>
               {result.engineEvidence.length > 0 ? (
                 <ul className="space-y-2">
                   {result.engineEvidence.map((ev, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-zinc-300">
-                      <TriangleAlert className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" aria-hidden />
+                    <li key={i} className="flex items-start gap-2 text-sm text-[#3d5844]">
+                      <TriangleAlert className="w-4 h-4 text-[#8a6206] shrink-0 mt-0.5" aria-hidden />
                       {ev}
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="text-sm text-zinc-500">Sin señales de alarma — consolidación de estructuras.</p>
+                <p className="text-sm text-[#6c8070]">Sin señales de alarma — consolidación de estructuras.</p>
               )}
               {result.refreshedWeeks.length > 0 && (
-                <p className="text-xs text-emerald-300/80">
+                <p className="text-xs text-brand-600/90">
                   Propuesta semanal actualizada con la evidencia nueva (semana{" "}
                   {result.refreshedWeeks.join(" y semana ")}).
                 </p>
@@ -729,13 +729,13 @@ export function IngestFlow({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Link
                 href="/dashboard/today"
-                className="flex items-center justify-center gap-2 min-h-[60px] rounded-3xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-base transition"
+                className="flex items-center justify-center gap-2 min-h-[60px] rounded-3xl bg-brand-600 hover:bg-brand text-white font-black text-base transition"
               >
                 Ver propuesta de la semana
               </Link>
               <Link
                 href="/dashboard/matches"
-                className="flex items-center justify-center gap-2 min-h-[60px] rounded-3xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 font-black text-base transition"
+                className="flex items-center justify-center gap-2 min-h-[60px] rounded-3xl border border-cream-border-strong bg-white hover:bg-cream-dark text-[#2a4630] font-black text-base transition"
               >
                 Volver a partidos
               </Link>

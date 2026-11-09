@@ -4,8 +4,8 @@
   "total": 36,
   "passed": 36,
   "failed": 0,
-  "durationMs": 1497,
-  "timestamp": "2026-11-09T06:29:04.626Z",
+  "durationMs": 1348,
+  "timestamp": "2026-11-09T06:45:06.566Z",
   "checks": [
     {
       "name": "E1 mondayOf(lunes 00:30 Madrid, invierno) → lunes 09-nov 00:00 UTC",

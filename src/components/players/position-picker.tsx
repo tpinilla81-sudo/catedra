@@ -24,17 +24,17 @@ export function PositionPicker({
   return (
     <div className="space-y-2">
       <div>
-        <label htmlFor="main-position" className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+        <label htmlFor="main-position" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
           Demarcación principal
         </label>
         <select
           id="main-position"
           value={main}
           onChange={(e) => onMainChange(e.target.value)}
-          className="mt-1 w-full min-h-[48px] rounded-2xl bg-zinc-800/60 border border-zinc-800 text-zinc-100 px-3 text-sm font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+          className="mt-1 w-full min-h-[48px] rounded-2xl bg-cream-dark/70 border border-cream-border-strong text-peel px-3 text-sm font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-600"
         >
           {ALL_POSITIONS.map((p) => (
-            <option key={p} value={p} className="bg-zinc-900">
+            <option key={p} value={p} className="bg-white">
               {p} · {POSITION_LABEL[p] ?? p}
             </option>
           ))}
@@ -42,7 +42,7 @@ export function PositionPicker({
       </div>
 
       <div>
-        <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+        <p className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
           Polivalencia (toca para marcar)
         </p>
         <div className="flex flex-wrap gap-1.5 mt-1.5">
@@ -57,8 +57,8 @@ export function PositionPicker({
                 title={POSITION_LABEL[p] ?? p}
                 className={`min-h-[36px] px-2.5 rounded-xl border text-xs font-black transition ${
                   active
-                    ? "bg-amber-400/15 border-amber-400/50 text-amber-200"
-                    : "bg-zinc-800/60 border-zinc-800 text-zinc-500 hover:text-zinc-300"
+                    ? "bg-brand-600/15 border-brand-600/50 text-brand-600"
+                    : "bg-white border-cream-border-strong text-[#6c8070] hover:text-peel"
                 }`}
               >
                 {POSITION_SHORT[p] ?? p}

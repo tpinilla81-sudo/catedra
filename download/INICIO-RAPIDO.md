@@ -1,4 +1,4 @@
-# ▶ INICIO RÁPIDO — ECOSYSTEM MÉTODO en local
+# ▶ INICIO RÁPIDO — CATEDRA by Método en local
 
 Guía para levantar la aplicación completa en tu propio ordenador (o en cualquier
 máquina de desarrollo). Sin Docker, sin instalar PostgreSQL: los binarios van
@@ -42,7 +42,7 @@ Abre **http://localhost:3000** y entra con:
 - **Pilar 3 — Ingesta**: partidos con reporte y **pizarra táctica sobre el campo** (Paso 2 de la ingesta). Para añadir un partido nuevo: **Partidos → + Nuevo partido**; al crear salta directo a la ingesta de 3 pasos (semáforo → pizarra → vestuario).
 - **Pilar 4 — Motor Prescriptivo + Hoy**: microciclos propuestos con sesiones MD+1/MD-3/MD-2/MD-1 y auditoría EngineRun (`/dashboard/quality` = panel de control E2E).
 
-> La navegación vive en la **barra inferior fija**: Hoy · Biblioteca · Plantilla · Partidos.
+> La navegación vive en el **menú lateral** (en móvil, el botón ☰ de la barra superior) con todos los pilares visibles: Hoy (P4) · Biblioteca (P1) · Plantilla (P2) · Partidos (P3) · Calidad.
 
 ## 4) Variables de entorno (opcional)
 

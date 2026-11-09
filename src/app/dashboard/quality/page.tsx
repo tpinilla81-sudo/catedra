@@ -88,30 +88,30 @@ export default async function QualityPage() {
   const allGreen = withData.length === PILARES.length && globalFailed === 0;
 
   return (
-    <main className="min-h-screen bg-zinc-950 pb-20">
-      <header className="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
+    <main className="min-h-screen bg-cream pb-20">
+      <header className="border-b border-cream-border bg-white/60">
         <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between gap-3">
           <div className="min-w-0 flex items-center gap-3">
             <Link
               href={user.clubId ? "/" : "/dashboard/catedra"}
               aria-label="Volver"
-              className="w-10 h-10 rounded-2xl border border-zinc-700 flex items-center justify-center text-zinc-400 hover:text-zinc-100 hover:border-zinc-500 shrink-0"
+              className="w-10 h-10 rounded-2xl border border-cream-border-strong flex items-center justify-center text-[#5d7263] hover:text-peel hover:border-[#a8a389] shrink-0"
             >
               <ArrowLeft className="w-5 h-5" aria-hidden />
             </Link>
             <div className="min-w-0">
-              <p className="text-xs text-zinc-500 leading-tight truncate">Calidad · ECOSYSTEM MÉTODO</p>
-              <h1 className="text-xl font-black text-zinc-50 leading-tight">Validación E2E</h1>
+              <p className="text-xs text-[#6c8070] leading-tight truncate">Calidad · CATEDRA by Método</p>
+              <h1 className="text-xl font-black text-peel leading-tight">Validación E2E</h1>
             </div>
           </div>
           <Badge
             variant="outline"
             className={`rounded-full px-3 py-1.5 text-xs font-black shrink-0 ${
               allGreen
-                ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40"
+                ? "bg-brand-600/15 text-brand-600 border-emerald-500/40"
                 : globalFailed > 0
-                  ? "bg-rose-500/15 text-rose-300 border-rose-500/40"
-                  : "bg-zinc-800 text-zinc-400 border-zinc-700"
+                  ? "bg-[#c62f32]/15 text-[#b4232a] border-rose-500/40"
+                  : "bg-cream-dark text-[#5d7263] border-cream-border-strong"
             }`}
           >
             {allGreen ? `✅ ${globalTotal}/${globalTotal} checks` : globalFailed > 0 ? `💥 ${globalFailed} fallos` : "Sin datos"}
@@ -120,7 +120,7 @@ export default async function QualityPage() {
       </header>
 
       <div className="mx-auto max-w-5xl px-4 space-y-4 pt-5">
-        <p className="text-sm text-zinc-400 leading-relaxed">
+        <p className="text-sm text-[#5d7263] leading-relaxed">
           Los 4 pilares del método, el refino de Severidad 3 y el scouting del
           rival (P4.1) se validan de punta a punta contra la base de datos real
           y el servidor HTTP (NextAuth + Tenant Guard). Cada suite escribe aquí
@@ -138,50 +138,50 @@ export default async function QualityPage() {
               aria-label={`Pilar ${p.n}: ${p.title}`}
               className={`rounded-3xl border overflow-hidden ${
                 ok
-                  ? "border-emerald-500/30 bg-emerald-500/[0.04]"
+                  ? "border-emerald-500/30 bg-brand-600/[0.04]"
                   : failed
-                    ? "border-rose-500/40 bg-rose-500/[0.04]"
-                    : "border-zinc-800 bg-zinc-900"
+                    ? "border-rose-500/40 bg-[#c62f32]/[0.04]"
+                    : "border-cream-border bg-white"
               }`}
             >
               <div className="px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-3 min-w-0">
                   {ok ? (
-                    <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" aria-hidden />
+                    <CheckCircle2 className="w-6 h-6 text-brand-600 shrink-0" aria-hidden />
                   ) : failed ? (
-                    <ShieldAlert className="w-6 h-6 text-rose-400 shrink-0" aria-hidden />
+                    <ShieldAlert className="w-6 h-6 text-[#b4232a] shrink-0" aria-hidden />
                   ) : (
-                    <FlaskConical className="w-6 h-6 text-zinc-500 shrink-0" aria-hidden />
+                    <FlaskConical className="w-6 h-6 text-[#6c8070] shrink-0" aria-hidden />
                   )}
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide">
+                    <p className="text-xs font-bold text-[#6c8070] uppercase tracking-wide">
                       {p.label}
                     </p>
-                    <p className="text-base font-black text-zinc-50 truncate">{p.title}</p>
+                    <p className="text-base font-black text-peel truncate">{p.title}</p>
                   </div>
                 </div>
                 <div className="text-right shrink-0">
                   {report ? (
                     <>
-                      <p className={`text-xl font-black ${ok ? "text-emerald-300" : failed ? "text-rose-300" : "text-zinc-300"}`}>
+                      <p className={`text-xl font-black ${ok ? "text-brand-600" : failed ? "text-[#b4232a]" : "text-[#3d5844]"}`}>
                         {report.passed}/{report.total}
-                        <span className="text-xs font-bold text-zinc-500 ml-1">({pct}%)</span>
+                        <span className="text-xs font-bold text-[#6c8070] ml-1">({pct}%)</span>
                       </p>
-                      <p className="text-[11px] text-zinc-500">
+                      <p className="text-[11px] text-[#6c8070]">
                         {fmtDate(report.timestamp)} · {report.durationMs} ms
                       </p>
                     </>
                   ) : (
-                    <p className="text-sm text-zinc-500 max-w-56">{error}</p>
+                    <p className="text-sm text-[#6c8070] max-w-56">{error}</p>
                   )}
                 </div>
               </div>
 
               {report && (
                 <div className="px-5 pb-2">
-                  <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                  <div className="h-1.5 rounded-full bg-cream-dark overflow-hidden">
                     <div
-                      className={`h-full ${ok ? "bg-emerald-400" : "bg-rose-400"}`}
+                      className={`h-full ${ok ? "bg-brand-400" : "bg-[#e05252]"}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -189,21 +189,21 @@ export default async function QualityPage() {
               )}
 
               {report && (
-                <details className="group border-t border-zinc-800/60">
-                  <summary className="cursor-pointer list-none px-5 py-3 text-sm font-semibold text-zinc-400 hover:text-zinc-200 flex items-center justify-between">
+                <details className="group border-t border-cream-border/70">
+                  <summary className="cursor-pointer list-none px-5 py-3 text-sm font-semibold text-[#5d7263] hover:text-[#2a4630] flex items-center justify-between">
                     Detalle de los {report.total} checks
-                    <span className="text-xs text-zinc-600 group-open:hidden">ver</span>
-                    <span className="hidden text-xs text-zinc-600 group-open:inline">ocultar</span>
+                    <span className="text-xs text-[#8a9a8d] group-open:hidden">ver</span>
+                    <span className="hidden text-xs text-[#8a9a8d] group-open:inline">ocultar</span>
                   </summary>
                   <ul className="px-5 pb-4 space-y-1.5">
                     {report.checks.map((c, idx) => (
                       <li key={idx} className="flex items-start gap-2 text-sm">
                         {c.ok ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400/70 mt-0.5 shrink-0" aria-hidden />
+                          <CheckCircle2 className="w-4 h-4 text-brand-600/90 mt-0.5 shrink-0" aria-hidden />
                         ) : (
-                          <XCircle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" aria-hidden />
+                          <XCircle className="w-4 h-4 text-[#b4232a] mt-0.5 shrink-0" aria-hidden />
                         )}
-                        <span className={c.ok ? "text-zinc-400" : "text-rose-200 font-semibold"}>
+                        <span className={c.ok ? "text-[#5d7263]" : "text-[#8f1d22] font-semibold"}>
                           {c.name}
                         </span>
                       </li>
@@ -213,7 +213,7 @@ export default async function QualityPage() {
               )}
 
               <div className="px-5 pb-4">
-                <p className="text-xs text-zinc-600 flex items-center gap-1.5 font-mono">
+                <p className="text-xs text-[#8a9a8d] flex items-center gap-1.5 font-mono">
                   <Terminal className="w-3.5 h-3.5" aria-hidden />
                   {p.script}
                 </p>

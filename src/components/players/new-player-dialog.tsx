@@ -102,17 +102,17 @@ export function NewPlayerDialog() {
     >
       <DialogTrigger asChild>
         <Button
-          className="min-h-[48px] rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black"
+          className="min-h-[48px] rounded-2xl bg-brand-600 hover:bg-brand-400 text-cream font-black"
           aria-label="Añadir jugador nuevo"
         >
           <UserPlus className="w-5 h-5" aria-hidden />
           <span>Nuevo</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="bg-zinc-900 border-zinc-800 rounded-3xl max-w-lg max-h-[92vh] overflow-y-auto">
+      <DialogContent className="bg-white border-cream-border rounded-3xl max-w-lg max-h-[92vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-zinc-50 text-lg font-black">Nuevo jugador</DialogTitle>
-          <DialogDescription className="text-zinc-400 text-sm">
+          <DialogTitle className="text-peel text-lg font-black">Nuevo jugador</DialogTitle>
+          <DialogDescription className="text-[#5d7263] text-sm">
             Alta rápida con su perfil pre-partido completo. Los campos de
             decisión (RPE, lesiones, académico) puedes dejarlos vacíos y
             completarlos después en su ficha.
@@ -122,12 +122,12 @@ export function NewPlayerDialog() {
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label htmlFor="np-first" className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+              <Label htmlFor="np-first" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
                 Nombre *
               </Label>
               <Input
                 id="np-first"
-                className="mt-1 min-h-[48px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+                className="mt-1 min-h-[48px] rounded-2xl bg-cream-dark/70 border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
                 placeholder="Nombre"
                 maxLength={60}
                 value={form.firstName}
@@ -135,12 +135,12 @@ export function NewPlayerDialog() {
               />
             </div>
             <div>
-              <Label htmlFor="np-last" className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+              <Label htmlFor="np-last" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
                 Apellidos
               </Label>
               <Input
                 id="np-last"
-                className="mt-1 min-h-[48px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+                className="mt-1 min-h-[48px] rounded-2xl bg-cream-dark/70 border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
                 placeholder="Apellidos"
                 maxLength={60}
                 value={form.lastName}
@@ -151,13 +151,13 @@ export function NewPlayerDialog() {
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label htmlFor="np-shirt" className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+              <Label htmlFor="np-shirt" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
                 Dorsal (opcional)
               </Label>
               <Input
                 id="np-shirt"
                 inputMode="numeric"
-                className="mt-1 min-h-[48px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+                className="mt-1 min-h-[48px] rounded-2xl bg-cream-dark/70 border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
                 placeholder="0-999"
                 maxLength={3}
                 value={form.shirtNumber}
@@ -165,13 +165,13 @@ export function NewPlayerDialog() {
               />
             </div>
             <div>
-              <Label htmlFor="np-rpe" className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+              <Label htmlFor="np-rpe" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
                 RPE actual (1-{RPE_MAX})
               </Label>
               <Input
                 id="np-rpe"
                 inputMode="numeric"
-                className="mt-1 min-h-[48px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+                className="mt-1 min-h-[48px] rounded-2xl bg-cream-dark/70 border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
                 placeholder={`1-${RPE_MAX}, vacío = sin marcar`}
                 maxLength={2}
                 value={form.currentRpe}
@@ -197,12 +197,12 @@ export function NewPlayerDialog() {
           />
 
           <div>
-            <Label htmlFor="np-injury" className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+            <Label htmlFor="np-injury" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
               Lesiones activas / precauciones médicas
             </Label>
             <Textarea
               id="np-injury"
-              className="mt-1 min-h-[64px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+              className="mt-1 min-h-[64px] rounded-2xl bg-cream-dark/70 border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
               placeholder="Ej.: esguince de tobillo derecho, alta prevista en 3 semanas"
               maxLength={500}
               value={form.injuryHistory}
@@ -211,12 +211,12 @@ export function NewPlayerDialog() {
           </div>
 
           <div>
-            <Label htmlFor="np-academic" className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+            <Label htmlFor="np-academic" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
               Horarios / estrés académico
             </Label>
             <Textarea
               id="np-academic"
-              className="mt-1 min-h-[64px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+              className="mt-1 min-h-[64px] rounded-2xl bg-cream-dark/70 border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
               placeholder="Ej.: exámenes esta semana, llega tarde los martes"
               maxLength={500}
               value={form.academicConstraints}
@@ -225,12 +225,12 @@ export function NewPlayerDialog() {
           </div>
 
           <div>
-            <Label htmlFor="np-strength" className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+            <Label htmlFor="np-strength" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
               Fortaleza principal
             </Label>
             <Input
               id="np-strength"
-              className="mt-1 min-h-[48px] rounded-2xl bg-zinc-800/60 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+              className="mt-1 min-h-[48px] rounded-2xl bg-cream-dark/70 border-cream-border-strong text-peel placeholder:text-[#8a9a8d]"
               placeholder="Ej.: desmarque al espacio"
               maxLength={500}
               value={form.strength}
@@ -239,7 +239,7 @@ export function NewPlayerDialog() {
           </div>
 
           {error && (
-            <p role="alert" className="rounded-2xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-300">
+            <p role="alert" className="rounded-2xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm font-semibold text-[#b4232a]">
               {error}
             </p>
           )}
@@ -247,7 +247,7 @@ export function NewPlayerDialog() {
           <Button
             onClick={submit}
             disabled={pending || form.firstName.trim().length === 0}
-            className="w-full min-h-[56px] rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-base"
+            className="w-full min-h-[56px] rounded-2xl bg-brand-600 hover:bg-brand-400 text-cream font-black text-base"
           >
             {pending ? (
               <Loader2 className="w-5 h-5 animate-spin" aria-hidden />
