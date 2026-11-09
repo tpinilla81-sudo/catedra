@@ -131,3 +131,20 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ============================================================================
+   PIZARRA ANIMADA (Biblioteca) — carril de pase con dash en marcha
+   ========================================================================== */
+@keyframes pizarra-dash {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+.pizarra-dash {
+  animation: pizarra-dash 0.55s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pizarra-dash {
+    animation: none;
+  }
+}

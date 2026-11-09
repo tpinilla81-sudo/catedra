@@ -15,10 +15,10 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarClock,
-  Copy,
   Clock,
   CopyPlus,
   Loader2,
+  MonitorPlay,
   Network,
   PenLine,
   Ruler,
@@ -59,6 +59,8 @@ import {
   normalizeName,
 } from "@/lib/taxonomy";
 import type { LibraryData, TaskCard } from "@/components/library/types";
+import { seleccionarAnimacion } from "@/lib/animaciones-ejercicio";
+import { PizarraAnimada } from "@/components/library/pizarra-animada";
 import { useToast } from "@/hooks/use-toast";
 
 // ---------- Tarjeta compacta ----------
@@ -73,6 +75,8 @@ function TaskCardItem({
   const origin = task.clubId === null ? ORIGIN_META.cathedral : ORIGIN_META.club;
   const intensity = INTENSITY_META[task.intensity] ?? INTENSITY_META.MEDIUM;
   const topRecipes = [...task.recipes].sort((a, b) => b.relevance - a.relevance).slice(0, 2);
+  // Animación determinista de la mecánica (misma tarea → misma pizarra)
+  const anim = useMemo(() => seleccionarAnimacion(task), [task]);
 
   return (
     <button
@@ -91,6 +95,11 @@ function TaskCardItem({
       </div>
 
       <p className="text-sm text-[#5d7263] mt-1 line-clamp-2 leading-snug">{task.objective}</p>
+
+      {/* Mini-pizarra animada: la mecánica del ejercicio, en movimiento */}
+      <div className="mt-2.5">
+        <PizarraAnimada animacion={anim} variante="mini" />
+      </div>
 
       <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
         {task.phases.map((p) => {
@@ -354,6 +363,8 @@ export function TaskDetailSheet({
   const [busy, startTransition] = useTransition();
   const { toast } = useToast();
   const router = useRouter();
+  // Animación determinista de la mecánica (null mientras no hay tarea abierta)
+  const anim = useMemo(() => (task ? seleccionarAnimacion(task) : null), [task]);
 
   const isClub = task ? task.clubId !== null : false;
   const origin = task ? (isClub ? ORIGIN_META.club : ORIGIN_META.cathedral) : ORIGIN_META.cathedral;
@@ -432,6 +443,18 @@ export function TaskDetailSheet({
             </SheetHeader>
 
             <p className="text-sm text-[#3d5844] leading-relaxed mt-1">{task.objective}</p>
+
+            {/* Pizarra animada: patrón de movimiento, carriles de pase y rotaciones */}
+            <div className="mt-4 rounded-3xl border border-cream-border bg-cream-dark/30 p-3">
+              <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                <MonitorPlay className="w-3.5 h-3.5" aria-hidden /> Pizarra en movimiento
+              </p>
+              {anim && (
+                <div className="mx-auto max-w-md">
+                  <PizarraAnimada animacion={anim} variante="detalle" />
+                </div>
+              )}
+            </div>
 
             {/* Metadatos de ingeniería */}
             <div className="grid grid-cols-2 gap-2 mt-4">
