@@ -29,7 +29,7 @@ BUNDLE="$HERE/catedra-deploy.bundle"
 [ -f "$BUNDLE" ] || die "No encuentro catedra-deploy.bundle en esta carpeta — descárgalo del chat junto a este script (versión ACTUALIZADA de hoy)"
 DIGEST="$(sha256sum "$BUNDLE" 2>/dev/null | cut -d' ' -f1 || shasum -a 256 "$BUNDLE" | cut -d' ' -f1)"
 case "$DIGEST" in
-  910ef424fb47b4046c15*) ok "bundle verificado (sha256 correcto — ficha rápida 1-toque + workflow catedra-sooty)" ;;
+  2a83650320f4863d0781ccbc*) ok "bundle verificado (sha256 correcto — perfil pre-partido 5 métricas + ficha rápida 1-toque)" ;;
   *) die "El bundle NO es la versión actualizada (descargaste el antiguo) → bórralo y descarga el nuevo del chat" ;;
 esac
 
@@ -50,7 +50,7 @@ else
   gh repo clone tpinilla81-sudo/catedra "$REPO_DIR" || die "No pude clonar tpinilla81-sudo/catedra (¿es el nombre exacto del repo?)"
 fi
 
-step "3/5  Incorporar los cambios del paquete (rebranding + schema Pilar 2 + Pizarra Pilar 3 + workflow de deploy)"
+step "3/5  Incorporar los cambios del paquete (perfil pre-partido 5 métricas + ficha rápida 1-toque + workflow de deploy)"
 git -C "$REPO_DIR" fetch "$BUNDLE" "+refs/heads/main:refs/heads/desde-chat" || die "No pude leer el bundle"
 if git -C "$REPO_DIR" rev-parse -q --verify main >/dev/null 2>&1; then
   git -C "$REPO_DIR" checkout main >/dev/null 2>&1 || die "No pude cambiar a la rama main"
