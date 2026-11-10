@@ -4,8 +4,7 @@
 # • Corteza: anillo verde profundo #17552C
 # • Albura (segundo anillo): crema #F1EDDA
 # • 6 gajos verde claro #A8D878 separados por radios crema
-# • Centro blanco con "C" espejada: mitad superior verde→C blanca,
-#   mitad inferior blanco→C verde
+# • Centro blanco con UNA "C" normal, verde y estrecha (arco elíptico fino)
 # Genera: public/logo.svg (1024) y src/app/icon.svg (favicon, mismo dibujo)
 # ============================================================================
 import math
@@ -57,38 +56,27 @@ for i in range(0, N, 2):
     a1 = (i + 1) * (360 / N) - GAP
     parts.append(f'<g fill="{LIME_LIGHT}" opacity="0.55">{wedge(CX, CY, R_IN, R_OUT, a0, a1)}</g>')
 
-# Centro blanco (todo clipeado al círculo central para no pisar los gajos)
-parts.append(f'<clipPath id="cc"><circle cx="{CX}" cy="{CY}" r="150"/></clipPath>')
-parts.append('<g clip-path="url(#cc)">')
+# Centro blanco con UNA "C" normal, verde y estrecha (a petición del míster):
+# sin efecto espejado — letra C clásica de trazo fino, algo condensada
+# (elipse rx<ry), color verde corteza #17552C sobre blanco.
 parts.append(f'<circle cx="{CX}" cy="{CY}" r="150" fill="{PAPER}"/>')
-# Mitad superior del centro en verde (para la C blanca)
-parts.append(f'<path d="M {CX-150} {CY} A 150 150 0 0 1 {CX+150} {CY} Z" fill="{DEEP}"/>')
 
-# Letra C (Geist-like: trazo grueso geométrico). La dibujamos como path único
-# centrado, luego dos copias clipadas a cada mitad con colores intercambiados.
-C_PATH = (
-    "M 601.5 415.5 "
-    "C 578 375.5 540.5 352 494 352 "
-    "C 420 352 368 408 368 512 "
-    "C 368 616 420 672 494 672 "
-    "C 540.5 672 578 648.5 601.5 608.5 "
-    "L 663 641 "
-    "C 630 700.5 570 738 494 738 "
-    "C 379 738 296 650 296 512 "
-    "C 296 374 379 286 494 286 "
-    "C 570 286 630 323.5 663 383 "
-    "Z"
+# C como arco elíptico de trazo estrecho. Terminales cortados en radial
+# (cap "butt": la cara del corte es perpendicular al trazo = corte de letra clásica).
+# Apertura de ±40° a la derecha; el arco va de 320° a 40° pasando por arriba.
+C_RX = 96    # semieje horizontal (menor que el vertical → C estrecha)
+C_RY = 106   # semieje vertical
+C_W = 32     # grosor del trazo (estrecho; el anterior era ~58)
+def c_point(deg, rx, ry):
+    a = math.radians(deg)
+    return (CX + rx * math.cos(a), CY + ry * math.sin(a))
+
+x0, y0 = c_point(320, C_RX + C_W / 2, C_RY + C_W / 2)
+x1, y1 = c_point(40, C_RX + C_W / 2, C_RY + C_W / 2)
+parts.append(
+    f'<path d="M {x0:.2f} {y0:.2f} A {C_RX + C_W / 2:.0f} {C_RY + C_W / 2:.0f} 0 1 0 {x1:.2f} {y1:.2f}" '
+    f'fill="none" stroke="{DEEP}" stroke-width="{C_W}"/>'
 )
-parts.append(f'<clipPath id="topHalf"><rect x="{CX-160}" y="{CY-160}" width="320" height="160"/></clipPath>')
-parts.append(f'<clipPath id="bottomHalf"><rect x="{CX-160}" y="{CY}" width="320" height="160"/></clipPath>')
-# El path de la C está centrado en (479.5, 512): lo re-centramos al (512,512)
-# y escalamos 0.8 para que quepa en el círculo blanco (r=150).
-C_TRANSFORM = f'transform="translate({CX} {CY}) scale(0.8) translate(-479.5 -{CY})"'
-# Mitad superior: fondo verde → C blanca
-parts.append(f'<g clip-path="url(#topHalf)"><path d="{C_PATH}" fill="{PAPER}" {C_TRANSFORM}/></g>')
-# Mitad inferior: fondo blanco → C verde
-parts.append(f'<g clip-path="url(#bottomHalf)"><path d="{C_PATH}" fill="{DEEP}" {C_TRANSFORM}/></g>')
-parts.append('</g>')
 
 svg = (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">'
