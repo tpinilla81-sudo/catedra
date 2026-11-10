@@ -611,7 +611,7 @@ export function TaxonomyTab({
 
               {/* Acciones (RBAC: solo roles de escritura; el alcance depende del modo) */}
               <div className="mt-5 space-y-2">
-                {canWrite && (detail.clubId !== null ? !platform : platform) && (
+                {canWrite && (!platform || detail.clubId === null) && (
                   <>
                     <div className="grid grid-cols-2 gap-2">
                       <Button

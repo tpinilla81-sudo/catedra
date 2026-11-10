@@ -6,13 +6,13 @@
 // Taxonomía (SubPrinciple) y Catálogo de Tareas (Task) con su motor relacional
 // de "recetas" (TaskSubPrinciple, relevancia 1-3).
 //
-// REGLAS DE ORO (multi-tenant + integridad de la Cátedra):
-//   1. El contenido GLOBAL de la Cátedra (clubId = null) es SOLO LECTURA para
-//      los clubs. Un usuario de club nunca puede editar/eliminar contenido
-//      global — el Tenant Guard solo garantiza VISIBILIDAD (OR: club | null),
-//      así que cada mutación valida explícitamente la propiedad del registro.
-//   2. "Duplicar a mi club" es la vía oficial para personalizar la Cátedra:
-//      crea una copia clubId-scoped con sus recetas/hijos remapeados.
+// REGLAS DE ORO (multi-tenant + propiedad del despliegue):
+//   1. El contenido GLOBAL de la Cátedra (clubId = null) lo escribe
+//      PLATFORM_ADMIN y TAMBIÉN el COACH_ADMIN del club (dueño del
+//      despliegue, a petición del míster: edita la Cátedra directamente).
+//      El Tenant Guard solo garantiza VISIBILIDAD (OR: club | null);
+//      writeGuard (compartido con la REST API) valida el rol por fila.
+//   2. "Duplicar a mi club" sigue disponible como vía rápida de copia.
 //   3. Una tarea prescrita en microciclos históricos NO se elimina (trazabilidad
 //      del motor: SessionTask.prescribedIssueId y el rationale del míster).
 //   4. Jerarquía máxima de 2 niveles (subprincipio → detalle) para mantener

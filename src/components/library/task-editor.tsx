@@ -10,8 +10,9 @@
 //   • Fases del juego (multi-selección)
 //   • MOTOR DE RECETAS: conexión bidireccional con la taxonomía ponderando
 //     relevancia 1-3 (Núcleo / Refuerza / Apoyo) + nota de uso.
-// El contenido de la Cátedra no llega aquí (solo lectura) — se abre siempre
-// sobre una copia del club o sobre una tarea nueva.
+// Se abre sobre cualquier tarea visible: copias del club, tareas nuevas y —
+// desde la petición del míster — también sobre las tareas de la Cátedra
+// (el COACH_ADMIN edita la Cátedra directamente; el guard autoriza).
 // ============================================================================
 
 import { useMemo, useState, useTransition } from "react";

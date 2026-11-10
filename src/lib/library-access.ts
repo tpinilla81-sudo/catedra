@@ -7,12 +7,15 @@
 // así ambas vías de escritura aplican EXACTAMENTE las mismas reglas de RBAC,
 // multi-tenancy y validación de ficha de tarea. Nada de I/O aquí.
 //
-// REGLAS DE ORO (multi-tenant + integridad de la Cátedra):
-//   1. El contenido GLOBAL de la Cátedra (clubId = null) es SOLO LECTURA para
-//      los clubs. Solo PLATFORM_ADMIN escribe contenido global.
-//   2. "Duplicar a mi club" es la vía oficial para personalizar la Cátedra.
-//   3. RBAC: ANALYST solo lectura · COACH_ADMIN CRUD de su club ·
-//      PLATFORM_ADMIN CRUD del contenido global (nunca el de un club).
+// REGLAS DE ORO (multi-tenant + propiedad del despliegue):
+//   1. El contenido GLOBAL de la Cátedra (clubId = null) lo escribe
+//      PLATFORM_ADMIN y, a partir de la petición del míster, TAMBIÉN el
+//      COACH_ADMIN del club (es dueño del despliegue: ajusta tareas y
+//      taxonomía sembradas sin duplicar). ANALYST sigue de solo lectura.
+//   2. "Duplicar a mi club" sigue disponible como vía rápida para
+//      personalizar sin tocar la Cátedra.
+//   3. RBAC: ANALYST solo lectura · COACH_ADMIN CRUD de su club Y de la
+//      Cátedra · PLATFORM_ADMIN CRUD del contenido global (nunca de un club).
 // ============================================================================
 
 import type { User } from "@prisma/client";
@@ -23,7 +26,7 @@ export const INTENSITIES = ["LOW", "MEDIUM", "HIGH"];
 export const MSG_READONLY_ANALYST =
   "Tu rol (Analista) es de solo lectura. Solicita al míster los cambios de la biblioteca.";
 export const MSG_CATEDRA_READONLY =
-  "El contenido oficial de la Cátedra es de solo lectura. Duplica a tu club para personalizarlo.";
+  "Tu rol (Analista) es de solo lectura: la biblioteca la edita el míster.";
 export const MSG_PLATFORM_NO_CLUB =
   "La Cátedra gestiona contenido global: nunca edita el contenido privado de un club.";
 
@@ -35,9 +38,11 @@ export function writeGuard(
 ): string | null {
   // 1) ANALYST: solo lectura en todo el sistema.
   if (user.role === "ANALYST") return MSG_READONLY_ANALYST;
-  // 2) Contenido global de la Cátedra: exclusivo de PLATFORM_ADMIN.
+  // 2) Contenido global de la Cátedra: PLATFORM_ADMIN o COACH_ADMIN del club
+  //    (dueño del despliegue — el míster edita tareas y taxonomía sembradas).
   if (targetClubId === null) {
-    return user.role === "PLATFORM_ADMIN" ? null : MSG_CATEDRA_READONLY;
+    if (user.role === "PLATFORM_ADMIN") return null;
+    return user.role === "COACH_ADMIN" ? null : MSG_CATEDRA_READONLY;
   }
   // 3) Contenido de club: solo el COACH_ADMIN del club dueño.
   if (user.role === "PLATFORM_ADMIN") return MSG_PLATFORM_NO_CLUB;

@@ -604,11 +604,9 @@ export function TaskDetailSheet({
               <p className="rounded-2xl border border-dashed border-cream-border-strong px-4 py-3 text-sm text-[#6c8070]">
                 Esta tarea no está conectada a la taxonomía. El motor solo prescribe tareas con
                 recetas —{" "}
-                {platform || isClub
+                {canWrite && (!platform || !isClub)
                   ? "edítala y añade sus subprincipios."
-                  : canWrite
-                    ? "duplica a tu club y conéctala."
-                    : "solicita al míster conectarla."}
+                  : "solicita al míster conectarla."}
               </p>
             )}
 
@@ -622,7 +620,7 @@ export function TaskDetailSheet({
 
             {/* Acciones (RBAC: solo roles de escritura; el alcance depende del modo) */}
             <div className="mt-5 space-y-2">
-              {canWrite && (isClub ? !platform : platform) && (
+              {canWrite && (!platform || !isClub) && (
                 <>
                   <Button
                     onClick={() => onEdit(task)}
