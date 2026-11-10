@@ -1,0 +1,69 @@
+name: Autopilot — aplicar paquete del agente
+
+# Aplica a producción el paquete (bundle) que el agente prepara y entrega
+# como URL pública + su sha256. El humano solo pulsa "Run workflow" (vale
+# desde el móvil). Todo lo demás (verificar, fusionar, subir) lo hace aquí,
+# dentro de GitHub, con los permisos del propio repo. El push a main dispara
+# el workflow "CI migraciones Neon" y el deploy nativo de Vercel.
+
+on:
+  workflow_dispatch:
+    inputs:
+      paquete_url:
+        description: "URL del paquete .bundle preparado por el agente"
+        required: true
+        type: string
+      paquete_sha256:
+        description: "SHA256 esperado del paquete (lo da el agente)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: autopilot
+  cancel-in-progress: false
+
+jobs:
+  aplicar-y-publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar repo completo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Descargar y VERIFICAR el paquete (integridad sha256)
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o /tmp/paquete.bundle "${{ inputs.paquete_url }}"
+          echo "${{ inputs.paquete_sha256 }}  /tmp/paquete.bundle" | sha256sum -c -
+
+      - name: Incorporar el paquete (SOLO fast-forward, sin fusión a ciegas)
+        run: |
+          set -euo pipefail
+          git config user.name "autopilot-catedra"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch /tmp/paquete.bundle "+refs/heads/main:refs/heads/desde-chat"
+          if git merge --ff-only desde-chat; then
+            echo "Paquete incorporado (fast-forward limpio)"
+          else
+            echo "::error::El remoto avanzó por otro sitio y el paquete no es fast-forward. No se toca nada. Avisa al agente."
+            exit 1
+          fi
+
+      - name: Publicar en main (esto dispara migración Neon + deploy Vercel)
+        run: |
+          set -euo pipefail
+          git push origin main
+
+      - name: Resumen
+        run: |
+          {
+            echo "### ✅ Autopilot aplicado"
+            echo ""
+            echo "Commit en producción: \`$(git log --oneline -1)\`"
+            echo ""
+            echo "Siguiente: ver 'CI migraciones Neon' en verde y el deploy en Vercel."
+          } >> "$GITHUB_STEP_SUMMARY"
