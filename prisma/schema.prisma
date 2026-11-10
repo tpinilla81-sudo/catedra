@@ -522,6 +522,7 @@ model Task {
   coachingPoints     String[] /// Puntos clave para el entrenador
   materials          String[] /// Conos, petos, maniquíes...
   diagramUrl         String? /// Diagrama / pizarra de la tarea
+  animationData      Json? /// Pizarra animada personalizada del míster (Animacion: fotogramas, fichas y balón) — JSON ligero, sin vídeo
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 

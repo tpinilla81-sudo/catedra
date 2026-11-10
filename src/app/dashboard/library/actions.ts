@@ -18,11 +18,9 @@
 //   4. Jerarquía máxima de 2 niveles (subprincipio → detalle) para mantener
 //      el árbol legible en tablet y evitar ciclos.
 //
-// RBAC (jerarquía de roles + propiedad del registro — utils/permissions.ts):
-//   • ANALYST        → SOLO LECTURA. Ninguna mutación, ni de club ni global.
-//   • COACH_ADMIN    → CRUD completo del contenido PROPIO del club.
-//   • PLATFORM_ADMIN → CRUD del contenido GLOBAL de la Cátedra (clubId = null)
-//     desde /dashboard/catedra. Nunca toca contenido de un club concreto.
+// RBAC, validadores y mensajes viven en src/lib/library-access.ts (compartidos
+// con la REST API del Pilar 2 — /api/pilar2/tasks — para que ambas vías de
+// escritura apliquen EXACTAMENTE las mismas reglas).
 // ============================================================================
 
 import { revalidatePath } from "next/cache";
@@ -31,6 +29,22 @@ import type { GamePhase, User } from "@prisma/client";
 import { getSessionUser } from "@/lib/session";
 import { createTenantClient } from "@/lib/tenant";
 import { db } from "@/lib/db";
+import { parseAnimacionGuardada } from "@/lib/animacion-guardada";
+import {
+  INTENSITIES,
+  MSG_CATEDRA_READONLY,
+  MSG_PLATFORM_NO_CLUB,
+  MSG_READONLY_ANALYST,
+  PHASES,
+  cleanStr,
+  createGuard,
+  duplicateGuard,
+  optInt,
+  optStr,
+  reqInt,
+  strList,
+  writeGuard,
+} from "@/lib/library-access";
 
 // ---------- Tipos públicos ----------
 
@@ -65,6 +79,8 @@ export type TaskInput = {
   coachingPoints: string[];
   materials: string[];
   diagramUrl: string | null;
+  /** Pizarra animada diseñada por el míster (Animacion del builder) · null = sin pizarra propia */
+  animationData?: unknown;
   recipes: RecipeInput[];
 };
 
@@ -79,13 +95,6 @@ type LibraryContext = {
   /** Club: cliente con Tenant Guard · Plataforma: cliente base */
   db: ReturnType<typeof createTenantClient>;
 };
-
-const MSG_READONLY_ANALYST =
-  "Tu rol (Analista) es de solo lectura. Solicita al míster los cambios de la biblioteca.";
-const MSG_CATEDRA_READONLY =
-  "El contenido oficial de la Cátedra es de solo lectura. Duplica a tu club para personalizarlo.";
-const MSG_PLATFORM_NO_CLUB =
-  "La Cátedra gestiona contenido global: nunca edita el contenido privado de un club.";
 
 async function requireLibraryContext(): Promise<LibraryContext> {
   const sessionUser = await getSessionUser();
@@ -105,81 +114,10 @@ async function requireLibraryContext(): Promise<LibraryContext> {
   return { user, clubId: sessionUser.clubId, db: dbT };
 }
 
-// ---------- Guard de escritura (jerarquía de roles + propiedad) ----------
-
-function writeGuard(
-  user: User,
-  targetClubId: string | null,
-  ctxClubId: string | null,
-): string | null {
-  // 1) ANALYST: solo lectura en todo el sistema.
-  if (user.role === "ANALYST") return MSG_READONLY_ANALYST;
-  // 2) Contenido global de la Cátedra: exclusivo de PLATFORM_ADMIN.
-  if (targetClubId === null) {
-    return user.role === "PLATFORM_ADMIN"
-      ? null
-      : MSG_CATEDRA_READONLY;
-  }
-  // 3) Contenido de club: solo el COACH_ADMIN del club dueño.
-  if (user.role === "PLATFORM_ADMIN") return MSG_PLATFORM_NO_CLUB;
-  return targetClubId === ctxClubId ? null : "No puedes editar contenido de otro club.";
-}
-
-function createGuard(user: User, ctxClubId: string | null): string | null {
-  // Plataforma: crea contenido global de la Cátedra.
-  if (ctxClubId === null) return user.role === "PLATFORM_ADMIN" ? null : MSG_CATEDRA_READONLY;
-  // Club: ANALYST no escribe; COACH_ADMIN crea contenido del club.
-  if (user.role === "ANALYST") return MSG_READONLY_ANALYST;
-  return null;
-}
-
-function duplicateGuard(user: User, ctxClubId: string | null): string | null {
-  // Duplicar a mi club = crear contenido del club → COACH_ADMIN en contexto club.
-  if (ctxClubId === null) return MSG_PLATFORM_NO_CLUB;
-  if (user.role === "ANALYST") return MSG_READONLY_ANALYST;
-  return null;
-}
-
 // ---------- Validadores (mensajes claros en lenguaje de míster) ----------
-
-const PHASES = ["OFFENSIVE", "DEFENSIVE", "OFF_TRANSITION", "DEF_TRANSITION", "SET_PIECE"];
-const INTENSITIES = ["LOW", "MEDIUM", "HIGH"];
 
 function fail(error: string): ActionResult {
   return { ok: false, error };
-}
-
-function cleanStr(v: unknown, max: number): string {
-  return typeof v === "string" ? v.trim().slice(0, max) : "";
-}
-
-function optStr(v: unknown, max: number): string | null {
-  const s = cleanStr(v, max);
-  return s.length > 0 ? s : null;
-}
-
-function optInt(v: unknown, min: number, max: number): number | null {
-  if (v === null || v === undefined || v === "") return null;
-  const n = Math.round(Number(v));
-  if (!Number.isFinite(n)) return null;
-  return Math.min(max, Math.max(min, n));
-}
-
-function reqInt(v: unknown, min: number, max: number): number | null {
-  return optInt(v, min, max);
-}
-
-function strList(v: unknown, maxItems: number): string[] | null {
-  if (!Array.isArray(v)) return null;
-  const out: string[] = [];
-  for (const item of v) {
-    const s = cleanStr(item, 160);
-    if (s.length === 0) continue;
-    if (out.includes(s)) continue;
-    out.push(s);
-    if (out.length >= maxItems) break;
-  }
-  return out;
 }
 
 // ---------- Revalidación común ----------
@@ -383,6 +321,19 @@ export async function saveTask(input: TaskInput): Promise<ActionResult> {
     });
   }
 
+  // ---------- Pizarra animada (Json? — el builder compila el Animacion) ----------
+  // null/undefined → sin pizarra propia (NULL en BD, la UI usa la plantilla).
+  // Objeto inválido → error claro: NUNCA se persiste un JSON corrupto.
+  let animationData: unknown = null;
+  if (input.animationData !== undefined && input.animationData !== null) {
+    const anim = parseAnimacionGuardada(input.animationData);
+    if (!anim)
+      return fail(
+        "La pizarra animada no es válida (máx. 40 fotogramas × 22 fichas). Vuelve a abrirla en el editor y guárdala de nuevo.",
+      );
+    animationData = anim;
+  }
+
   const data = {
     title,
     objective,
@@ -399,6 +350,7 @@ export async function saveTask(input: TaskInput): Promise<ActionResult> {
     coachingPoints: points as never,
     materials: materials as never,
     diagramUrl,
+    animationData: animationData as never,
   };
 
   // ---------- EDICIÓN (RBAC: ANALYST ❌ · club solo lo propio · global solo Cátedra) ----------
@@ -503,6 +455,7 @@ export async function duplicateTaskToClub(id: string): Promise<ActionResult> {
       coachingPoints: row.coachingPoints,
       materials: row.materials,
       diagramUrl: row.diagramUrl,
+      animationData: row.animationData ?? undefined,
       createdById: user.id,
       subPrinciples: {
         create: row.subPrinciples.map((r) => ({

@@ -75,8 +75,9 @@ function TaskCardItem({
   const origin = task.clubId === null ? ORIGIN_META.cathedral : ORIGIN_META.club;
   const intensity = INTENSITY_META[task.intensity] ?? INTENSITY_META.MEDIUM;
   const topRecipes = [...task.recipes].sort((a, b) => b.relevance - a.relevance).slice(0, 2);
-  // Animación determinista de la mecánica (misma tarea → misma pizarra)
-  const anim = useMemo(() => seleccionarAnimacion(task), [task]);
+  // Pizarra de la tarea: la PERSONALIZADA del míster si existe; si no, la
+  // plantilla determinista de la mecánica (misma tarea → misma pizarra)
+  const anim = useMemo(() => task.animationData ?? seleccionarAnimacion(task), [task]);
 
   return (
     <button
@@ -363,8 +364,11 @@ export function TaskDetailSheet({
   const [busy, startTransition] = useTransition();
   const { toast } = useToast();
   const router = useRouter();
-  // Animación determinista de la mecánica (null mientras no hay tarea abierta)
-  const anim = useMemo(() => (task ? seleccionarAnimacion(task) : null), [task]);
+  // Pizarra: la PERSONALIZADA guardada si existe; si no, plantilla (null sin tarea)
+  const anim = useMemo(
+    () => (task ? task.animationData ?? seleccionarAnimacion(task) : null),
+    [task],
+  );
 
   const isClub = task ? task.clubId !== null : false;
   const origin = task ? (isClub ? ORIGIN_META.club : ORIGIN_META.cathedral) : ORIGIN_META.cathedral;
@@ -448,6 +452,11 @@ export function TaskDetailSheet({
             <div className="mt-4 rounded-3xl border border-cream-border bg-cream-dark/30 p-3">
               <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest mb-2 flex items-center gap-1.5">
                 <MonitorPlay className="w-3.5 h-3.5" aria-hidden /> Pizarra en movimiento
+                {task.animationData && (
+                  <span className="rounded-md bg-brand-600/15 border border-emerald-500/50 px-1.5 py-0.5 text-[9px] font-black text-brand-600 normal-case">
+                    diseñada por el míster
+                  </span>
+                )}
               </p>
               {anim && (
                 <div className="mx-auto max-w-md">

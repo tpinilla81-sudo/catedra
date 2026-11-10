@@ -37,6 +37,8 @@ import {
   normalizeName,
 } from "@/lib/taxonomy";
 import type { SPNode, TaskCard } from "@/components/library/types";
+import type { Animacion } from "@/lib/animaciones-ejercicio";
+import { TacticalAnimationBuilder } from "@/components/library/tactical-animation-builder";
 import { useToast } from "@/hooks/use-toast";
 
 type RecipeDraft = { subPrincipleId: string; relevance: number; usageNote: string };
@@ -57,6 +59,8 @@ type Draft = {
   points: string[];
   materials: string[];
   diagramUrl: string;
+  /** Pizarra animada personalizada (null = sin pizarra propia) */
+  animationData: Animacion | null;
   recipes: RecipeDraft[];
 };
 
@@ -77,6 +81,7 @@ function initialDraft(task: TaskCard | null): Draft {
     points: task ? [...task.coachingPoints] : [],
     materials: task ? [...task.materials] : [],
     diagramUrl: task?.diagramUrl ?? "",
+    animationData: task?.animationData ?? null,
     recipes: task
       ? task.recipes.map((r) => ({
           subPrincipleId: r.subPrincipleId,
@@ -284,6 +289,8 @@ export function TaskEditor({
       coachingPoints: draft.points,
       materials: draft.materials,
       diagramUrl: draft.diagramUrl,
+      // La pizarra viaja con la ficha: guardar la tarea guarda la animación
+      animationData: draft.animationData,
       recipes: draft.recipes.map((r) => ({
         subPrincipleId: r.subPrincipleId,
         relevance: r.relevance,
@@ -511,6 +518,14 @@ export function TaskEditor({
           inputMode="url"
           className="min-h-[44px] rounded-2xl bg-cream-dark/70 border-cream-border text-peel placeholder:text-[#8a9a8d]"
         />
+
+        {/* ---------- PIZARRA TÁCTICA ANIMADA (se guarda con la ficha) ---------- */}
+        <div className="mt-5">
+          <TacticalAnimationBuilder
+            value={draft.animationData}
+            onChange={(anim) => set("animationData", anim)}
+          />
+        </div>
 
         {/* ---------- MOTOR DE RECETAS ---------- */}
         <SectionTitle>

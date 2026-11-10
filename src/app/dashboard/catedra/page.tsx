@@ -11,6 +11,7 @@
 import { LibraryView } from "@/components/library/library-view";
 import type { LibraryData, RecipeLink, SPNode, TaskCard } from "@/components/library/types";
 import { requirePlatformContext } from "@/lib/session";
+import { parseAnimacionGuardada } from "@/lib/animacion-guardada";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +89,7 @@ export default async function CatedraPage() {
     coachingPoints: t.coachingPoints,
     materials: t.materials,
     diagramUrl: t.diagramUrl,
+    animationData: parseAnimacionGuardada(t.animationData),
     createdByName: t.createdBy?.name ?? null,
     usageCount: t._count.sessions,
     recipes: recipesByTask.get(t.id) ?? [],

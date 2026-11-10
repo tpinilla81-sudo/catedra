@@ -7,6 +7,8 @@
 //   tarea → subprincipios que aborda      (¿qué corrige esta tarea?)
 // ============================================================================
 
+import type { Animacion } from "@/lib/animaciones-ejercicio";
+
 export type RecipeLink = {
   subPrincipleId: string;
   relevance: number; // 1 = apoyo · 2 = refuerza · 3 = núcleo
@@ -47,6 +49,8 @@ export type TaskCard = {
   coachingPoints: string[];
   materials: string[];
   diagramUrl: string | null;
+  /** Pizarra animada PERSONALIZADA del míster (si no, la UI usa la plantilla determinista) */
+  animationData: Animacion | null;
   createdByName: string | null;
   /** Veces prescrita por el motor en microciclos (trazabilidad) */
   usageCount: number;
