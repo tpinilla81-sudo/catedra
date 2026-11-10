@@ -33,6 +33,11 @@ import {
   type VoiceOutcome,
   type VoicePt,
 } from "@/lib/voice-events";
+import {
+  createYouTubePlayer,
+  parseVideoUrl,
+  type YTPlayerLike,
+} from "@/lib/video-url";
 
 export type SpatialSaveInput = {
   startX: number; /// origen del vector (causa), 0-100
@@ -96,6 +101,13 @@ export function SpatialEventWhiteboard({
   const videoRef = useRef<HTMLVideoElement>(null);
   const clipStopRef = useRef<((e: Event) => void) | null>(null);
 
+  // ---- vídeo: directo (mp4) o YouTube (IFrame API, tipos propios) ----------
+  const parsedVideo = useMemo(() => parseVideoUrl(videoUrl), [videoUrl]);
+  const ytHostRef = useRef<HTMLDivElement>(null);
+  const ytPlayerRef = useRef<YTPlayerLike | null>(null);
+  const ytPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ytClipRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const [videoTime, setVideoTime] = useState(0);
   const [drag, setDrag] = useState<{ origin: Pt; videoSeconds: number | null } | null>(null);
   const [dragPos, setDragPos] = useState<Pt | null>(null);
@@ -136,9 +148,52 @@ export function SpatialEventWhiteboard({
         // ya estaba parado
       }
       if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+      if (ytPollRef.current) clearInterval(ytPollRef.current);
+      if (ytClipRef.current) clearInterval(ytClipRef.current);
+      try {
+        ytPlayerRef.current?.destroy();
+      } catch {
+        // player ya destruido
+      }
     },
     [],
   );
+
+  // ---- segundo de vídeo actual (directo o YouTube) -------------------------
+  const getVideoTime = (): number | null => {
+    if (parsedVideo?.kind === "youtube") {
+      const t = ytPlayerRef.current?.getCurrentTime();
+      return typeof t === "number" && Number.isFinite(t) && t >= 0 ? t : null;
+    }
+    const v = videoRef.current;
+    return v ? v.currentTime : null;
+  };
+
+  // ---- montar/destruir el player de YouTube cuando cambia el vídeo --------
+  const ytId = parsedVideo?.kind === "youtube" ? parsedVideo.id : null;
+  useEffect(() => {
+    if (!ytId) return;
+    const host = ytHostRef.current;
+    if (!host) return;
+    let cancelled = false;
+    void createYouTubePlayer(host, ytId).then((player) => {
+      if (cancelled || !player) return;
+      ytPlayerRef.current = player;
+      // YT no emite "timeupdate": sondeo ligero para el reloj de la cabecera
+      ytPollRef.current = setInterval(() => {
+        const t = player.getCurrentTime();
+        if (typeof t === "number" && Number.isFinite(t)) setVideoTime(t);
+      }, 250);
+    });
+    return () => {
+      cancelled = true;
+      if (ytPollRef.current) {
+        clearInterval(ytPollRef.current);
+        ytPollRef.current = null;
+      }
+      ytPlayerRef.current = null;
+    };
+  }, [ytId]);
 
   // ---- gesto: origen de la causa -----------------------------------------
   const coordsFromEvent = (e: React.PointerEvent<HTMLDivElement>): Pt => {
@@ -159,7 +214,7 @@ export function SpatialEventWhiteboard({
       // navegador sin captura: el gesto sigue dentro del campo
     }
     // El instante de la CAUSA es el que manda para el auto-clip
-    const videoSeconds = videoRef.current ? videoRef.current.currentTime : null;
+    const videoSeconds = getVideoTime();
     setDrag({ origin: c, videoSeconds });
     setDragPos(c);
     setMenu(null);
@@ -180,7 +235,7 @@ export function SpatialEventWhiteboard({
     if (armed) {
       const moved = Math.hypot(end.x - drag.origin.x, end.y - drag.origin.y);
       const finalEnd = moved < 3 ? pushEnd(drag.origin, armed as VoiceOutcome) : end;
-      const videoSeconds = videoRef.current ? videoRef.current.currentTime : null;
+      const videoSeconds = getVideoTime();
       void saveVector({
         startX: drag.origin.x,
         startY: drag.origin.y,
@@ -245,7 +300,7 @@ export function SpatialEventWhiteboard({
       }
       setPendingVoice(null);
       setVoiceMsg(`✅ ${VOICE_OUTCOME_LABEL[parse.outcome]} · ${parse.zones.join(" → ")}`);
-      const videoSeconds = videoRef.current ? videoRef.current.currentTime : null;
+      const videoSeconds = getVideoTime();
       await saveVector({
         startX: parse.origin.x,
         startY: parse.origin.y,
@@ -331,7 +386,7 @@ export function SpatialEventWhiteboard({
     const { origin, end } = completePartial(outcome, zone);
     setPendingVoice(null);
     setVoiceMsg(`✅ ${VOICE_OUTCOME_LABEL[outcome]} · ${zone.label}`);
-    const videoSeconds = videoRef.current ? videoRef.current.currentTime : null;
+    const videoSeconds = getVideoTime();
     await saveVector({
       startX: origin.x,
       startY: origin.y,
@@ -344,24 +399,47 @@ export function SpatialEventWhiteboard({
   };
 
   // ---- reproducción instantánea del auto-clip (-3s / +2s) ------------------
-  const playClip = useCallback((start: number, end: number) => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (clipStopRef.current) v.removeEventListener("timeupdate", clipStopRef.current);
-    v.currentTime = Math.max(0, start);
-    void v.play().catch(() => {
-      // autoplay bloqueado: el míster le da a play y el clip continúa
-    });
-    const stop = () => {
-      if (v.currentTime >= end) {
-        v.pause();
-        v.removeEventListener("timeupdate", stop);
-        if (clipStopRef.current === stop) clipStopRef.current = null;
+  const playClip = useCallback(
+    (start: number, end: number) => {
+      // ---- YouTube: seek + sondeo hasta el final del clip ----
+      if (parsedVideo?.kind === "youtube") {
+        const p = ytPlayerRef.current;
+        if (!p) return;
+        if (ytClipRef.current) clearInterval(ytClipRef.current);
+        p.seekTo(Math.max(0, start), true);
+        p.playVideo();
+        ytClipRef.current = setInterval(() => {
+          const t = p.getCurrentTime();
+          if (typeof t === "number" && Number.isFinite(t) && t >= end) {
+            p.pauseVideo();
+            if (ytClipRef.current) {
+              clearInterval(ytClipRef.current);
+              ytClipRef.current = null;
+            }
+          }
+        }, 250);
+        return;
       }
-    };
-    clipStopRef.current = stop;
-    v.addEventListener("timeupdate", stop);
-  }, []);
+      // ---- vídeo directo (HTML5) ----
+      const v = videoRef.current;
+      if (!v) return;
+      if (clipStopRef.current) v.removeEventListener("timeupdate", clipStopRef.current);
+      v.currentTime = Math.max(0, start);
+      void v.play().catch(() => {
+        // autoplay bloqueado: el míster le da a play y el clip continúa
+      });
+      const stop = () => {
+        if (v.currentTime >= end) {
+          v.pause();
+          v.removeEventListener("timeupdate", stop);
+          if (clipStopRef.current === stop) clipStopRef.current = null;
+        }
+      };
+      clipStopRef.current = stop;
+      v.addEventListener("timeupdate", stop);
+    },
+    [parsedVideo],
+  );
 
   const busy = saving || pendingOutcome != null;
 
@@ -475,10 +553,10 @@ export function SpatialEventWhiteboard({
         {/* ---------- Vídeo sincronizado (si la sesión lo tiene) ---------- */}
         <div className="flex flex-col gap-2">
           <div className="relative aspect-video overflow-hidden rounded-xl border border-[#1c3a26] bg-black">
-            {videoUrl ? (
+            {parsedVideo?.kind === "direct" ? (
               <video
                 ref={videoRef}
-                src={videoUrl}
+                src={parsedVideo.url}
                 controls
                 playsInline
                 preload="metadata"
@@ -486,6 +564,16 @@ export function SpatialEventWhiteboard({
                 className="h-full w-full object-contain"
                 data-testid="spatial-video"
               />
+            ) : parsedVideo?.kind === "youtube" ? (
+              // YouTube: IFrame API (permite leer el segundo exacto y hacer seek)
+              <div className="h-full w-full">
+                <div
+                  key={parsedVideo.id}
+                  ref={ytHostRef}
+                  className="h-full w-full"
+                  data-testid="spatial-video-yt"
+                />
+              </div>
             ) : (
               <div className="flex h-full items-center justify-center px-6 text-center text-xs text-[#6d8070]">
                 Sin vídeo sincronizado — Modo pizarra pura: los vectores se sellan

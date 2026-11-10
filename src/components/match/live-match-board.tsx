@@ -54,6 +54,7 @@ import {
   type MatchSessionDTO,
   type TelemetryEventDTO,
 } from "@/lib/pilar3";
+import { parseVideoUrl } from "@/lib/video-url";
 import {
   SpatialEventWhiteboard,
   type SpatialSaveInput,
@@ -1388,7 +1389,7 @@ function VideoSyncPanel({
 
         <div className="space-y-1.5">
           <label htmlFor="video-url" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">
-            Enlace del vídeo (mp4 o plataforma)
+            Enlace del vídeo (YouTube o mp4 directo)
           </label>
           <input
             id="video-url"
@@ -1396,9 +1397,30 @@ function VideoSyncPanel({
             inputMode="url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://…"
+            placeholder="https://youtu.be/… o https://…/video.mp4"
             className="w-full rounded-lg border border-[#2a4a34] bg-[#0a1a10] px-3 py-2.5 text-sm text-cream placeholder:text-[#4a5f4c] focus:outline-none focus:border-brand-500"
           />
+          {(() => {
+            const parsed = parseVideoUrl(url);
+            if (!url.trim()) return null;
+            if (parsed?.kind === "youtube")
+              return (
+                <p className="text-[11px] font-semibold text-brand-400">
+                  ▶ YouTube detectado — se incrustará en la pizarra con timecode exacto.
+                </p>
+              );
+            if (parsed?.kind === "direct")
+              return (
+                <p className="text-[11px] font-semibold text-[#a9bca9]">
+                  ✓ Vídeo directo — reproducción nativa en la pizarra.
+                </p>
+              );
+            return (
+              <p className="text-[11px] font-semibold text-amber-400">
+                ⚠ El enlace no parece una URL de vídeo válida (http/https).
+              </p>
+            );
+          })()}
         </div>
 
         <div className="space-y-1.5">
