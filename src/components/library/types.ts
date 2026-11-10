@@ -40,6 +40,12 @@ export type TaskCard = {
   spaceLengthM: number | null;
   spaceWidthM: number | null;
   spaceNote: string | null;
+  /** Zona del campo donde se hace la tarea (taxonomía FIELD_ZONES) */
+  fieldZoneLabel: string | null;
+  fieldZoneX: number | null;
+  fieldZoneY: number | null;
+  /** Vídeo REAL de la tarea grabado en su zona y metros */
+  videoUrl: string | null;
   playersMin: number;
   playersMax: number | null;
   durationMin: number;

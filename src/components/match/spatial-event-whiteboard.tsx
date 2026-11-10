@@ -29,6 +29,7 @@ import {
   VOICE_ZONE_CHIPS,
   completePartial,
   parseVoiceEvent,
+  pushEnd,
   type VoiceOutcome,
   type VoicePt,
 } from "@/lib/voice-events";
@@ -100,6 +101,8 @@ export function SpatialEventWhiteboard({
   const [dragPos, setDragPos] = useState<Pt | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [pendingOutcome, setPendingOutcome] = useState<string | null>(null);
+  /// Evento ARMADO en la botonera fija: tocar el campo registra al instante
+  const [armed, setArmed] = useState<string | null>(null);
 
   // ---- estado del modo voz 🎙️ --------------------------------------------
   const [voiceSupported, setVoiceSupported] = useState(false);
@@ -169,9 +172,27 @@ export function SpatialEventWhiteboard({
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!drag) return;
-    setMenu({ origin: drag.origin, end: coordsFromEvent(e), videoSeconds: drag.videoSeconds });
+    const end = coordsFromEvent(e);
     setDrag(null);
     setDragPos(null);
+
+    // ---- Modo rápido: evento armado en la botonera → guardar SIN menú ----
+    if (armed) {
+      const moved = Math.hypot(end.x - drag.origin.x, end.y - drag.origin.y);
+      const finalEnd = moved < 3 ? pushEnd(drag.origin, armed as VoiceOutcome) : end;
+      const videoSeconds = videoRef.current ? videoRef.current.currentTime : null;
+      void saveVector({
+        startX: drag.origin.x,
+        startY: drag.origin.y,
+        endX: finalEnd.x,
+        endY: finalEnd.y,
+        outcome: armed,
+        videoSeconds,
+      }).then(() => flashVoiceVector(drag.origin, finalEnd));
+      return;
+    }
+
+    setMenu({ origin: drag.origin, end, videoSeconds: drag.videoSeconds });
   };
 
   const handlePointerCancel = () => {
@@ -442,10 +463,10 @@ export function SpatialEventWhiteboard({
             Comandos de voz
           </summary>
           <p className="mt-1 px-1 text-[11px] leading-relaxed text-[#8aa28d]">
-            «recuperamos banda derecha» · «disparo rival desde la frontal» · «contra por el carril
-            izquierdo» · «robo en medio campo» · «nos chutan desde tres cuartos» — di la{' '}
-            <strong className="text-[#a9bca9]">salida</strong> y la{' '}
-            <strong className="text-[#a9bca9]">zona</strong>; si falta la zona, elige el chip.
+            La voz <strong className="text-[#a9bca9]">solo</strong> reconoce los 3 eventos de la
+            botonera: 🎯 disparo rival · ⚡ transición/contra · 🛡️ balón recuperado — más las zonas
+            («banda derecha», «medio campo», «área rival»…). Ej.: «recuperamos banda derecha». Si
+            falta la zona, elige el chip.
           </p>
         </details>
       </div>
@@ -524,12 +545,32 @@ export function SpatialEventWhiteboard({
           </div>
         </div>
 
-        {/* ---------- Campo táctil: tap (causa) → arrastre (efecto) ---------- */}
+        {/* ---------- Campo táctil: botonera fija + tap (causa) → arrastre (efecto) ---------- */}
         <div className="flex flex-col gap-2">
-          <p className="px-1 text-[11px] text-[#6d8070]">
-            Pulsa donde se <strong className="text-[#a9bca9]">pierde el balón</strong> y
-            arrastra hasta la <strong className="text-[#a9bca9]">consecuencia</strong>.
-          </p>
+          <div className="flex flex-wrap items-center gap-1.5" data-testid="spatial-quick">
+            {SPATIAL_OUTCOMES.map((o) => {
+              const active = armed === o.value;
+              return (
+                <button
+                  key={o.value}
+                  onClick={() => setArmed(active ? null : o.value)}
+                  className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
+                    active
+                      ? `${TONE_CLASSES[o.tone]} text-white ring-2 ring-white/60`
+                      : "border border-[#2a4a34] bg-[#0f2317] text-[#dfe9d8] hover:border-[#3a5a44]"
+                  }`}
+                  data-testid={`spatial-quick-${o.value}`}
+                >
+                  <span aria-hidden>{o.emoji}</span> {o.label}
+                </button>
+              );
+            })}
+            <span className="text-[10px] text-[#6d8070]">
+              {armed
+                ? "→ toca o arrastra en el campo y se guarda"
+                : "elige un evento y toca el campo — o arrastra directo"}
+            </span>
+          </div>
           <div
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}

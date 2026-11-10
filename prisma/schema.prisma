@@ -513,6 +513,10 @@ model Task {
   spaceLengthM       Int? /// Dimensiones del espacio: largo (m)
   spaceWidthM        Int? /// Dimensiones del espacio: ancho (m)
   spaceNote          String? /// "Con dos zonas laterales libres"
+  fieldZoneLabel     String? /// Zona del campo donde se hace (taxonomía FIELD_ZONES)
+  fieldZoneX         Int?    /// Pin exacto en el mini-campo del editor (0-100, opcional)
+  fieldZoneY         Int?    /// Pin exacto en el mini-campo del editor (0-100, opcional)
+  videoUrl           String? /// Vídeo REAL de la tarea, grabado en su zona y metros
   playersMin         Int /// Jugadores requeridos (mínimo)
   playersMax         Int? /// Jugadores requeridos (máximo, si aplica)
   durationMin        Int /// Tiempo total sugerido (min)

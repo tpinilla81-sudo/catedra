@@ -26,6 +26,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { GamePhase, User } from "@prisma/client";
+import { FIELD_ZONE_DEFAULT, FIELD_ZONE_VALUES } from "@/lib/field-zone";
 import { getSessionUser } from "@/lib/session";
 import { createTenantClient } from "@/lib/tenant";
 import { db } from "@/lib/db";
@@ -70,6 +71,12 @@ export type TaskInput = {
   spaceLengthM: number | null;
   spaceWidthM: number | null;
   spaceNote: string | null;
+  /** Zona del campo donde se hace la tarea (taxonomía FIELD_ZONES) */
+  fieldZoneLabel: string | null;
+  fieldZoneX: number | null;
+  fieldZoneY: number | null;
+  /** Vídeo REAL de la tarea grabado en su zona y metros */
+  videoUrl: string | null;
   playersMin: number;
   playersMax: number | null;
   durationMin: number;
@@ -266,6 +273,7 @@ export async function saveTask(input: TaskInput): Promise<ActionResult> {
   const spaceNote = optStr(input.spaceNote, 200);
   const repetitions = optStr(input.repetitions, 80);
   const diagramUrl = optStr(input.diagramUrl, 300);
+  const videoUrl = optStr(input.videoUrl, 300);
   const intensity = cleanStr(input.intensity, 20);
 
   const phases = Array.isArray(input.phases)
@@ -280,6 +288,13 @@ export async function saveTask(input: TaskInput): Promise<ActionResult> {
   const durationMin = reqInt(input.durationMin, 1, 180);
   const spaceLengthM = optInt(input.spaceLengthM, 3, 140);
   const spaceWidthM = optInt(input.spaceWidthM, 3, 140);
+  const fieldZoneX = optInt(input.fieldZoneX, 0, 100);
+  const fieldZoneY = optInt(input.fieldZoneY, 0, 100);
+  // Zona: si no llega → "Todo el campo" (el default del catálogo)
+  const fieldZoneLabel =
+    input.fieldZoneLabel && FIELD_ZONE_VALUES.includes(input.fieldZoneLabel)
+      ? input.fieldZoneLabel
+      : FIELD_ZONE_DEFAULT;
 
   if (title.length < 3) return fail("El título de la tarea necesita al menos 3 caracteres.");
   if (objective.length < 5) return fail("Describe el objetivo de la tarea (mínimo 5 caracteres).");
@@ -291,6 +306,8 @@ export async function saveTask(input: TaskInput): Promise<ActionResult> {
   if (!INTENSITIES.includes(intensity)) return fail("Intensidad no válida.");
   if (diagramUrl && !/^https?:\/\//i.test(diagramUrl))
     return fail("La URL del diagrama debe empezar por http:// o https://");
+  if (videoUrl && !/^https?:\/\//i.test(videoUrl))
+    return fail("La URL del vídeo debe empezar por http:// o https://");
   if (!rules || !points || !materials)
     return fail("Las listas de reglas, puntos y materiales no son válidas.");
 
@@ -341,6 +358,10 @@ export async function saveTask(input: TaskInput): Promise<ActionResult> {
     spaceLengthM,
     spaceWidthM,
     spaceNote,
+    fieldZoneLabel,
+    fieldZoneX,
+    fieldZoneY,
+    videoUrl,
     playersMin: playersMin!,
     playersMax,
     durationMin: durationMin!,
@@ -446,6 +467,10 @@ export async function duplicateTaskToClub(id: string): Promise<ActionResult> {
       spaceLengthM: row.spaceLengthM,
       spaceWidthM: row.spaceWidthM,
       spaceNote: row.spaceNote,
+      fieldZoneLabel: row.fieldZoneLabel,
+      fieldZoneX: row.fieldZoneX,
+      fieldZoneY: row.fieldZoneY,
+      videoUrl: row.videoUrl,
       playersMin: row.playersMin,
       playersMax: row.playersMax,
       durationMin: row.durationMin,

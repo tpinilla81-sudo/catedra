@@ -40,6 +40,7 @@ import type { SPNode, TaskCard } from "@/components/library/types";
 import type { Animacion } from "@/lib/animaciones-ejercicio";
 import { TacticalAnimationBuilder } from "@/components/library/tactical-animation-builder";
 import { useToast } from "@/hooks/use-toast";
+import { FIELD_ZONES } from "@/lib/field-zone";
 
 type RecipeDraft = { subPrincipleId: string; relevance: number; usageNote: string };
 
@@ -50,6 +51,10 @@ type Draft = {
   spaceLengthM: string;
   spaceWidthM: string;
   spaceNote: string;
+  fieldZoneLabel: string;
+  fieldZoneX: string;
+  fieldZoneY: string;
+  videoUrl: string;
   playersMin: number;
   playersMax: string;
   durationMin: number;
@@ -72,6 +77,10 @@ function initialDraft(task: TaskCard | null): Draft {
     spaceLengthM: task?.spaceLengthM != null ? String(task.spaceLengthM) : "",
     spaceWidthM: task?.spaceWidthM != null ? String(task.spaceWidthM) : "",
     spaceNote: task?.spaceNote ?? "",
+    fieldZoneLabel: task?.fieldZoneLabel ?? "TODO_EL_CAMPO",
+    fieldZoneX: task?.fieldZoneX != null ? String(task.fieldZoneX) : "",
+    fieldZoneY: task?.fieldZoneY != null ? String(task.fieldZoneY) : "",
+    videoUrl: task?.videoUrl ?? "",
     playersMin: task?.playersMin ?? 10,
     playersMax: task?.playersMax != null ? String(task.playersMax) : "",
     durationMin: task?.durationMin ?? 20,
@@ -253,6 +262,15 @@ export function TaskEditor({
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
 
+  /// Pin exacto de la zona: toca el mini-campo (ratón o dedo) → coordenadas 0-100
+  const handlePinField = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.round(Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)));
+    const y = Math.round(Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)));
+    set("fieldZoneX", String(x));
+    set("fieldZoneY", String(y));
+  };
+
   // Subprincipios disponibles para conectar (visible para el club y aún no conectados)
   const spCandidates = useMemo(() => {
     const q = normalizeName(spQuery);
@@ -280,6 +298,10 @@ export function TaskEditor({
       spaceLengthM: draft.spaceLengthM.trim() ? Number(draft.spaceLengthM) : null,
       spaceWidthM: draft.spaceWidthM.trim() ? Number(draft.spaceWidthM) : null,
       spaceNote: draft.spaceNote,
+      fieldZoneLabel: draft.fieldZoneLabel || "TODO_EL_CAMPO",
+      fieldZoneX: draft.fieldZoneX.trim() ? Number(draft.fieldZoneX) : null,
+      fieldZoneY: draft.fieldZoneY.trim() ? Number(draft.fieldZoneY) : null,
+      videoUrl: draft.videoUrl,
       playersMin: draft.playersMin,
       playersMax: draft.playersMax.trim() ? Number(draft.playersMax) : null,
       durationMin: draft.durationMin,
@@ -421,6 +443,86 @@ export function TaskEditor({
           maxLength={200}
           className="mt-2 min-h-[44px] rounded-2xl bg-cream-dark/70 border-cream-border text-peel placeholder:text-[#8a9a8d]"
         />
+
+        {/* ---------- Zona del campo donde se hace (petición del míster) ---------- */}
+        <div className="mt-3 rounded-2xl bg-cream-dark/70 px-3 py-2.5">
+          <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest">
+            Zona del campo donde se hace
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {FIELD_ZONES.map((z) => {
+              const active = draft.fieldZoneLabel === z.value;
+              return (
+                <button
+                  key={z.value}
+                  type="button"
+                  title={z.hint}
+                  onClick={() => set("fieldZoneLabel", z.value)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+                    active
+                      ? "border-brand-600 bg-brand-600 text-white"
+                      : "border-cream-border-strong bg-cream text-[#3d5844] hover:border-brand-500"
+                  }`}
+                >
+                  {z.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Mini-campo: pin exacto (opcional) */}
+          <div
+            onClick={handlePinField}
+            style={{ touchAction: "manipulation" }}
+            className="relative mt-2.5 aspect-[16/10] w-full cursor-crosshair overflow-hidden rounded-xl border-2 border-[#4c7a55] bg-[#e8f1e2]"
+          >
+            <div className="pointer-events-none absolute inset-2 rounded-lg border border-[#4c7a55]/50" />
+            <div className="pointer-events-none absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#4c7a55]/50" />
+            <div className="pointer-events-none absolute left-1/2 top-2 bottom-2 w-px bg-[#4c7a55]/50" />
+            <div className="pointer-events-none absolute left-2 top-1/2 h-12 w-7 -translate-y-1/2 border-y border-r border-[#4c7a55]/50" />
+            <div className="pointer-events-none absolute right-2 top-1/2 h-12 w-7 -translate-y-1/2 border-y border-l border-[#4c7a55]/50" />
+            {draft.fieldZoneX && draft.fieldZoneY && (
+              <div
+                className="pointer-events-none absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-brand-600 shadow"
+                style={{ left: `${draft.fieldZoneX}%`, top: `${draft.fieldZoneY}%` }}
+              />
+            )}
+          </div>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <p className="text-[10px] text-[#6c8070]">
+              Toca el mini-campo para marcar el punto exacto (opcional).
+            </p>
+            {draft.fieldZoneX && (
+              <button
+                type="button"
+                onClick={() => {
+                  set("fieldZoneX", "");
+                  set("fieldZoneY", "");
+                }}
+                className="shrink-0 text-[10px] font-bold text-[#6c8070] underline underline-offset-2"
+              >
+                Quitar pin
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ---------- Vídeo REAL de la tarea ---------- */}
+        <div className="mt-3 rounded-2xl bg-cream-dark/70 px-3 py-2.5">
+          <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest">
+            Vídeo REAL de la tarea
+          </p>
+          <Input
+            value={draft.videoUrl}
+            onChange={(e) => set("videoUrl", e.target.value)}
+            placeholder="https://… enlace del vídeo grabado en esta zona"
+            maxLength={300}
+            className="mt-2 min-h-[44px] rounded-2xl bg-cream border-cream-border text-peel placeholder:text-[#8a9a8d]"
+          />
+          <p className="mt-1 text-[10px] text-[#6c8070]">
+            Grábala en los metros y la zona marcados arriba: así el vídeo y la ficha cuentan lo mismo.
+          </p>
+        </div>
 
         <div className="space-y-2 mt-2">
           <Stepper

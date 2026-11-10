@@ -18,6 +18,7 @@ import {
   Clock,
   CopyPlus,
   Loader2,
+  MapPin,
   MonitorPlay,
   Network,
   PenLine,
@@ -25,8 +26,10 @@ import {
   Search,
   Trash2,
   Users,
+  Video,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { fieldZoneLabel } from "@/lib/field-zone";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -478,6 +481,11 @@ export function TaskDetailSheet({
                 hint={task.spaceNote ?? undefined}
               />
               <MetaBox
+                icon={MapPin}
+                label="ZONA DEL CAMPO"
+                value={fieldZoneLabel(task.fieldZoneLabel)}
+              />
+              <MetaBox
                 icon={Users}
                 label="JUGADORES"
                 value={`${task.playersMin}${task.playersMax ? `–${task.playersMax}` : "+"}`}
@@ -518,6 +526,36 @@ export function TaskDetailSheet({
                     Ver diagrama de la tarea ↗
                   </a>
                 </p>
+              )}
+
+              {/* Vídeo REAL de la tarea (grabado en su zona y metros) */}
+              {task.videoUrl && (
+                <div className="pt-1">
+                  <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#6c8070]">
+                    <Video className="h-3.5 w-3.5" aria-hidden /> Vídeo real ·{" "}
+                    {fieldZoneLabel(task.fieldZoneLabel)}
+                  </p>
+                  {/\.(mp4|webm|ogg|mov)(\?|$)/i.test(task.videoUrl) ? (
+                    <video
+                      controls
+                      playsInline
+                      preload="metadata"
+                      src={task.videoUrl}
+                      className="mt-2 w-full rounded-xl border border-cream-border bg-black"
+                    />
+                  ) : (
+                    <p className="mt-1 text-xs">
+                      <a
+                        href={task.videoUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-brand-600 underline underline-offset-2 break-all"
+                      >
+                        Ver el vídeo grabado en esta zona ↗
+                      </a>
+                    </p>
+                  )}
+                </div>
               )}
             </div>
 

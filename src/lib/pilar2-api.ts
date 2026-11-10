@@ -30,6 +30,7 @@ import {
   writeGuard,
 } from "@/lib/library-access";
 import { ANIM_LIMITES, parseAnimacionGuardada } from "@/lib/animacion-guardada";
+import { FIELD_ZONE_DEFAULT, FIELD_ZONE_VALUES } from "@/lib/field-zone";
 
 type DbT = ReturnType<typeof createTenantClient>;
 
@@ -160,6 +161,31 @@ export function normalizeTaskPayload(
   if (!partial || has("spaceLengthM")) data.spaceLengthM = optInt(body.spaceLengthM, 3, 140);
   if (!partial || has("spaceWidthM")) data.spaceWidthM = optInt(body.spaceWidthM, 3, 140);
   if (!partial || has("spaceNote")) data.spaceNote = optStr(body.spaceNote, 200);
+
+  // ---------- Zona del campo + vídeo real (petición del míster) ----------
+  if (!partial || has("fieldZoneLabel")) {
+    const rawZone = body.fieldZoneLabel;
+    if (rawZone === undefined || rawZone === null || rawZone === "") {
+      data.fieldZoneLabel = partial ? null : FIELD_ZONE_DEFAULT;
+    } else {
+      const zone = cleanStr(rawZone, 40);
+      if (!FIELD_ZONE_VALUES.includes(zone)) {
+        return {
+          error: json400(`Zona del campo no válida. Usa una de: ${FIELD_ZONE_VALUES.join(", ")}.`),
+        };
+      }
+      data.fieldZoneLabel = zone;
+    }
+  }
+  if (!partial || has("fieldZoneX")) data.fieldZoneX = optInt(body.fieldZoneX, 0, 100);
+  if (!partial || has("fieldZoneY")) data.fieldZoneY = optInt(body.fieldZoneY, 0, 100);
+  if (!partial || has("videoUrl")) {
+    const videoUrl = optStr(body.videoUrl, 300);
+    if (videoUrl && !/^https?:\/\//i.test(videoUrl)) {
+      return { error: json400("La URL del vídeo debe empezar por http:// o https://") };
+    }
+    data.videoUrl = videoUrl;
+  }
 
   // ---------- Carga (con defaults sensatos en creación: cero fricción) ----------
   if (!partial || has("playersMin")) {
@@ -313,6 +339,10 @@ export function taskJSON(row: TaskWithRecipes) {
     spaceLengthM: row.spaceLengthM,
     spaceWidthM: row.spaceWidthM,
     spaceNote: row.spaceNote,
+    fieldZoneLabel: row.fieldZoneLabel,
+    fieldZoneX: row.fieldZoneX,
+    fieldZoneY: row.fieldZoneY,
+    videoUrl: row.videoUrl,
     playersMin: row.playersMin,
     playersMax: row.playersMax,
     durationMin: row.durationMin,

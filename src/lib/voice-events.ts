@@ -100,9 +100,11 @@ export function normalizeVoiceText(raw: string): string {
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 /** Punto final por defecto: origen + empuje hacia la portería rival. */
-function defaultEnd(origin: VoicePt, outcome: VoiceOutcome): VoicePt {
+export function pushEnd(origin: VoicePt, outcome: VoiceOutcome): VoicePt {
   return { x: clamp(origin.x + PUSH_BY_OUTCOME[outcome], 2, 98), y: origin.y };
 }
+
+const defaultEnd = pushEnd;
 
 /**
  * Parsea una frase del míster y devuelve el evento espacial entendido.
