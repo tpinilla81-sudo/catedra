@@ -4,7 +4,8 @@
 // APP SHELL — CATEDRA by Método
 // ----------------------------------------------------------------------------
 // Menú lateral SOLO con los nombres de las secciones (sin etiquetas de pilar):
-//   Hoy · Biblioteca · Plantilla · Partidos.
+//   Hoy · Biblioteca · Plantilla · Partidos · Pizarra Táctica.
+//   (mock del míster: la pizarra sale de los partidos y es pestaña global)
 //   La Cátedra aparece solo para PLATFORM_ADMIN (contexto de plataforma).
 // • Desktop (lg+): sidebar fijo verde corteza + contenido fijo en viewport:
 //   SIN scroll de página (cada sección compone su interior).
@@ -22,11 +23,17 @@ import {
   Landmark,
   LogOut,
   Menu,
+  Presentation,
   Users,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
-export type AppShellKey = "today" | "library" | "players" | "matches";
+export type AppShellKey =
+  | "today"
+  | "library"
+  | "players"
+  | "matches"
+  | "pizarra";
 
 type Props = {
   active: AppShellKey;
@@ -53,6 +60,7 @@ const NAV_ITEMS: Array<{
   { key: "library", href: "/dashboard/library", label: "Biblioteca", icon: BookOpen },
   { key: "players", href: "/dashboard/players", label: "Plantilla", icon: Users },
   { key: "matches", href: "/dashboard/matches", label: "Partidos", icon: CalendarDays },
+  { key: "pizarra", href: "/dashboard/pizarra", label: "Pizarra Táctica", icon: Presentation },
 ];
 
 function Wordmark({ compact = false }: { compact?: boolean }) {
