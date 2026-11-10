@@ -10,10 +10,12 @@
 // Datos 100% vivos: llega del RSC (page.tsx) — nada pintado a mano.
 // ============================================================================
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Home, Plus, Search } from "lucide-react";
 import { FIELD_ZONES } from "@/lib/field-zone";
+import { acceptPlan, ensureWeeklyProposal } from "@/app/dashboard/today/actions";
 
 // ---------- Tipos que viajan del RSC ----------
 
@@ -51,7 +53,70 @@ export type CompactoMatch = {
   played: boolean;
 };
 
+// ---------- Pilar 4 · Módulo HOY (microciclo semanal conectado con diagnóstico y rival) ----------
+
+export type CompactoHoyTask = {
+  order: number;
+  title: string;
+  objective: string;
+  intensity: string;
+  durationMin: number | null;
+  playersMin: number;
+  playersMax: number | null;
+  spaceLengthM: number | null;
+  spaceWidthM: number | null;
+  rationale: string | null;
+  corrige: string | null;
+  videoUrl: string | null;
+};
+
+export type CompactoHoySession = {
+  id: string;
+  label: string;
+  dateIso: string;
+  objective: string | null;
+  durationMin: number | null;
+  tasks: CompactoHoyTask[];
+};
+
+export type CompactoHoyIssue = {
+  kind: string;
+  phase: string | null;
+  severity: number;
+  evidence: string;
+  subPrinciple: string | null;
+};
+
+export type CompactoAudit = {
+  version: string;
+  trigger: string;
+  prescriptions: Array<{
+    taskTitle: string;
+    sessionLabel: string | null;
+    rationale: string;
+    relevance: number | null;
+  }>;
+  discarded: Array<{ taskTitle: string; reason: string }>;
+};
+
+export type CompactoHoy = {
+  weekStartIso: string;
+  microcycleId: string;
+  status: string | null;
+  engineVersion: string | null;
+  tacticalDirectives: string[];
+  diagnosisSummary: string | null;
+  issues: CompactoHoyIssue[];
+  sessions: CompactoHoySession[];
+  audit: CompactoAudit | null;
+};
+
 export type CompactoData = {
+  hoy: CompactoHoy | null;
+  pulse: { morale: number; fatigue: number; streak: number | null } | null;
+  lastMatch: { opponent: string; isHome: boolean; goalsFor: number; goalsAgainst: number } | null;
+  nextMatch: { opponent: string; isHome: boolean; kickoffIso: string } | null;
+  todayIso: string;
   tasks: CompactoTask[];
   players: CompactoPlayer[];
   matches: CompactoMatch[];
@@ -108,7 +173,8 @@ function zoneLabel(value: string | null): string | null {
 // ---------- Componente maestro ----------
 
 export function CompactoView({ data }: { data: CompactoData }) {
-  const [activeTab, setActiveTab] = useState<"library" | "squad" | "matches">("library");
+  // El míster abre la app y lo PRIMERO que ve es el plan de la semana (mock: barra Hoy·Biblioteca·Plantilla·Partidos)
+  const [activeTab, setActiveTab] = useState<"hoy" | "library" | "squad" | "matches">("hoy");
 
   return (
     <div className="flex flex-col h-[100dvh] w-full bg-slate-950 text-slate-100 overflow-hidden text-xs select-none">
@@ -127,6 +193,7 @@ export function CompactoView({ data }: { data: CompactoData }) {
           <div className="flex gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
             {(
               [
+                { key: "hoy", label: "Hoy" },
                 { key: "library", label: "Biblioteca" },
                 { key: "squad", label: "Plantilla" },
                 { key: "matches", label: "Partidos" },
@@ -158,6 +225,15 @@ export function CompactoView({ data }: { data: CompactoData }) {
 
       {/* ---------- Panel activo (sin scroll general) ---------- */}
       <main className="flex-1 overflow-hidden p-2.5 flex flex-col gap-2">
+        {activeTab === "hoy" && (
+          <HoyTab
+            hoy={data.hoy}
+            pulse={data.pulse}
+            lastMatch={data.lastMatch}
+            nextMatch={data.nextMatch}
+            todayIso={data.todayIso}
+          />
+        )}
         {activeTab === "library" && <LibraryTab tasks={data.tasks} />}
         {activeTab === "squad" && <SquadTab players={data.players} />}
         {activeTab === "matches" && <MatchesTab matches={data.matches} />}
@@ -513,5 +589,441 @@ function MatchesTab({ matches }: { matches: CompactoMatch[] }) {
 function Chip({ children }: { children: React.ReactNode }) {
   return (
     <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">{children}</span>
+  );
+}
+
+// ============================================================================
+// PESTAÑA 0 · HOY — planificación semanal del motor (conectada con diagnóstico
+// y rival). Mismo motor y MISMAS Server Actions que /dashboard/today: el tab
+// es una vista compacta del microciclo real, no un mock pintado a mano.
+// ============================================================================
+
+const STATUS_HOY: Record<string, { label: string; cls: string }> = {
+  PROPOSED: { label: "Propuesta lista — pendiente de tu visto bueno", cls: "bg-amber-500/10 text-amber-400 border border-amber-500/30" },
+  ACCEPTED: { label: "Plan aceptado — a entrenar", cls: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" },
+  ADJUSTED: { label: "Ajustado por el cuerpo técnico", cls: "bg-emerald-500/10 text-emerald-300 border border-emerald-500/30" },
+  COMPLETED: { label: "Semana completada", cls: "bg-slate-800 text-slate-300 border border-slate-700" },
+};
+
+const ISSUE_KIND: Record<string, { label: string; cls: string }> = {
+  TACTICAL: { label: "Táctica", cls: "bg-rose-500/10 text-rose-400 border border-rose-500/30" },
+  PHYSICAL: { label: "Físico", cls: "bg-amber-500/10 text-amber-400 border border-amber-500/30" },
+  MORALE: { label: "Ánimo", cls: "bg-violet-500/10 text-violet-400 border border-violet-500/30" },
+};
+
+const PHASE_LABEL: Record<string, string> = {
+  OFFENSIVE: "Ofensiva",
+  DEFENSIVE: "Defensiva",
+  OFF_TRANSITION: "Trans. of.",
+  DEF_TRANSITION: "Trans. def.",
+  SET_PIECE: "ABP",
+};
+
+function gaugeBar(value: number): string {
+  if (value >= 7) return "bg-rose-500";
+  if (value >= 4) return "bg-amber-400";
+  return "bg-emerald-500";
+}
+
+/** Día calendario del stored @db.Date — formateado en UTC para que no rote el día */
+function fmtDay(dateIso: string): string {
+  return new Date(dateIso).toLocaleDateString("es-ES", {
+    weekday: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function fmtShort(dateIso: string): string {
+  return new Date(dateIso).toLocaleDateString("es-ES", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
+function fmtKickoff(dateIso: string): string {
+  const d = new Date(dateIso);
+  const dia = d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Madrid" });
+  const hora = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Madrid" });
+  return `${dia} · ${hora}h`;
+}
+
+function HoyStat({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-2 min-w-0">
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide truncate">{title}</p>
+      {children}
+    </div>
+  );
+}
+
+function HoyTab({
+  hoy,
+  pulse,
+  lastMatch,
+  nextMatch,
+  todayIso,
+}: {
+  hoy: CompactoHoy | null;
+  pulse: CompactoData["pulse"];
+  lastMatch: CompactoData["lastMatch"];
+  nextMatch: CompactoData["nextMatch"];
+  todayIso: string;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [expandedTask, setExpandedTask] = useState<string | null>(null);
+
+  // El día de HOY arranca abierto (si hay sesión); el resto, cerrados
+  const initialOpen = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    if (hoy) {
+      const today = hoy.sessions.find((s) => s.dateIso.slice(0, 10) === todayIso.slice(0, 10));
+      if (today) map[today.id] = true;
+      else if (hoy.sessions[0]) map[hoy.sessions[0].id] = true;
+    }
+    return map;
+  }, [hoy, todayIso]);
+  const [open, setOpen] = useState<Record<string, boolean>>(initialOpen);
+
+  const accept = () => {
+    if (!hoy?.microcycleId) return;
+    startTransition(async () => {
+      await acceptPlan(hoy.microcycleId);
+      router.refresh(); // recarga el RSC con el microciclo ya aceptado
+    });
+  };
+
+  const cook = () => {
+    startTransition(async () => {
+      await ensureWeeklyProposal();
+      router.refresh();
+    });
+  };
+
+  const toggleDay = (id: string) => setOpen((prev) => ({ ...prev, [id]: !prev[id] }));
+  const status = hoy?.status ? STATUS_HOY[hoy.status] : null;
+
+  return (
+    <div className="flex flex-col h-full gap-2 overflow-y-auto pr-1">
+      {/* ---------- Pulso del vestuario + contexto de partidos ---------- */}
+      <div className={`grid gap-1.5 ${pulse ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2"}`}>
+        {pulse && (
+          <>
+            <HoyStat title="Inercia anímica">
+              <p className="text-lg font-black text-slate-100 leading-tight">
+                {pulse.morale}
+                <span className="text-[10px] text-slate-500 font-bold">/10</span>
+              </p>
+              <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden my-1">
+                <div className={`h-full ${gaugeBar(pulse.morale)}`} style={{ width: `${pulse.morale * 10}%` }} />
+              </div>
+              {pulse.streak != null && (
+                <p className="text-[10px] text-slate-500 truncate">
+                  {pulse.streak > 0 ? `▲ Racha: +${pulse.streak} victorias` : pulse.streak < 0 ? `▼ Racha: ${pulse.streak} derrotas` : "Racha: empates"}
+                </p>
+              )}
+            </HoyStat>
+            <HoyStat title="Fatiga grupal">
+              <p className="text-lg font-black text-slate-100 leading-tight">
+                {pulse.fatigue}
+                <span className="text-[10px] text-slate-500 font-bold">/10</span>
+              </p>
+              <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden my-1">
+                <div className={`h-full ${gaugeBar(pulse.fatigue)}`} style={{ width: `${pulse.fatigue * 10}%` }} />
+              </div>
+              <p className="text-[10px] text-slate-500 truncate">
+                {pulse.fatigue >= 7 ? "Carga alta: semana controlada" : "Nivel de carga asumible"}
+              </p>
+            </HoyStat>
+          </>
+        )}
+        <HoyStat title="Último partido">
+          {lastMatch ? (
+            <>
+              <p className="text-lg font-black text-slate-100 leading-tight font-mono">
+                {lastMatch.goalsFor}–{lastMatch.goalsAgainst}
+              </p>
+              <p className="text-[10px] text-slate-500 truncate">vs {lastMatch.opponent} · {lastMatch.isHome ? "en casa" : "fuera"}</p>
+            </>
+          ) : (
+            <p className="text-[11px] text-slate-500">Sin partidos aún</p>
+          )}
+        </HoyStat>
+        <HoyStat title="Próximo partido">
+          {nextMatch ? (
+            <>
+              <p className="text-sm font-black text-emerald-400 leading-tight truncate">vs {nextMatch.opponent}</p>
+              <p className="text-[10px] text-slate-500 truncate" suppressHydrationWarning>
+                {nextMatch.isHome ? "🏠" : "✈️"} {fmtKickoff(nextMatch.kickoffIso)}
+              </p>
+            </>
+          ) : (
+            <p className="text-[11px] text-slate-500">Calendario por definir</p>
+          )}
+        </HoyStat>
+      </div>
+
+      {/* ---------- Sin propuesta: cero pantallas en blanco ---------- */}
+      {!hoy ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-slate-800 p-6 text-center">
+          <p className="text-sm font-bold text-slate-200">El motor no tiene propuesta cocinada para esta semana</p>
+          <p className="text-[11px] text-slate-500 max-w-xs">
+            Con un toque, cocinamos el microciclo a partir del último partido (diagnóstico) y del pulso del vestuario.
+          </p>
+          <button
+            onClick={cook}
+            disabled={pending}
+            className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white px-4 py-2 rounded-lg font-bold min-h-[36px]"
+          >
+            {pending ? "Cocinando…" : "⚡ Cocinar propuesta"}
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* ---------- Microciclo ---------- */}
+          <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-2.5 space-y-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <p className="font-bold text-slate-100 text-sm">
+                Microciclo · <span suppressHydrationWarning>{fmtShort(hoy.weekStartIso)}</span>
+              </p>
+              {status && (
+                <span className={`text-[10px] px-2 py-0.5 rounded-full ${status.cls}`}>{status.label}</span>
+              )}
+            </div>
+            {hoy.tacticalDirectives.length > 0 && (
+              <div className="space-y-1">
+                {hoy.tacticalDirectives.map((d, i) => (
+                  <p key={i} className="text-[11px] text-slate-300 flex items-start gap-1.5">
+                    <span className="text-emerald-400 shrink-0" aria-hidden>▸</span> {d}
+                  </p>
+                ))}
+              </div>
+            )}
+            {hoy.diagnosisSummary && (
+              <p className="text-[11px] text-slate-400 leading-snug">
+                <span className="font-semibold text-slate-300">Diagnóstico del motor: </span>
+                {hoy.diagnosisSummary}
+              </p>
+            )}
+          </div>
+
+          {/* ---------- Qué falló (conectado con el diagnóstico del rival/partido) ---------- */}
+          {hoy.issues.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide px-0.5">
+                Qué falló {hoy.engineVersion ? `(${hoy.engineVersion})` : ""}
+              </p>
+              {hoy.issues.map((iss, i) => {
+                const kind = ISSUE_KIND[iss.kind] ?? ISSUE_KIND.TACTICAL;
+                return (
+                  <div key={i} className="bg-slate-900/60 border border-slate-800 rounded-lg px-2.5 py-1.5 space-y-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${kind.cls}`}>{kind.label}</span>
+                      {iss.phase && (
+                        <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">
+                          {PHASE_LABEL[iss.phase] ?? iss.phase}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-amber-400" title={`Severidad ${iss.severity}/5`} aria-label={`Severidad ${iss.severity} de 5`}>
+                        {"⚠".repeat(Math.max(1, Math.min(5, iss.severity)))}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-snug">{iss.evidence}</p>
+                    {iss.subPrinciple && (
+                      <p className="text-[10px] text-slate-500">Subprincipio: {iss.subPrinciple}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ---------- Días de la semana (acordeón) ---------- */}
+          <div className="space-y-1.5">
+            {hoy.sessions.map((s) => {
+              const isOpen = open[s.id] ?? false;
+              const isToday = s.dateIso.slice(0, 10) === todayIso.slice(0, 10);
+              return (
+                <div key={s.id} className="bg-slate-900/60 border border-slate-800 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => toggleDay(s.id)}
+                    aria-expanded={isOpen}
+                    className="w-full flex items-center justify-between gap-2 p-2.5 bg-slate-900 hover:bg-slate-800/80 font-semibold text-slate-200 text-left transition"
+                  >
+                    <span className="flex items-center gap-2 truncate min-w-0">
+                      <span className="text-[10px] font-mono bg-emerald-600/15 text-emerald-400 border border-emerald-600/30 px-1.5 py-0.5 rounded shrink-0">
+                        {s.label}
+                      </span>
+                      <span className="truncate capitalize" suppressHydrationWarning>{fmtDay(s.dateIso)}</span>
+                      {isToday && (
+                        <span className="text-[10px] bg-emerald-600 text-white px-1.5 py-0.5 rounded font-bold shrink-0">HOY</span>
+                      )}
+                    </span>
+                    <span className="flex items-center gap-2 shrink-0">
+                      {s.durationMin != null && (
+                        <span className="text-[10px] text-slate-500 font-mono">{s.durationMin} min</span>
+                      )}
+                      <span className="text-emerald-400 font-mono">{isOpen ? "▲" : "▼"}</span>
+                    </span>
+                  </button>
+                  {isOpen && (
+                    <div className="p-2 bg-slate-950/40 border-t border-slate-800/80 space-y-1.5">
+                      {s.objective && (
+                        <p className="text-[11px] text-slate-400 leading-snug">{s.objective}</p>
+                      )}
+                      {s.tasks.length === 0 && (
+                        <p className="text-[11px] text-slate-500 text-center py-1">Sesión libre — aún sin tareas asignadas.</p>
+                      )}
+                      {s.tasks.map((t) => {
+                        const expanded = expandedTask === `${s.id}:${t.order}`;
+                        return (
+                          <div key={t.order} className="border border-slate-800 rounded bg-slate-900/80 overflow-hidden">
+                            <button
+                              onClick={() => setExpandedTask(expanded ? null : `${s.id}:${t.order}`)}
+                              aria-expanded={expanded}
+                              className="w-full flex justify-between items-center gap-2 p-2 hover:bg-slate-800/60 text-left transition"
+                            >
+                              <span className="font-medium text-slate-300 truncate">
+                                <span className="text-emerald-400 font-mono mr-1.5">{t.order}.</span>
+                                {t.title}
+                              </span>
+                              <span className="flex items-center gap-1 shrink-0">
+                                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded">
+                                  {INTENSITY_LABEL[t.intensity] ?? t.intensity}
+                                </span>
+                                <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">
+                                  {t.durationMin ?? "—"} min
+                                </span>
+                              </span>
+                            </button>
+                            {expanded && (
+                              <div className="px-2 pb-2 pt-1 border-t border-slate-800/80 space-y-1.5">
+                                <p className="text-[11px] text-slate-400 leading-snug">{t.objective}</p>
+                                <div className="flex flex-wrap gap-1">
+                                  <Chip>
+                                    {t.playersMin}
+                                    {t.playersMax ? `–${t.playersMax}` : "+"} jug.
+                                  </Chip>
+                                  {(t.spaceLengthM || t.spaceWidthM) && (
+                                    <Chip>
+                                      Espacio {t.spaceLengthM ?? "–"}×{t.spaceWidthM ?? "–"} m
+                                    </Chip>
+                                  )}
+                                </div>
+                                {t.rationale && (
+                                  <p className="text-[11px] italic text-slate-500 border-l-2 border-emerald-600/40 pl-2 leading-snug">
+                                    Por qué esta tarea: {t.rationale}
+                                  </p>
+                                )}
+                                {t.corrige && (
+                                  <p className="text-[10px] text-amber-400/90 leading-snug">
+                                    ⚠ Corrige: {t.corrige}
+                                  </p>
+                                )}
+                                {t.videoUrl && (
+                                  <a
+                                    href={t.videoUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[11px] font-semibold"
+                                  >
+                                    ▶ Vídeo real de la tarea
+                                  </a>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {hoy.sessions.length === 0 && (
+              <p className="rounded-lg border border-dashed border-slate-800 p-3 text-slate-500 text-center text-[11px]">
+                El microciclo aún no tiene sesiones asignadas.
+              </p>
+            )}
+          </div>
+
+          {/* ---------- Por qué este plan (auditoría del motor) ---------- */}
+          {hoy.audit && hoy.audit.prescriptions.length > 0 && (
+            <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-2.5 space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Por qué este plan</p>
+                <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-mono">
+                  motor {hoy.audit.version}
+                </span>
+              </div>
+              {hoy.audit.prescriptions.map((p, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-emerald-600/15 text-emerald-400 text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold text-slate-300 truncate">
+                      {p.taskTitle}
+                      {p.sessionLabel && <span className="ml-1.5 text-[10px] text-emerald-400 font-mono">{p.sessionLabel}</span>}
+                    </p>
+                    <p className="text-[10px] text-slate-500 leading-snug">{p.rationale}</p>
+                    {p.relevance != null && (
+                      <p className="text-[10px] text-slate-600">
+                        {p.relevance === 3 ? "Núcleo" : p.relevance === 2 ? "Refuerza" : "Apoyo"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {hoy.audit.discarded.length > 0 && (
+                <details className="group rounded-lg border border-slate-800 bg-slate-950/50 overflow-hidden">
+                  <summary className="cursor-pointer list-none px-2.5 py-1.5 text-[11px] font-semibold text-slate-400 flex items-center justify-between hover:text-slate-200">
+                    Candidatas evaluadas y descartadas ({hoy.audit.discarded.length})
+                    <span className="text-[10px] text-slate-600 group-open:hidden">ver</span>
+                    <span className="hidden text-[10px] text-slate-600 group-open:inline">ocultar</span>
+                  </summary>
+                  <div className="px-2.5 pb-2 space-y-1">
+                    {hoy.audit.discarded.map((d, i) => (
+                      <div key={i} className="flex items-start justify-between gap-2 bg-slate-900/80 rounded px-2 py-1">
+                        <p className="text-[11px] text-slate-400 min-w-0">{d.taskTitle}</p>
+                        <p className="text-[10px] text-slate-600 text-right shrink-0">{d.reason}</p>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+          )}
+
+          {/* ---------- CTA: decisión con un toque ---------- */}
+          {hoy.status === "PROPOSED" ? (
+            <button
+              onClick={accept}
+              disabled={pending}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white py-3 rounded-lg font-bold text-sm min-h-[44px] shadow-lg shadow-emerald-900/40"
+            >
+              {pending ? "Guardando…" : "✅ Aceptar Plan"}
+            </button>
+          ) : (
+            <div className="rounded-lg border border-emerald-600/40 bg-emerald-600/10 px-3 py-2.5 text-center">
+              <p className="text-sm font-bold text-emerald-400">
+                {STATUS_HOY[hoy.status ?? ""]?.label ?? hoy.status}
+              </p>
+              <p className="text-[11px] text-emerald-500/80 mt-0.5">
+                Plan de la semana cerrado. Toca cualquier tarea para retocarla (próxima fase).
+              </p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }

@@ -43,6 +43,7 @@ export async function acceptPlan(microcycleId: string) {
   });
 
   revalidatePath("/dashboard/today");
+  revalidatePath("/dashboard/compacto"); // el tab Hoy del modo compacto comparte este motor
   revalidatePath("/");
   return { ok: true, status: microcycle.status };
 }
@@ -72,6 +73,7 @@ export async function ensureWeeklyProposal() {
     });
 
     revalidatePath("/dashboard/today");
+    revalidatePath("/dashboard/compacto"); // el tab Hoy del modo compacto comparte este motor
     revalidatePath("/");
     return {
       ok: true,
