@@ -34,7 +34,7 @@ BUNDLE="$HERE/catedra-deploy.bundle"
 [ -f "$BUNDLE" ] || die "No encuentro catedra-deploy.bundle en esta carpeta — descárgalo del chat junto a este script (versión ACTUALIZADA de hoy)"
 DIGEST="$(sha256sum "$BUNDLE" 2>/dev/null | cut -d' ' -f1 || shasum -a 256 "$BUNDLE" | cut -d' ' -f1)"
 case "$DIGEST" in
-  5284b718647e6fba*) ok "bundle verificado (sha256 correcto — restaura Pilar 3 completo + fix toggle + pizarra animada)" ;;
+  7f00c52976e75ea5*) ok "bundle verificado (sha256 correcto — restaura Pilar 3 completo + fix toggle + pizarra animada + AUTOPILOT)" ;;
   *) die "El bundle NO es la versión actualizada (descargaste el antiguo) → bórralo y descarga el nuevo del chat" ;;
 esac
 
@@ -96,7 +96,10 @@ echo "     (prueba: pulsa 'Cargado / Al límite' y luego otra vez — debe"
 echo "      marcarse y desmarcarse sin errores)"
 echo "   • Login: mister@cfmetodo.es / metodo2025"
 echo ""
-echo "  PARA SIEMPRE: cada 'git push' a main repite este despliegue solo."
+echo "  PARA SIEMPRE (autopilot instalado con este paseo): los próximos cambios"
+echo "  los prepara el agente y se aplican desde github.com/tpinilla81-sudo/catedra"
+echo "/actions → workflow 'Autopilot' → Run workflow (pega el enlace y el código"
+echo "  que te dé el agente) — vale desde el MÓVIL, sin terminal, en 20 segundos."
 echo "  Si la acción sale en rojo: copia el error del log (GitHub oculta los"
 echo "  secretos automáticamente) y pégamelo — te doy la corrección."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
