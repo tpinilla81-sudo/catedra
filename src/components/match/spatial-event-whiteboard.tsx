@@ -15,7 +15,7 @@
 // — el mismo gesto funciona con dedo (móvil a pie de campo), ratón y lápiz.
 // ============================================================================
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   SPATIAL_OUTCOMES,
   actionMeta,

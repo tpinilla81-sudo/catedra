@@ -15,7 +15,7 @@
 // ============================================================================
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Loader2, Minus, Plus, UserCog } from "lucide-react";
+import { Loader2, Minus, Plus, UserCog, Users } from "lucide-react";
 import type { PlayerStatus } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -283,49 +283,52 @@ export function PlayersView({
   }
 
   return (
-    <div>
-      {/* ---------- Cabecera ---------- */}
-      <header className="border-b border-cream-border bg-white/60">
-        <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between gap-3">
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* ================= ZONA FIJA (sticky master) ================= */}
+      <div className="flex-none border-b border-cream-border bg-white/85 backdrop-blur z-10">
+      <header className="mx-auto max-w-5xl px-4 py-2 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-2xl bg-brand-600/10 border border-emerald-500/30 flex items-center justify-center shrink-0">
+            <Users className="w-5 h-5 text-brand-600" aria-hidden />
+          </div>
           <div className="min-w-0">
-            <p className="text-xs text-[#6c8070] leading-tight truncate">Pilar 2 · {teamName}</p>
-            <h1 className="text-2xl font-black text-peel leading-tight">Plantilla</h1>
+            <p className="text-[11px] text-[#6c8070] leading-tight truncate">Pilar 2 · {teamName}</p>
+            <h1 className="text-base font-black text-peel leading-tight truncate">Plantilla</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <NewPlayerDialog />
-            <ImportSquadDialog />
-          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <NewPlayerDialog />
+          <ImportSquadDialog />
         </div>
       </header>
 
-      <div className="mx-auto max-w-5xl px-4 space-y-5 pt-5">
-        {/* ---------- Pulso de plantilla ---------- */}
-        <section aria-label="Resumen de plantilla" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <div className="rounded-3xl bg-white border border-cream-border p-4">
-            <p className="text-xs font-semibold text-[#5d7263]">JUGADORES</p>
-            <p className="text-2xl font-black text-peel mt-1">{players.length}</p>
+      {/* Cuadros compactos de la plantilla */}
+      <div className="mx-auto max-w-5xl px-4 pb-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+          <div className="rounded-xl bg-white border border-cream-border px-2.5 py-1.5">
+            <p className="text-[9px] font-bold text-[#6c8070] uppercase tracking-wide">Disponibles</p>
+            <p className="text-sm font-black text-brand-600 leading-tight mt-0.5">
+              {stats.available}<span className="text-[10px] text-[#6c8070]">/{players.length}</span>
+            </p>
           </div>
-          <div className="rounded-3xl bg-white border border-cream-border p-4">
-            <p className="text-xs font-semibold text-[#5d7263]">DISPONIBLES</p>
-            <p className="text-2xl font-black text-brand-600 mt-1">{stats.available}</p>
+          <div className="rounded-xl bg-white border border-cream-border px-2.5 py-1.5">
+            <p className="text-[9px] font-bold text-[#6c8070] uppercase tracking-wide">Bajas</p>
+            <p className="text-sm font-black text-[#b4232a] leading-tight mt-0.5">{stats.out}</p>
           </div>
-          <div className="rounded-3xl bg-white border border-cream-border p-4">
-            <p className="text-xs font-semibold text-[#5d7263]">BAJAS</p>
-            <p className="text-2xl font-black text-[#b4232a] mt-1">{stats.out}</p>
+          <div className="rounded-xl bg-white border border-cream-border px-2.5 py-1.5">
+            <p className="text-[9px] font-bold text-[#6c8070] uppercase tracking-wide">Polivalentes</p>
+            <p className="text-sm font-black text-[#8a6206] leading-tight mt-0.5">{stats.poly}</p>
           </div>
-          <div className="rounded-3xl bg-white border border-cream-border p-4">
-            <p className="text-xs font-semibold text-[#5d7263]">POLIVALENTES</p>
-            <p className="text-2xl font-black text-[#8a6206] mt-1">{stats.poly}</p>
+          <div className="rounded-xl bg-white border border-cream-border px-2.5 py-1.5">
+            <p className="text-[9px] font-bold text-[#6c8070] uppercase tracking-wide">Carga alta</p>
+            <p className={`text-sm font-black leading-tight mt-0.5 ${stats.fatigued > 0 ? "text-[#b4232a]" : "text-peel"}`}>{stats.fatigued}</p>
           </div>
-          <div className="rounded-3xl bg-white border border-cream-border p-4">
-            <p className="text-xs font-semibold text-[#5d7263]">CARGA ALTA</p>
-            <p className="text-2xl font-black text-[#b4232a] mt-1">{stats.fatigued}</p>
-          </div>
-        </section>
+        </div>
+      </div>
 
-        {/* ---------- Filtros rápidos por demarcación ---------- */}
-        <section aria-label="Filtros por demarcación">
-          <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      {/* Filtros de demarcación (también fijos: siempre a mano) */}
+      <div className="mx-auto max-w-5xl px-4 pb-2">
+        <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             {[
               { key: "ALL", label: "Todos" },
               ...POSITION_GROUPS,
@@ -359,8 +362,13 @@ export function PlayersView({
                 </button>
               );
             })}
-          </div>
-        </section>
+        </div>
+      </div>
+      </div>
+
+      {/* ================= SCROLL: convocatoria ================= */}
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+        <div className="mx-auto max-w-5xl px-4 py-3">
 
         {/* ---------- Tarjetas ---------- */}
         <section aria-label="Listado de jugadores" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -474,6 +482,7 @@ export function PlayersView({
             );
           })}
         </section>
+        </div>
       </div>
 
       {/* ---------- Editor rápido (hoja inferior táctil) ---------- */}

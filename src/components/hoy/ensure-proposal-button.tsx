@@ -2,6 +2,7 @@
 
 // Red de seguridad de la regla de oro: si por lo que sea no existe propuesta
 // para esta semana, un solo toque la cocina desde los datos reales.
+// Variante compact para la zona fija (sticky master) de Hoy.
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -9,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ensureWeeklyProposal } from "@/app/dashboard/today/actions";
 import { ChefHat } from "lucide-react";
 
-export function EnsureProposalButton() {
+export function EnsureProposalButton({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -26,6 +27,19 @@ export function EnsureProposalButton() {
       }
     });
   };
+
+  if (compact) {
+    return (
+      <Button
+        onClick={handleCook}
+        disabled={pending}
+        className="h-11 px-4 text-sm font-black rounded-2xl bg-[#e3a93c] hover:bg-[#d69a2d] text-peel shadow-md shadow-[#e3a93c]/30 min-h-[44px]"
+      >
+        <ChefHat className="w-4 h-4 mr-1.5" aria-hidden />
+        {pending ? "Cocinando…" : "Cocinar propuesta"}
+      </Button>
+    );
+  }
 
   return (
     <Button

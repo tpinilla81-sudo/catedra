@@ -321,7 +321,9 @@ export function TaxonomyTab({
   onNewTask: () => void;
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(PHASE_ORDER.map((p) => [p, true])),
+    // Fases PLEGADAS por defecto (anatomía compacta del míster): un toque
+    // abre cada fase; la página nunca arranca llena.
+    Object.fromEntries(PHASE_ORDER.map((p) => [p, false])),
   );
   const [detail, setDetail] = useState<SPNode | null>(null);
   const [editor, setEditor] = useState<{
@@ -385,7 +387,7 @@ export function TaxonomyTab({
         const roots = rootsOf(phase);
         const phaseSPs = data.subprinciples.filter((s) => s.phase === phase);
         const hasIssue = phaseSPs.some((s) => s.issue);
-        const expanded = open[phase] ?? true;
+        const expanded = open[phase] ?? false;
 
         return (
           <section

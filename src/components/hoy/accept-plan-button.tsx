@@ -1,6 +1,7 @@
 "use client";
 
 // [✅ Aceptar Plan] — la decisión del lunes con UN toque.
+// Variante compact para la zona fija (sticky master) de Hoy.
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -8,7 +9,13 @@ import { Button } from "@/components/ui/button";
 import { acceptPlan } from "@/app/dashboard/today/actions";
 import { CheckCheck } from "lucide-react";
 
-export function AcceptPlanButton({ microcycleId }: { microcycleId: string }) {
+export function AcceptPlanButton({
+  microcycleId,
+  compact = false,
+}: {
+  microcycleId: string;
+  compact?: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [done, setDone] = useState(false);
@@ -27,6 +34,19 @@ export function AcceptPlanButton({ microcycleId }: { microcycleId: string }) {
       }
     });
   };
+
+  if (compact) {
+    return (
+      <Button
+        onClick={handleAccept}
+        disabled={pending || done}
+        className="h-11 px-4 text-sm font-black rounded-2xl bg-brand-600 hover:bg-brand text-white shadow-md shadow-brand-600/25 min-h-[44px]"
+      >
+        <CheckCheck className="w-4 h-4 mr-1.5" aria-hidden />
+        {done ? "Aceptado" : pending ? "Aceptando…" : "Aceptar Plan"}
+      </Button>
+    );
+  }
 
   return (
     <Button
