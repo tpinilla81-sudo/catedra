@@ -24,6 +24,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import {
+  Crosshair,
   Flag,
   Loader2,
   Pause,
@@ -47,11 +48,16 @@ import {
 } from "@/lib/taxonomy";
 import {
   ACTION_PRESETS,
+  actionMeta,
   formatClock,
   minuteOfElapsed,
   type MatchSessionDTO,
   type TelemetryEventDTO,
 } from "@/lib/pilar3";
+import {
+  SpatialEventWhiteboard,
+  type SpatialSaveInput,
+} from "@/components/match/spatial-event-whiteboard";
 
 // ---------- Tipos ----------
 
@@ -112,14 +118,14 @@ const STATE_EMOJI: Record<string, string> = {
 
 function eventEmoji(e: TelemetryEventDTO): string {
   if (e.type === "ACTION") {
-    return ACTION_PRESETS.find((a) => a.value === e.value)?.emoji ?? "📌";
+    return actionMeta(e.value)?.emoji ?? "📌";
   }
   return STATE_EMOJI[e.value] ?? "•";
 }
 
 function eventLabel(e: TelemetryEventDTO): string {
   if (e.type === "ACTION") {
-    return ACTION_PRESETS.find((a) => a.value === e.value)?.label ?? e.value;
+    return actionMeta(e.value)?.label ?? e.value;
   }
   const metas = {
     FATIGUE: FATIGUE_FLAG_META,
@@ -353,6 +359,8 @@ export function LiveMatchBoard({
   const [pendingClock, setPendingClock] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [videoOpen, setVideoOpen] = useState(false);
+  const [spatialOpen, setSpatialOpen] = useState(false);
+  const [savingSpatial, setSavingSpatial] = useState(false);
 
   const playerName = useMemo(() => {
     const map = new Map<string, string>();
@@ -603,6 +611,50 @@ export function LiveMatchBoard({
     }
   };
 
+  /** Pizarra espacial: vector causa→efecto + auto-clip en el instante de la causa */
+  const handleSpatialSave = async (input: SpatialSaveInput) => {
+    setSavingSpatial(true);
+    try {
+      const data = await postTelemetry({
+        events: [
+          {
+            type: "ACTION",
+            value: input.outcome,
+            coordinatesX: input.startX,
+            coordinatesY: input.startY,
+            coordinatesX2: input.endX,
+            coordinatesY2: input.endY,
+          },
+        ],
+      });
+      const ev = data.created?.[0];
+      if (ev && input.videoSeconds != null && session?.videoUrl) {
+        const res = await fetch("/api/pilar3/video-bookmarks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            telemetryEventId: ev.id,
+            videoTimestampSeconds: input.videoSeconds,
+          }),
+        });
+        const bd = (await res.json().catch(() => null)) as { ok?: boolean } | null;
+        if (res.ok && bd?.ok) {
+          setBookmarked((prev) => new Set(prev).add(ev.id));
+        }
+      }
+      toast({ title: "Causa→efecto registrada ⚡" });
+    } catch (err) {
+      console.error("Error en la pizarra espacial:", err);
+      toast({
+        title: "No se pudo registrar el vector",
+        description: err instanceof Error ? err.message : "Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingSpatial(false);
+    }
+  };
+
   const handleAddTag = async (player: LivePlayerData, code: string, label: string) => {
     setPendingKey(`tag:${code}`);
     try {
@@ -792,6 +844,20 @@ export function LiveMatchBoard({
             >
               <Video className="w-4 h-4" aria-hidden />
               {session?.videoUrl ? "Vídeo ✓" : "Vídeo"}
+            </button>
+            <button
+              onClick={() => setSpatialOpen((v) => !v)}
+              aria-expanded={spatialOpen}
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2.5 text-sm font-bold transition-colors active:scale-95 ${
+                spatialOpen
+                  ? "border-brand-600/60 bg-brand-600/15 text-brand-400"
+                  : "border-[#2a4a34] bg-[#0a1a10] text-[#dfe9d8] hover:bg-[#1c3a26]"
+              }`}
+              aria-label="Pizarra espacial causa a efecto"
+              data-testid="btn-espacial"
+            >
+              <Crosshair className="w-4 h-4" aria-hidden />
+              Espacial
             </button>
           </div>
         </div>
@@ -1208,6 +1274,17 @@ export function LiveMatchBoard({
             ))}
           </div>
         </section>
+      )}
+
+      {/* ---------- Pizarra espacial causa→efecto ---------- */}
+      {spatialOpen && (
+        <SpatialEventWhiteboard
+          session={session}
+          elapsedSeconds={elapsedSeconds}
+          events={events.filter((e) => e.coordinatesX2 != null && e.coordinatesY2 != null)}
+          saving={savingSpatial}
+          onSaveEvent={handleSpatialSave}
+        />
       )}
 
       {/* ---------- Panel de sincronización de vídeo ---------- */}

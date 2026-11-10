@@ -83,6 +83,8 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
         value: true,
         coordinatesX: true,
         coordinatesY: true,
+        coordinatesX2: true,
+        coordinatesY2: true,
       },
     }),
     db.videoBookmark.findMany({
@@ -153,6 +155,8 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
       value: e.value.slice(0, MAX_NOTES),
       coordinatesX: e.coordinatesX,
       coordinatesY: e.coordinatesY,
+      coordinatesX2: e.coordinatesX2,
+      coordinatesY2: e.coordinatesY2,
     })),
     bookmarks,
     aggregates: {

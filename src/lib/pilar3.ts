@@ -64,6 +64,41 @@ export const ACTION_PRESETS: ActionPreset[] = [
 
 export const ACTION_VALUES = new Set(ACTION_PRESETS.map((a) => a.value));
 
+// ---------- Pizarra espacial causa→efecto (vector completo) ----------
+
+export type SpatialOutcome = {
+  value: string;
+  label: string;
+  hint: string;
+  emoji: string;
+  tone: "positive" | "negative" | "neutral";
+};
+
+/// Las 3 consecuencias de la botonera flotante de la pizarra espacial.
+/// El analista pulsa donde se PIERDE el balón (causa) y arrastra hasta la
+/// consecuencia (efecto): coordinatesX/Y = origen · coordinatesX2/Y2 = fin.
+export const SPATIAL_OUTCOMES: SpatialOutcome[] = [
+  { value: "SHOT_AGAINST", label: "Disparo rival", hint: "Alto peligro", emoji: "🎯", tone: "negative" },
+  { value: "COUNTER_ATTACK", label: "Transición / contra", hint: "Medio", emoji: "⚡", tone: "neutral" },
+  { value: "RECOVERED_BALL", label: "Balón recuperado", hint: "Controlado", emoji: "🛡️", tone: "positive" },
+];
+
+export const SPATIAL_VALUES = new Set(SPATIAL_OUTCOMES.map((s) => s.value));
+
+/// Emoji + label de un ACTION: presets clásicos, espaciales, o null (texto libre)
+export function actionMeta(value: string): { emoji: string; label: string } | null {
+  const a = ACTION_PRESETS.find((x) => x.value === value);
+  if (a) return { emoji: a.emoji, label: a.label };
+  const s = SPATIAL_OUTCOMES.find((x) => x.value === value);
+  if (s) return { emoji: s.emoji, label: s.label };
+  return null;
+}
+
+/// ¿El evento traza un vector causa→efecto completo?
+export function isSpatialVector(e: { coordinatesX2?: number | null; coordinatesY2?: number | null }): boolean {
+  return e.coordinatesX2 != null && e.coordinatesY2 != null;
+}
+
 // ---------- Sesión y reloj autoritativo ----------
 
 export type SessionStatusValue = "LIVE" | "PAUSED" | "FINISHED";
@@ -139,6 +174,8 @@ export type TelemetryEventInput = {
   minute?: number | null;
   coordinatesX?: number | null;
   coordinatesY?: number | null;
+  coordinatesX2?: number | null; /// pizarra espacial: fin del vector
+  coordinatesY2?: number | null;
 };
 
 export type TelemetryEventDTO = {
@@ -150,6 +187,8 @@ export type TelemetryEventDTO = {
   value: string;
   coordinatesX: number | null;
   coordinatesY: number | null;
+  coordinatesX2: number | null; /// pizarra espacial: fin del vector
+  coordinatesY2: number | null;
 };
 
 export type VideoBookmarkDTO = {
@@ -207,6 +246,16 @@ export function sanitizeEventInput(
     return null;
   }
 
+  // Vector espacial: los dos extremos van JUNTOS (o ninguno) y en rango
+  const hasX2 = r.coordinatesX2 != null && r.coordinatesX2 !== "";
+  const hasY2 = r.coordinatesY2 != null && r.coordinatesY2 !== "";
+  if (hasX2 !== hasY2) return null;
+  const coordinatesX2 = numOrNull(r.coordinatesX2, 0, 100);
+  const coordinatesY2 = numOrNull(r.coordinatesY2, 0, 100);
+  if ((hasX2 || hasY2) && (coordinatesX2 === null || coordinatesY2 === null)) {
+    return null;
+  }
+
   const playerId =
     typeof r.playerId === "string" && r.playerId.trim() ? r.playerId.trim() : null;
 
@@ -217,6 +266,8 @@ export function sanitizeEventInput(
     minute,
     coordinatesX,
     coordinatesY,
+    coordinatesX2,
+    coordinatesY2,
   };
 }
 

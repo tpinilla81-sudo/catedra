@@ -261,6 +261,8 @@ export async function POST(req: NextRequest) {
         value: ev.value,
         coordinatesX: ev.coordinatesX,
         coordinatesY: ev.coordinatesY,
+        coordinatesX2: ev.coordinatesX2,
+        coordinatesY2: ev.coordinatesY2,
       },
     });
     created.push({
@@ -272,6 +274,8 @@ export async function POST(req: NextRequest) {
       value: row.value,
       coordinatesX: row.coordinatesX,
       coordinatesY: row.coordinatesY,
+      coordinatesX2: row.coordinatesX2,
+      coordinatesY2: row.coordinatesY2,
     });
 
     // Los ejes de estado tocan también la ficha del tablón (estado activo)

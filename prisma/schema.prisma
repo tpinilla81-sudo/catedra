@@ -835,6 +835,8 @@ model MatchTelemetryEvent {
   value          String /// "FRESH" · "MINOR" · "GOAL_FOR"... o texto libre ≤ 140
   coordinatesX   Float? /// 0-100 (ancho del campo)
   coordinatesY   Float? /// 0-100 (profundidad del campo)
+  coordinatesX2  Float? /// Pizarra espacial: FIN del vector causa→efecto, 0-100
+  coordinatesY2  Float? /// Pizarra espacial: FIN del vector causa→efecto, 0-100
   createdAt      DateTime      @default(now())
 
   club         Club                 @relation(fields: [clubId], references: [id], onDelete: Cascade)

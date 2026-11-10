@@ -63,6 +63,8 @@ export default async function LiveMatchPage({
         value: true,
         coordinatesX: true,
         coordinatesY: true,
+        coordinatesX2: true,
+        coordinatesY2: true,
       },
     }),
   ]);
@@ -119,6 +121,8 @@ export default async function LiveMatchPage({
     value: e.value,
     coordinatesX: e.coordinatesX,
     coordinatesY: e.coordinatesY,
+    coordinatesX2: e.coordinatesX2,
+    coordinatesY2: e.coordinatesY2,
   }));
 
   return (
