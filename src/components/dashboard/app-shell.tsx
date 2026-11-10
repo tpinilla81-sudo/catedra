@@ -22,11 +22,12 @@ import {
   Landmark,
   LogOut,
   Menu,
+  Terminal,
   Users,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
-export type AppShellKey = "today" | "library" | "players" | "matches" | "quality";
+export type AppShellKey = "today" | "compacto" | "library" | "players" | "matches" | "quality";
 
 type Props = {
   active: AppShellKey;
@@ -51,6 +52,7 @@ const NAV_ITEMS: Array<{
   pillar: string;
 }> = [
   { key: "today", href: "/dashboard/today", label: "Hoy", icon: Home, pillar: "P4" },
+  { key: "compacto", href: "/dashboard/compacto", label: "Compacto", icon: Terminal, pillar: "BANQ" },
   { key: "library", href: "/dashboard/library", label: "Biblioteca", icon: BookOpen, pillar: "P1" },
   { key: "players", href: "/dashboard/players", label: "Plantilla", icon: Users, pillar: "P2" },
   { key: "matches", href: "/dashboard/matches", label: "Partidos", icon: CalendarDays, pillar: "P3" },
