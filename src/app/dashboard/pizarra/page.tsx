@@ -131,9 +131,11 @@ export default async function PizarraPage() {
                 Pizarra libre · preparación (nada se sella aquí)
               </h2>
               <p className="text-xs text-[#6c8070] leading-snug">
-                Campo libre para preparar y explicar: elige el tipo de evento y toca el campo
-                donde quieres colocarlo (toca un punto para quitarlo). Para registrar hechos
-                contra el vídeo y el reloj, abre la pizarra en directo del partido.
+                Campo libre para preparar y explicar: saca las fichas de la plantilla real, los
+                rivales y el balón y arrástralos con el dedo o el ratón (el balón soltado junto a
+                un jugador queda a su pie); también puedes tocar el campo para colocar eventos del
+                vocabulario de la ingesta. Para registrar hechos contra el vídeo y el reloj, abre
+                la pizarra en directo del partido.
               </p>
               <div className="rounded-2xl border border-cream-border bg-white/70 p-3">
                 <PrepWhiteboard
