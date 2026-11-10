@@ -70,3 +70,4 @@ download/catedra-deploy.bundle
 # Resultados de herramientas del agente (nunca en el repo)
 tool-results/
 upload/
+download/
