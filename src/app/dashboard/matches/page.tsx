@@ -52,7 +52,7 @@ export default async function MatchesPage() {
       role={user.role}
       pendingIngest={pending.length}
     >
-    <main className="min-h-screen bg-cream pb-10">
+    <main className="min-h-full bg-cream pb-6">
       <header className="border-b border-cream-border bg-white/60">
         <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between gap-3">
           <div className="min-w-0">

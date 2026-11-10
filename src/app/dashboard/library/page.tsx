@@ -120,7 +120,7 @@ export default async function LibraryPage() {
 
   return (
     <AppShell active="library" userName={user.name} role={user.role}>
-    <main className="min-h-screen bg-cream pb-10">
+    <main className="min-h-full bg-cream pb-6">
       {/* RBAC de presentación: los guards autoritativos viven en cada Server Action */}
       <LibraryView data={data} role={user.role} />
     </main>

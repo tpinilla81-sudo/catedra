@@ -3,10 +3,11 @@
 // ============================================================================
 // APP SHELL — CATEDRA by Método
 // ----------------------------------------------------------------------------
-// Menú lateral con TODOS los pilares visibles para todos los roles:
-//   Hoy (P4) · Biblioteca (P1) · Plantilla (P2) · Partidos (P3) · Calidad.
+// Menú lateral SOLO con los nombres de las secciones (sin etiquetas de pilar):
+//   Hoy · Biblioteca · Plantilla · Partidos.
 //   La Cátedra aparece solo para PLATFORM_ADMIN (contexto de plataforma).
-// • Desktop (lg+): sidebar fijo verde corteza con wordmark + usuario + salir.
+// • Desktop (lg+): sidebar fijo verde corteza + contenido fijo en viewport:
+//   SIN scroll de página (cada sección compone su interior).
 // • Móvil: barra superior con logo + wordmark y drawer (Sheet) lateral.
 // El contenido de cada página se renderiza dentro del shell (children).
 // ============================================================================
@@ -17,17 +18,15 @@ import { signOut } from "next-auth/react";
 import {
   BookOpen,
   CalendarDays,
-  FlaskConical,
   Home,
   Landmark,
   LogOut,
   Menu,
-  Terminal,
   Users,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
-export type AppShellKey = "today" | "compacto" | "library" | "players" | "matches" | "quality";
+export type AppShellKey = "today" | "library" | "players" | "matches";
 
 type Props = {
   active: AppShellKey;
@@ -49,14 +48,11 @@ const NAV_ITEMS: Array<{
   href: string;
   label: string;
   icon: typeof Home;
-  pillar: string;
 }> = [
-  { key: "today", href: "/dashboard/today", label: "Hoy", icon: Home, pillar: "P4" },
-  { key: "compacto", href: "/dashboard/compacto", label: "Compacto", icon: Terminal, pillar: "BANQ" },
-  { key: "library", href: "/dashboard/library", label: "Biblioteca", icon: BookOpen, pillar: "P1" },
-  { key: "players", href: "/dashboard/players", label: "Plantilla", icon: Users, pillar: "P2" },
-  { key: "matches", href: "/dashboard/matches", label: "Partidos", icon: CalendarDays, pillar: "P3" },
-  { key: "quality", href: "/dashboard/quality", label: "Calidad", icon: FlaskConical, pillar: "E2E" },
+  { key: "today", href: "/dashboard/today", label: "Hoy", icon: Home },
+  { key: "library", href: "/dashboard/library", label: "Biblioteca", icon: BookOpen },
+  { key: "players", href: "/dashboard/players", label: "Plantilla", icon: Users },
+  { key: "matches", href: "/dashboard/matches", label: "Partidos", icon: CalendarDays },
 ];
 
 function Wordmark({ compact = false }: { compact?: boolean }) {
@@ -113,15 +109,6 @@ function NavList({ active, pendingIngest, onNavigate }: {
                 title={`${pendingIngest} ingesta${pendingIngest! > 1 ? "s" : ""} pendiente${pendingIngest! > 1 ? "s" : ""}`}
               >
                 {pendingIngest}
-              </span>
-            )}
-            {item.key !== "matches" && (
-              <span
-                className={`ml-auto text-[10px] font-black tracking-wider rounded-full px-2 py-0.5 ${
-                  isActive ? "bg-white/15 text-[#f5f2e4]" : "bg-white/5 text-[#9db29a]"
-                }`}
-              >
-                {item.pillar}
               </span>
             )}
           </Link>
@@ -198,7 +185,9 @@ export function AppShell({ active, userName, role, pendingIngest, children }: Pr
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-cream">
+    // Shell FIJO en viewport: la página nunca hace scroll — el scroll interno
+    // lo decide cada sección dentro de su panel (cabecera y menú siempre visibles).
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-cream lg:block">
       {/* ---------- Sidebar fijo (desktop) ---------- */}
       <aside className="hidden lg:block fixed inset-y-0 left-0 w-[272px] z-40">
         <SidebarBody
@@ -210,7 +199,7 @@ export function AppShell({ active, userName, role, pendingIngest, children }: Pr
       </aside>
 
       {/* ---------- Barra superior con drawer (móvil) ---------- */}
-      <div className="lg:hidden sticky top-0 z-40 border-b border-cream-border bg-white/90 backdrop-blur">
+      <div className="lg:hidden flex-none z-40 border-b border-cream-border bg-white/90 backdrop-blur">
         <div className="flex items-center justify-between gap-3 px-4 h-16 text-peel">
           <button
             type="button"
@@ -227,8 +216,8 @@ export function AppShell({ active, userName, role, pendingIngest, children }: Pr
         </div>
       </div>
 
-      {/* ---------- Contenido ---------- */}
-      <div className="lg:pl-[272px]">
+      {/* ---------- Contenido (panel interno con scroll propio) ---------- */}
+      <div className="flex-1 overflow-y-auto overscroll-contain lg:h-[100dvh] lg:flex-none lg:pl-[272px]">
         {children}
       </div>
 

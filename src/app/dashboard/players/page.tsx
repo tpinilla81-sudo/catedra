@@ -40,7 +40,7 @@ export default async function PlayersPage() {
 
   return (
     <AppShell active="players" userName={user.name} role={user.role}>
-    <main className="min-h-screen bg-cream pb-10">
+    <main className="min-h-full bg-cream pb-6">
       <PlayersView teamName={team.name} players={data} />
     </main>
     </AppShell>

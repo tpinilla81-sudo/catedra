@@ -1,8 +1,7 @@
 "use client";
-import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { FlaskConical, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 
 type Props = {
   userName: string;
@@ -26,16 +25,6 @@ export function UserMenu({ userName, role }: Props) {
           {ROLE_LABELS[role] ?? role}
         </p>
       </div>
-      {role !== "ANALYST" && (
-        <Link
-          href="/dashboard/quality"
-          aria-label="Panel de validación E2E"
-          title="Panel de validación E2E"
-          className="h-11 w-11 rounded-2xl border border-cream-border-strong text-[#5d7263] hover:bg-cream-dark hover:text-peel flex items-center justify-center"
-        >
-          <FlaskConical className="w-5 h-5" aria-hidden />
-        </Link>
-      )}
       <Button
         variant="outline"
         size="icon"

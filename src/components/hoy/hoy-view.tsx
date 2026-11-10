@@ -126,19 +126,19 @@ export async function HoyView() {
 
   return (
     <AppShell active="today" userName={user.name} role={user.role}>
-    <main className="pb-10">
+    <main className="pb-6">
       <PersistActiveTeam teamId={team.id} />
 
       {/* ---------- Cabecera ---------- */}
       <header className="border-b border-cream-border bg-white/60">
-        <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between gap-4">
+        <div className="mx-auto max-w-5xl px-4 py-2.5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-11 h-11 rounded-2xl bg-brand-600/10 border border-emerald-500/30 flex items-center justify-center shrink-0">
-              <Trophy className="w-6 h-6 text-brand-600" aria-hidden />
+            <div className="w-9 h-9 rounded-2xl bg-brand-600/10 border border-emerald-500/30 flex items-center justify-center shrink-0">
+              <Trophy className="w-5 h-5 text-brand-600" aria-hidden />
             </div>
             <div className="min-w-0">
-              <p className="text-xs text-[#6c8070] leading-tight truncate">CF Método · Fase 2</p>
-              <p className="text-lg font-bold text-peel leading-tight truncate">
+              <p className="text-[11px] text-[#6c8070] leading-tight truncate">CF Método · Fase 2</p>
+              <p className="text-base font-bold text-peel leading-tight truncate">
                 {team.name}
               </p>
             </div>
@@ -146,12 +146,12 @@ export async function HoyView() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-5xl px-4 space-y-6 pt-6">
+      <div className="mx-auto max-w-5xl px-4 space-y-4 pt-4">
         {/* ---------- Título + fecha ---------- */}
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
           <div>
-            <h1 className="text-3xl font-black tracking-tight">Hoy</h1>
-            <p className="text-[#5d7263] flex items-center gap-2 mt-1">
+            <h1 className="text-2xl font-black tracking-tight">Hoy</h1>
+            <p className="text-[#5d7263] flex items-center gap-2 mt-0.5 text-sm">
               <CalendarDays className="w-4 h-4" aria-hidden />
               {dateLabel}
             </p>
@@ -169,12 +169,12 @@ export async function HoyView() {
           {pulse && (
             <>
               <Card className="bg-white border-cream-border rounded-3xl">
-                <CardContent className="p-4 space-y-3">
+                <CardContent className="p-3 space-y-2">
                   <p className="text-xs font-semibold text-[#5d7263] flex items-center gap-1.5">
                     <HeartPulse className="w-4 h-4 text-[#6d28d9]" aria-hidden /> INERCIA ANÍMICA
                   </p>
-                  <p className="text-3xl font-black text-peel">{pulse.moraleScore}<span className="text-sm text-[#6c8070] font-bold">/10</span></p>
-                  <div className="h-2 rounded-full bg-cream-dark overflow-hidden">
+                  <p className="text-2xl font-black text-peel">{pulse.moraleScore}<span className="text-sm text-[#6c8070] font-bold">/10</span></p>
+                  <div className="h-1.5 rounded-full bg-cream-dark overflow-hidden">
                     <div className={`h-full ${gaugeColor(pulse.moraleScore)}`} style={{ width: `${pulse.moraleScore * 10}%` }} />
                   </div>
                   {pulse.resultsStreak != null && (
@@ -186,12 +186,12 @@ export async function HoyView() {
                 </CardContent>
               </Card>
               <Card className="bg-white border-cream-border rounded-3xl">
-                <CardContent className="p-4 space-y-3">
+                <CardContent className="p-3 space-y-2">
                   <p className="text-xs font-semibold text-[#5d7263] flex items-center gap-1.5">
                     <Dumbbell className="w-4 h-4 text-[#8a6206]" aria-hidden /> FATIGA GRUPAL
                   </p>
-                  <p className="text-3xl font-black text-peel">{pulse.fatigueScore}<span className="text-sm text-[#6c8070] font-bold">/10</span></p>
-                  <div className="h-2 rounded-full bg-cream-dark overflow-hidden">
+                  <p className="text-2xl font-black text-peel">{pulse.fatigueScore}<span className="text-sm text-[#6c8070] font-bold">/10</span></p>
+                  <div className="h-1.5 rounded-full bg-cream-dark overflow-hidden">
                     <div className={`h-full ${gaugeColor(pulse.fatigueScore)}`} style={{ width: `${pulse.fatigueScore * 10}%` }} />
                   </div>
                   <p className="text-xs text-[#6c8070]">
@@ -202,7 +202,7 @@ export async function HoyView() {
             </>
           )}
           <Card className="bg-white border-cream-border rounded-3xl">
-            <CardContent className="p-4 space-y-2">
+            <CardContent className="p-3 space-y-1.5">
               <p className="text-xs font-semibold text-[#5d7263] flex items-center gap-1.5">
                 <Trophy className="w-4 h-4 text-brand-600" aria-hidden /> ÚLTIMO PARTIDO
               </p>
@@ -221,7 +221,7 @@ export async function HoyView() {
             </CardContent>
           </Card>
           <Card className="bg-white border-cream-border rounded-3xl">
-            <CardContent className="p-4 space-y-2">
+            <CardContent className="p-3 space-y-1.5">
               <p className="text-xs font-semibold text-[#5d7263] flex items-center gap-1.5">
                 <MapPin className="w-4 h-4 text-[#5d7263]" aria-hidden /> PRÓXIMO PARTIDO
               </p>
@@ -244,7 +244,7 @@ export async function HoyView() {
           <h2 id="plan-title" className="sr-only">Plan de la semana</h2>
           {!microcycle ? (
             <Card className="bg-white border-cream-border rounded-3xl">
-              <CardContent className="p-8 text-center space-y-4">
+              <CardContent className="p-6 text-center space-y-3">
                 <Sparkles className="w-10 h-10 text-[#8a6206] mx-auto" aria-hidden />
                 <p className="text-lg font-bold text-peel">
                   El motor no tiene propuesta cocinada para esta semana
@@ -259,9 +259,9 @@ export async function HoyView() {
           ) : (
             <div className="space-y-5">
               <Card className="bg-white border-cream-border rounded-3xl overflow-hidden">
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-2">
                   <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <CardTitle className="text-xl font-black text-peel">
+                    <CardTitle className="text-lg font-black text-peel">
                       Microciclo · {format(microcycle.weekStart, "d MMM", { locale: es })}
                     </CardTitle>
                     <Badge variant="outline" className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_CHIP[microcycle.status]?.cls ?? ""}`}>
@@ -272,9 +272,9 @@ export async function HoyView() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     {microcycle.tacticalDirectives.map((d, i) => (
-                      <div key={i} className="flex items-start gap-2 rounded-2xl bg-cream-dark/70 px-4 py-3">
-                        <Shield className="w-5 h-5 text-brand-600 mt-0.5 shrink-0" aria-hidden />
-                        <p className="text-sm font-semibold text-peel">{d}</p>
+                      <div key={i} className="flex items-start gap-2 rounded-2xl bg-cream-dark/70 px-3 py-2">
+                        <Shield className="w-4 h-4 text-brand-600 mt-0.5 shrink-0" aria-hidden />
+                        <p className="text-[13px] font-semibold text-peel">{d}</p>
                       </div>
                     ))}
                   </div>
@@ -297,7 +297,7 @@ export async function HoyView() {
                           const chip = KIND_CHIP[issue.kind] ?? KIND_CHIP.TACTICAL;
                           const Icon = chip.icon;
                           return (
-                            <div key={issue.id} className="rounded-2xl border border-cream-border bg-cream-dark/70 px-4 py-3 space-y-1.5">
+                            <div key={issue.id} className="rounded-2xl border border-cream-border bg-cream-dark/70 px-3 py-2 space-y-1.5">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <Badge variant="outline" className={`rounded-full text-xs ${chip.cls}`}>
                                   <Icon className="w-3 h-3 mr-1" aria-hidden />
@@ -336,13 +336,13 @@ export async function HoyView() {
               {/* ---------- Sesiones ---------- */}
               {microcycle.sessions.map((session) => (
                 <Card key={session.id} className="bg-white border-cream-border rounded-3xl">
-                  <CardHeader className="pb-3">
+                  <CardHeader className="pb-2">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div className="flex items-center gap-3">
                         <Badge className="rounded-xl bg-brand-600/15 text-brand-600 border border-emerald-500/30 hover:bg-brand-600/15 px-3 py-1 font-bold">
                           {session.label}
                         </Badge>
-                        <CardTitle className="text-lg font-bold text-peel">
+                        <CardTitle className="text-base font-bold text-peel">
                           {format(session.date, "EEEE d", { locale: es })}
                         </CardTitle>
                       </div>
@@ -360,7 +360,7 @@ export async function HoyView() {
                       <p className="text-sm text-[#6c8070]">Sesión libre — aún sin tareas asignadas.</p>
                     )}
                     {session.tasks.map((st) => (
-                      <div key={st.id} className="rounded-2xl border border-cream-border bg-cream-dark/70 p-4 space-y-2">
+                      <div key={st.id} className="rounded-2xl border border-cream-border bg-cream-dark/70 p-3 space-y-1.5">
                         <div className="flex items-start justify-between gap-3 flex-wrap">
                           <p className="font-bold text-peel">
                             <span className="text-brand-600 mr-2">{st.order}.</span>
@@ -419,7 +419,7 @@ export async function HoyView() {
                 <Card className="bg-white border-cream-border rounded-3xl">
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <CardTitle className="text-lg font-black text-peel flex items-center gap-2">
+                      <CardTitle className="text-base font-black text-peel flex items-center gap-2">
                         <Sparkles className="w-5 h-5 text-[#8a6206]" aria-hidden />
                         Por qué este plan
                       </CardTitle>
@@ -439,7 +439,7 @@ export async function HoyView() {
                     {runPrescriptions.length > 0 ? (
                       <div className="space-y-2">
                         {runPrescriptions.map((p, i) => (
-                          <div key={i} className="rounded-2xl border border-emerald-500/20 bg-brand-600/5 px-4 py-3 flex items-start gap-3">
+                          <div key={i} className="rounded-2xl border border-emerald-500/20 bg-brand-600/5 px-3 py-2 flex items-start gap-3">
                             <span className="w-6 h-6 rounded-full bg-brand-600/15 text-brand-600 text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
                               {i + 1}
                             </span>
@@ -468,7 +468,7 @@ export async function HoyView() {
 
                     {runDiscarded.length > 0 && (
                       <details className="group rounded-2xl border border-cream-border bg-cream-dark/70 overflow-hidden">
-                        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-[#5d7263] flex items-center justify-between hover:text-[#2a4630]">
+                        <summary className="cursor-pointer list-none px-3 py-2 text-sm font-semibold text-[#5d7263] flex items-center justify-between hover:text-[#2a4630]">
                           Candidatas evaluadas y descartadas ({runDiscarded.length})
                           <span className="text-xs text-[#8a9a8d] group-open:hidden">ver</span>
                           <span className="hidden text-xs text-[#8a9a8d] group-open:inline">ocultar</span>
@@ -491,7 +491,7 @@ export async function HoyView() {
               {microcycle.status === "PROPOSED" ? (
                 <AcceptPlanButton microcycleId={microcycle.id} />
               ) : (
-                <div className="rounded-3xl border border-emerald-500/40 bg-brand-600/10 p-5 text-center">
+                <div className="rounded-3xl border border-emerald-500/40 bg-brand-600/10 p-4 text-center">
                   <p className="text-lg font-bold text-brand-600 flex items-center justify-center gap-2">
                     <Trophy className="w-5 h-5" aria-hidden />
                     {STATUS_CHIP[microcycle.status]?.label ?? microcycle.status}

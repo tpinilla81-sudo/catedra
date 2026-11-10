@@ -85,7 +85,7 @@ export default async function MatchIngestPage({
     : null;
 
   return (
-    <main className="min-h-screen bg-cream pb-6">
+    <main className="min-h-full bg-cream pb-6">
       <IngestFlow match={matchData} players={playerData} initialReport={initialReport} />
     </main>
   );
