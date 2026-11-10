@@ -15,7 +15,7 @@
 // — el mismo gesto funciona con dedo (móvil a pie de campo), ratón y lápiz.
 // ============================================================================
 
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   SPATIAL_OUTCOMES,
   actionMeta,
@@ -24,6 +24,14 @@ import {
   type MatchSessionDTO,
   type TelemetryEventDTO,
 } from "@/lib/pilar3";
+import {
+  VOICE_OUTCOME_LABEL,
+  VOICE_ZONE_CHIPS,
+  completePartial,
+  parseVoiceEvent,
+  type VoiceOutcome,
+  type VoicePt,
+} from "@/lib/voice-events";
 
 export type SpatialSaveInput = {
   startX: number; /// origen del vector (causa), 0-100
@@ -51,6 +59,29 @@ const TONE_CLASSES: Record<string, string> = {
   positive: "bg-emerald-600/85 hover:bg-emerald-600",
 } as const;
 
+// ---- Web Speech API: tipos mínimos propios (sin dependencias) --------------
+type SpeechResultLike = { isFinal: boolean; length: number; 0: { transcript: string } };
+type SpeechEventLike = { resultIndex: number; results: { length: number; [i: number]: SpeechResultLike } };
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult: ((e: SpeechEventLike) => void) | null;
+  onerror: ((e: { error?: string }) => void) | null;
+  onend: (() => void) | null;
+};
+
+function getSpeechRecognition(): (new () => SpeechRecognitionLike) | null {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as Record<string, unknown>;
+  const ctor = (w.SpeechRecognition ?? w.webkitSpeechRecognition) as
+    | (new () => SpeechRecognitionLike)
+    | undefined;
+  return ctor ?? null;
+}
+
 export function SpatialEventWhiteboard({
   session,
   elapsedSeconds,
@@ -69,6 +100,42 @@ export function SpatialEventWhiteboard({
   const [dragPos, setDragPos] = useState<Pt | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [pendingOutcome, setPendingOutcome] = useState<string | null>(null);
+
+  // ---- estado del modo voz 🎙️ --------------------------------------------
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [interim, setInterim] = useState("");
+  const [voiceMsg, setVoiceMsg] = useState<string | null>(null);
+  const [pendingVoice, setPendingVoice] = useState<{ outcome: VoiceOutcome } | null>(null);
+  const [voiceVector, setVoiceVector] = useState<{ start: VoicePt; end: VoicePt } | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const listeningRef = useRef(false);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /// El padre re-crea su handler en cada render: guardamos SIEMPRE el último
+  /// para que el reconocimiento de voz no dispare closures obsoletas.
+  const onSaveEventRef = useRef(onSaveEvent);
+  useEffect(() => {
+    onSaveEventRef.current = onSaveEvent;
+  }, [onSaveEvent]);
+
+  useEffect(() => {
+    setVoiceSupported(getSpeechRecognition() !== null);
+  }, []);
+
+  // Cleanup: parar micro y temporizadores al desmontar (sin fugas)
+  useEffect(
+    () => () => {
+      listeningRef.current = false;
+      try {
+        recognitionRef.current?.stop();
+      } catch {
+        // ya estaba parado
+      }
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    },
+    [],
+  );
 
   // ---- gesto: origen de la causa -----------------------------------------
   const coordsFromEvent = (e: React.PointerEvent<HTMLDivElement>): Pt => {
@@ -112,12 +179,17 @@ export function SpatialEventWhiteboard({
     setDragPos(null);
   };
 
+  // ---- guardado compartido (gesto y voz usan el mismo camino) --------------
+  const saveVector = useCallback(async (input: SpatialSaveInput) => {
+    await onSaveEventRef.current(input);
+  }, []);
+
   // ---- confirmación de la consecuencia ------------------------------------
   const handleSelectOutcome = async (outcome: string) => {
     if (!menu || saving || pendingOutcome) return;
     setPendingOutcome(outcome);
     try {
-      await onSaveEvent({
+      await saveVector({
         startX: menu.origin.x,
         startY: menu.origin.y,
         endX: menu.end.x,
@@ -129,6 +201,125 @@ export function SpatialEventWhiteboard({
     } finally {
       setPendingOutcome(null);
     }
+  };
+
+  // ---- 🎙️ voz: del dicho al hecho (vector en la pizarra) -------------------
+  const flashVoiceVector = useCallback((start: VoicePt, end: VoicePt) => {
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    setVoiceVector({ start, end });
+    flashTimerRef.current = setTimeout(() => setVoiceVector(null), 4000);
+  }, []);
+
+  const handleFinalTranscript = useCallback(
+    async (text: string) => {
+      const parse = parseVoiceEvent(text);
+      if (parse.status === "none") {
+        setVoiceMsg(`🤔 «${text.trim()}» — no lo entendí. Ej.: «recuperamos banda derecha».`);
+        return;
+      }
+      if (parse.status === "partial") {
+        setPendingVoice({ outcome: parse.outcome });
+        setVoiceMsg(`Casi: «${text.trim()}» — ¿dónde? Elige la zona:`);
+        return;
+      }
+      setPendingVoice(null);
+      setVoiceMsg(`✅ ${VOICE_OUTCOME_LABEL[parse.outcome]} · ${parse.zones.join(" → ")}`);
+      const videoSeconds = videoRef.current ? videoRef.current.currentTime : null;
+      await saveVector({
+        startX: parse.origin.x,
+        startY: parse.origin.y,
+        endX: parse.end.x,
+        endY: parse.end.y,
+        outcome: parse.outcome,
+        videoSeconds,
+      });
+      flashVoiceVector(parse.origin, parse.end);
+    },
+    [saveVector, flashVoiceVector],
+  );
+
+  const stopListening = useCallback(() => {
+    listeningRef.current = false;
+    setListening(false);
+    setInterim("");
+    try {
+      recognitionRef.current?.stop();
+    } catch {
+      // ya estaba parado
+    }
+  }, []);
+
+  const startListening = useCallback(() => {
+    const Ctor = getSpeechRecognition();
+    if (!Ctor) {
+      setVoiceSupported(false);
+      return;
+    }
+    try {
+      const rec = new Ctor();
+      rec.lang = "es-ES";
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.onresult = (e) => {
+        let interimText = "";
+        for (let i = e.resultIndex; i < e.results.length; i += 1) {
+          const res = e.results[i];
+          const transcript = res?.[0]?.transcript ?? "";
+          if (res.isFinal) {
+            if (transcript.trim()) void handleFinalTranscript(transcript);
+          } else {
+            interimText += transcript;
+          }
+        }
+        setInterim(interimText);
+      };
+      rec.onerror = (e) => {
+        if (e.error === "not-allowed") {
+          setVoiceMsg("🎙️ Permiso de micrófono denegado — actívalo en el navegador.");
+        } else if (e.error && e.error !== "no-speech" && e.error !== "aborted") {
+          setVoiceMsg(`🎙️ Error de voz: ${e.error}`);
+        }
+      };
+      rec.onend = () => {
+        // Chrome corta tras los silencios: si seguimos en modo voz, reenganchamos
+        if (listeningRef.current) {
+          setTimeout(() => {
+            if (!listeningRef.current) return;
+            try {
+              rec.start();
+            } catch {
+              // ya arrancado
+            }
+          }, 300);
+        }
+      };
+      recognitionRef.current = rec;
+      listeningRef.current = true;
+      setListening(true);
+      setVoiceMsg(null);
+      setPendingVoice(null);
+      rec.start();
+    } catch {
+      setVoiceMsg("🎙️ Tu navegador no permite voz en este momento.");
+    }
+  }, [handleFinalTranscript]);
+
+  const handleChipZone = async (zone: (typeof VOICE_ZONE_CHIPS)[number]) => {
+    if (!pendingVoice) return;
+    const outcome = pendingVoice.outcome;
+    const { origin, end } = completePartial(outcome, zone);
+    setPendingVoice(null);
+    setVoiceMsg(`✅ ${VOICE_OUTCOME_LABEL[outcome]} · ${zone.label}`);
+    const videoSeconds = videoRef.current ? videoRef.current.currentTime : null;
+    await saveVector({
+      startX: origin.x,
+      startY: origin.y,
+      endX: end.x,
+      endY: end.y,
+      outcome,
+      videoSeconds,
+    });
+    flashVoiceVector(origin, end);
   };
 
   // ---- reproducción instantánea del auto-clip (-3s / +2s) ------------------
@@ -179,6 +370,84 @@ export function SpatialEventWhiteboard({
             </span>
           )}
         </span>
+      </div>
+
+      {/* ---------- 🎙️ Modo voz en directo (manos libres) ---------- */}
+      <div
+        className="mb-3 rounded-xl border border-[#1c3a26] bg-[#0a1a10] p-2.5"
+        data-testid="voice-panel"
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          {voiceSupported ? (
+            <button
+              onClick={listening ? stopListening : startListening}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
+                listening
+                  ? "animate-pulse bg-red-600 text-white hover:bg-red-500"
+                  : "bg-[#1c3a26] text-[#dfe9d8] hover:bg-[#2a4a34]"
+              }`}
+              data-testid="voice-toggle"
+            >
+              {listening ? "⏹️ Parar voz" : "🎙️ Hablar"}
+            </button>
+          ) : (
+            <span className="text-[11px] text-[#6d8070]">
+              🎙️ Voz no disponible en este navegador — usa Chrome o Safari actualizado.
+            </span>
+          )}
+          {listening && (
+            <span className="flex items-center gap-1.5 text-[11px] text-[#a9bca9]">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" aria-hidden />
+              Escuchando en español…
+            </span>
+          )}
+          {voiceMsg && (
+            <span className="text-[11px] text-[#dfe9d8]" data-testid="voice-msg">
+              {voiceMsg}
+            </span>
+          )}
+        </div>
+
+        {(interim || pendingVoice) && (
+          <div className="mt-2 space-y-2">
+            {interim && <p className="px-1 text-[11px] italic text-[#6d8070]">«{interim}»</p>}
+            {pendingVoice && (
+              <div className="flex flex-wrap gap-1.5" data-testid="voice-chips">
+                {VOICE_ZONE_CHIPS.map((z) => (
+                  <button
+                    key={z.label}
+                    onClick={() => void handleChipZone(z)}
+                    className="rounded-full border border-[#2a4a34] bg-[#0f2317] px-2.5 py-1 text-[11px] font-semibold text-[#dfe9d8] transition hover:border-brand-500"
+                    data-testid={`voice-chip-${z.label.replace(/\s+/g, "-")}`}
+                  >
+                    {z.label}
+                  </button>
+                ))}
+                <button
+                  onClick={() => {
+                    setPendingVoice(null);
+                    setVoiceMsg("Cancelado.");
+                  }}
+                  className="rounded-full bg-[#1c3a26] px-2.5 py-1 text-[11px] text-[#8aa28d] transition hover:bg-[#2a4a34]"
+                >
+                  Descartar
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <details className="mt-1.5">
+          <summary className="cursor-pointer px-1 text-[10px] uppercase tracking-wider text-[#6d8070]">
+            Comandos de voz
+          </summary>
+          <p className="mt-1 px-1 text-[11px] leading-relaxed text-[#8aa28d]">
+            «recuperamos banda derecha» · «disparo rival desde la frontal» · «contra por el carril
+            izquierdo» · «robo en medio campo» · «nos chutan desde tres cuartos» — di la{' '}
+            <strong className="text-[#a9bca9]">salida</strong> y la{' '}
+            <strong className="text-[#a9bca9]">zona</strong>; si falta la zona, elige el chip.
+          </p>
+        </details>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -324,6 +593,36 @@ export function SpatialEventWhiteboard({
                   strokeWidth="2"
                   strokeDasharray="3,3"
                 />
+              )}
+
+              {/* Vector recién registrado POR VOZ (flash 4s) */}
+              {voiceVector && (
+                <g data-testid="voice-vector">
+                  <line
+                    x1={`${voiceVector.start.x}%`}
+                    y1={`${voiceVector.start.y}%`}
+                    x2={`${voiceVector.end.x}%`}
+                    y2={`${voiceVector.end.y}%`}
+                    stroke="#34d399"
+                    strokeWidth="3.5"
+                  />
+                  <circle
+                    cx={`${voiceVector.start.x}%`}
+                    cy={`${voiceVector.start.y}%`}
+                    r="6"
+                    fill="#34d399"
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                  />
+                  <circle
+                    cx={`${voiceVector.end.x}%`}
+                    cy={`${voiceVector.end.y}%`}
+                    r="4.5"
+                    fill="#34d399"
+                    stroke="#ffffff"
+                    strokeWidth="1.5"
+                  />
+                </g>
               )}
             </svg>
 

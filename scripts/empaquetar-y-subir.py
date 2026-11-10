@@ -8,7 +8,7 @@ import time
 import urllib.request
 
 ROOT = "/home/z/my-project"
-BASE = "034ea78"
+BASE = "c5de3e7"  # main actual en GitHub: el paquete SOLO lleva los commits nuevos
 DPASTE = "https://dpaste.org/api/"
 
 
