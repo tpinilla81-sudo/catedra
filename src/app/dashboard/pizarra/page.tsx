@@ -36,6 +36,7 @@ export default async function PizarraPage() {
         firstName: true,
         lastName: true,
         shirtNumber: true,
+        primaryPosition: true,
       },
     }),
   ]);
@@ -172,10 +173,11 @@ export default async function PizarraPage() {
               <p className="text-xs text-[#6c8070] leading-snug">
                 Campo libre para preparar y explicar: VUELCA el once confirmado de cualquier
                 partido (alineación sincronizada), saca las fichas de la plantilla real, los
-                rivales y el balón y arrástralos con el dedo o el ratón (el balón soltado junto a
-                un jugador queda a su pie); también puedes tocar el campo para colocar eventos del
-                vocabulario de la ingesta. Para registrar hechos contra el vídeo y el reloj, abre
-                la pizarra en directo del partido.
+                rivales y el balón y arrástralos con el dedo o el ratón (el balón soltado junto
+                a un jugador queda a su pie); dibuja flechas sobre el césped y usa «Restablecer
+                Posiciones» para volver al 4-3-3 estándar (cada propio a su demarcación). Modo
+                explicación táctica: aquí no se registra ningún evento ni telemetría — para
+                sellar hechos contra el vídeo y el reloj, abre la pizarra en directo del partido.
               </p>
               <div className="rounded-2xl border border-cream-border bg-white/70 p-3">
                 <PrepWhiteboard
@@ -184,6 +186,7 @@ export default async function PizarraPage() {
                     firstName: p.firstName,
                     lastName: p.lastName,
                     shirtNumber: p.shirtNumber,
+                    primaryPosition: p.primaryPosition,
                   }))}
                   lineups={lineups}
                 />

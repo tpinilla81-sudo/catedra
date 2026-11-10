@@ -1,41 +1,48 @@
 "use client";
 
 // ============================================================================
-// PIZARRA LIBRE DE PREPARACIÓN (mock del míster: pizarra global)
+// PIZARRA LIBRE DE PREPARACIÓN — MODO EXPLICACIÓN TÁCTICA PURA
+// (mock del míster: "Pizarra Táctica Pura (Dibujo, Fichas y Balón)")
 // ----------------------------------------------------------------------------
-// Campo táctico libre que vive en /dashboard/pizarra: mismo vocabulario de
-// eventos que la ingesta y mismo campo táctil, pero SIN base de datos —
-// es la "pizarra previa" para preparar y explicar sobre la tablet. Todo lo
-// que se quiera SELLAR contra el vídeo va a la pizarra en directo del
-// partido (tablón live con telemetría y marcadores de vídeo).
+// Campo táctico libre que vive en /dashboard/pizarra: SOLO material de
+// vestuario — fichas de la PLANTILLA REAL (dorsal + apellido), fichas
+// rivales, balón y FLECHAS de dibujo — todo ARRASTRABLE/DIBUJABLE con dedo
+// o ratón (Pointer Events + setPointerCapture + touch-action:none, el mismo
+// patrón probado del constructor de animaciones de Biblioteca). El balón
+// soltado junto a una ficha se coloca al pie del jugador; una flecha que
+// nace o muere junto a una ficha se engancha al jugador y toma su color.
 //
-// FICHAS Y BALÓN (petición del míster): para explicar en directo hace falta
-// material de pizarra de vestuario — fichas de la PLANTILLA REAL (dorsal +
-// apellido), fichas rivales y un balón, todos ARRASTRABLES con dedo o ratón
-// (Pointer Events + setPointerCapture + touch-action:none, el mismo patrón
-// probado del constructor de animaciones de Biblioteca). El balón soltado
-// junto a una ficha se coloca al pie del jugador. Nada de esto se sella.
+// MOCK: "Modo Explicación Táctica Activo (Sin registro de pérdidas ni
+// telemetría)" — aquí NO se coloca ningún evento: la paleta de eventos y el
+// vocabulario de ingesta viven SOLO en la pizarra en directo del partido,
+// donde se sellan contra el vídeo y el reloj. «Restablecer Posiciones»
+// devuelve las fichas a la formación 4-3-3 estándar (cada propio a SU
+// demarcación real, rivales espejados y balón al centro). Nada se guarda:
+// es la pizarra previa para explicar sobre la tablet.
 // ============================================================================
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   CalendarSync,
   CircleDot,
   Eraser,
   Layers,
+  Move,
+  Pencil,
   Plus,
   RotateCcw,
   Trash2,
+  Undo2,
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { EVENT_META, QUICK_EVENT_TYPES } from "@/lib/taxonomy";
 
 export type PrepPlayerData = {
   id: string;
   firstName: string;
   lastName: string;
   shirtNumber: number | null;
+  primaryPosition: string;
 };
 
 /** Alineación confirmada de un partido (LiveMatchEvaluation.isStarter=true):
@@ -53,15 +60,29 @@ export type PrepLineupData = {
   }>;
 };
 
-type PrepEvent = { x: number; y: number; type: string; playerId: string | null };
-
 type Ficha = {
   id: string;
   kind: "own" | "rival" | "ball";
   num: number | null; // dorsal propio / número de rival
   name: string; // apellido (propio) · "R4" (rival) · "" (balón)
+  pos: string | null; // demarcación real (propia) — la usa Restablecer Posiciones
   sx: number; // 0..150 (unidades del viewBox, Portería propia a la IZQUIERDA)
   sy: number; // 0..100
+};
+
+type FlechaColor = "verde" | "rojo" | "blanco";
+type Flecha = {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  color: FlechaColor;
+};
+
+const FLECHA_STROKE: Record<FlechaColor, string> = {
+  verde: "#4ade80",
+  rojo: "#f87171",
+  blanco: "#e5e5e5",
 };
 
 // 4-3-3 propia (svg units 150×100, ataca hacia la derecha)
@@ -72,9 +93,7 @@ const FORMACION_433: [number, number][] = [
   [68, 18], [66, 50], [68, 82], // LW ST RW
 ];
 
-/** Slot preferente de la formación 4-3-3 para cada demarcación real. Al volcar
- *  el once se respeta la posición del jugador; si dos caen en el mismo hueco,
- *  el segundo se desplaza al slot libre más cercano (o a una columna aparte). */
+/** Slot preferente de la formación 4-3-3 para cada demarcación real. */
 const SLOT_OF_POSITION: Record<string, number> = {
   GK: 0,
   LB: 1,
@@ -99,6 +118,48 @@ const clampY = (y: number) => Math.min(97, Math.max(3, y));
 let fichaSeq = 0;
 const nextFichaId = () => `f${++fichaSeq}-${Math.random().toString(36).slice(2, 7)}`;
 
+/** Coordenada estándar 4-3-3 para cada ficha propia según su demarcación real
+ *  (la usan «Volcar once ⚡» y «Restablecer Posiciones»): respeta la posición
+ *  del jugador; si dos caen en el mismo hueco, el segundo toma el slot libre
+ *  y los que no caben van a una columna aparte. */
+function slots433(positions: (string | null)[]): Array<{ sx: number; sy: number }> {
+  const usados = new Set<number>();
+  const orden = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const out: Array<{ sx: number; sy: number }> = [];
+  let columna = 0;
+  for (const pos of positions) {
+    const prefer = pos != null ? (SLOT_OF_POSITION[pos] ?? -1) : -1;
+    const slot =
+      prefer >= 0 && !usados.has(prefer)
+        ? prefer
+        : (orden.find((s) => !usados.has(s)) ?? -1);
+    if (slot === -1) {
+      out.push({ sx: 34, sy: Math.min(94, 14 + columna++ * 16) });
+      continue;
+    }
+    usados.add(slot);
+    out.push({ sx: FORMACION_433[slot][0], sy: FORMACION_433[slot][1] });
+  }
+  return out;
+}
+
+/** Ficha más cercana a un punto (para enganchar balón y flechas a jugadores). */
+function fichaMasCercana(fichas: Ficha[], x: number, y: number, radio: number): Ficha | null {
+  let mejor: Ficha | null = null;
+  let dist = radio;
+  for (const f of fichas) {
+    const d = Math.hypot(f.sx - x, f.sy - y);
+    if (d <= dist) {
+      dist = d;
+      mejor = f;
+    }
+  }
+  return mejor;
+}
+
+const colorDeFicha = (f: Ficha | null): FlechaColor =>
+  f?.kind === "own" ? "verde" : f?.kind === "rival" ? "rojo" : "blanco";
+
 export function PrepWhiteboard({
   players,
   lineups = [],
@@ -106,13 +167,14 @@ export function PrepWhiteboard({
   players: PrepPlayerData[];
   lineups?: PrepLineupData[];
 }) {
-  const [events, setEvents] = useState<PrepEvent[]>([]);
-  const [activeType, setActiveType] = useState<string>("BALL_LOSS");
-  const [activePlayerId, setActivePlayerId] = useState<string | null>(null);
   const [fichas, setFichas] = useState<Ficha[]>([]);
   const [dragId, setDragId] = useState<string | null>(null);
   const [volcadoSel, setVolcadoSel] = useState<string>(lineups[0]?.matchId ?? "");
   const [volcadoLabel, setVolcadoLabel] = useState<string | null>(null);
+  // Dibujo libre (mock: "Dibujo, Fichas y Balón") — estado local, nada se sella
+  const [modo, setModo] = useState<"mover" | "dibujar">("mover");
+  const [flechas, setFlechas] = useState<Flecha[]>([]);
+  const [flechaViva, setFlechaViva] = useState<Flecha | null>(null);
 
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{
@@ -125,12 +187,14 @@ export function PrepWhiteboard({
     sx0: number;
     sy0: number;
   } | null>(null);
-
-  const counts = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const e of events) map[e.type] = (map[e.type] ?? 0) + 1;
-    return map;
-  }, [events]);
+  const drawRef = useRef<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    color: FlechaColor;
+    raf: number;
+  } | null>(null);
 
   const ownFichas = fichas.filter((f) => f.kind === "own");
   const rivalFichas = fichas.filter((f) => f.kind === "rival");
@@ -141,13 +205,15 @@ export function PrepWhiteboard({
     if (ownFichas.length > 0) return;
     const once = players.slice(0, 11);
     if (once.length === 0) return;
+    const coords = slots433(once.map((p) => p.primaryPosition ?? null));
     const nuevas: Ficha[] = once.map((p, i) => ({
       id: nextFichaId(),
       kind: "own" as const,
       num: p.shirtNumber ?? i + 1,
       name: p.lastName,
-      sx: FORMACION_433[i][0],
-      sy: FORMACION_433[i][1],
+      pos: p.primaryPosition ?? null,
+      sx: coords[i].sx,
+      sy: coords[i].sy,
     }));
     setFichas((prev) => [...prev, ...nuevas]);
   }, [players, ownFichas.length]);
@@ -165,6 +231,7 @@ export function PrepWhiteboard({
           kind: "own",
           num: libre.shirtNumber ?? 0,
           name: libre.lastName,
+          pos: libre.primaryPosition ?? null,
           sx: col,
           sy: 46 + (prev.length % 5) * 2,
         },
@@ -179,6 +246,7 @@ export function PrepWhiteboard({
       kind: "rival" as const,
       num: i + 1,
       name: `R${i + 1}`,
+      pos: null,
       sx: 150 - pos[0],
       sy: pos[1],
     }));
@@ -196,6 +264,7 @@ export function PrepWhiteboard({
           kind: "rival",
           num: n + 1,
           name: `R${n + 1}`,
+          pos: null,
           sx: 112 - (n % 3) * 8,
           sy: 30 + (n % 5) * 9,
         },
@@ -207,7 +276,7 @@ export function PrepWhiteboard({
     setFichas((prev) =>
       prev.some((f) => f.kind === "ball")
         ? prev.filter((f) => f.kind !== "ball")
-        : [...prev, { id: nextFichaId(), kind: "ball", num: null, name: "", sx: 75, sy: 50 }],
+        : [...prev, { id: nextFichaId(), kind: "ball", num: null, name: "", pos: null, sx: 75, sy: 50 }],
     );
   }, []);
 
@@ -221,39 +290,17 @@ export function PrepWhiteboard({
       if (!lineup || lineup.starters.length === 0) return;
       setFichas((prev) => {
         const sinPropios = prev.filter((f) => f.kind !== "own"); // rivales y balón se conservan
-        const usados = new Set<number>();
-        const propias: Ficha[] = [];
-        const sinHueco: typeof lineup.starters = [];
-        for (const p of lineup.starters.slice(0, 11)) {
-          const prefer = SLOT_OF_POSITION[p.position] ?? 9;
-          let slot = prefer;
-          if (usados.has(slot)) {
-            slot = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].find((s) => !usados.has(s)) ?? -1;
-          }
-          if (slot === -1) {
-            sinHueco.push(p);
-            continue;
-          }
-          usados.add(slot);
-          propias.push({
-            id: nextFichaId(),
-            kind: "own",
-            num: p.shirtNumber ?? 0,
-            name: p.lastName,
-            sx: FORMACION_433[slot][0],
-            sy: FORMACION_433[slot][1],
-          });
-        }
-        sinHueco.forEach((p, i) =>
-          propias.push({
-            id: nextFichaId(),
-            kind: "own",
-            num: p.shirtNumber ?? 0,
-            name: p.lastName,
-            sx: 34,
-            sy: Math.min(94, 14 + i * 16),
-          }),
-        );
+        const props = lineup.starters.slice(0, 11);
+        const coords = slots433(props.map((p) => p.position));
+        const propias: Ficha[] = props.map((p, i) => ({
+          id: nextFichaId(),
+          kind: "own" as const,
+          num: p.shirtNumber ?? 0,
+          name: p.lastName,
+          pos: p.position,
+          sx: coords[i].sx,
+          sy: coords[i].sy,
+        }));
         return [...sinPropios, ...propias];
       });
       setVolcadoLabel(lineup.label);
@@ -261,7 +308,31 @@ export function PrepWhiteboard({
     [lineups],
   );
 
-  // ---------- arrastre (mismo patrón probado del constructor de Biblioteca) ----------
+  // ---------- RESTABLECER POSICIONES (mock del míster): formación estándar
+  // 4-3-3 — cada propio a SU demarcación, rivales espejados, balón al centro ----------
+  const resetPosiciones = useCallback(() => {
+    setFichas((prev) => {
+      if (prev.length === 0) return prev;
+      const propias = prev.filter((f) => f.kind === "own");
+      const coords = slots433(propias.map((f) => f.pos ?? null));
+      const destino = new Map<string, { sx: number; sy: number }>();
+      propias.forEach((f, i) => destino.set(f.id, coords[i]));
+      let ri = 0;
+      for (const f of prev) {
+        if (f.kind === "rival") {
+          const p = FORMACION_433[ri++ % 11];
+          destino.set(f.id, { sx: 150 - p[0], sy: p[1] });
+        }
+      }
+      return prev.map((f) => {
+        const d = destino.get(f.id);
+        if (d) return { ...f, sx: d.sx, sy: d.sy };
+        return f.kind === "ball" ? { ...f, sx: 75, sy: 50 } : f;
+      });
+    });
+  }, []);
+
+  // ---------- arrastre de fichas (mismo patrón probado del constructor) ----------
   const pitchCoords = useCallback((clientX: number, clientY: number) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect || rect.width === 0 || rect.height === 0) return null;
@@ -283,6 +354,10 @@ export function PrepWhiteboard({
 
   const onFichaPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>, f: Ficha) => {
+      // En modo dibujo el gesto sobre una ficha es el INICIO de una flecha:
+      // dejamos que el pointerdown burbujee al lienzo (que la engancha a la
+      // ficha y toma su color) en vez de arrastrar la ficha.
+      if (modo === "dibujar") return;
       const pos = pitchCoords(e.clientX, e.clientY);
       if (!pos) return;
       e.preventDefault();
@@ -300,7 +375,7 @@ export function PrepWhiteboard({
         sy0: pos.y,
       };
     },
-    [pitchCoords],
+    [modo, pitchCoords],
   );
 
   const onFichaPointerMove = useCallback(
@@ -333,15 +408,17 @@ export function PrepWhiteboard({
         setFichas((prev) => {
           const balon = prev.find((f) => f.id === d.id && f.kind === "ball");
           if (!balon) return prev;
-          const cerca = prev
-            .filter((f) => f.kind !== "ball")
-            .map((f) => ({ f, dist: Math.hypot(f.sx - balon.sx, f.sy - balon.sy) }))
-            .sort((a, b) => a.dist - b.dist)[0];
-          if (cerca && cerca.dist < 5) {
-            const lado = balon.sx <= cerca.f.sx ? -1 : 1;
+          const cerca = fichaMasCercana(
+            prev.filter((f) => f.kind !== "ball"),
+            balon.sx,
+            balon.sy,
+            5,
+          );
+          if (cerca) {
+            const lado = balon.sx <= cerca.sx ? -1 : 1;
             return prev.map((f) =>
               f.id === balon.id
-                ? { ...f, sx: clampX(cerca.f.sx + lado * 3.2), sy: clampY(cerca.f.sy) }
+                ? { ...f, sx: clampX(cerca.sx + lado * 3.2), sy: clampY(cerca.sy) }
                 : f,
             );
           }
@@ -363,77 +440,87 @@ export function PrepWhiteboard({
     setDragId(null);
   }, []);
 
-  function addEvent(x: number, y: number) {
-    setEvents((prev) => [
-      ...prev,
-      { x, y, type: activeType, playerId: activePlayerId },
-    ]);
-  }
+  // ---------- dibujo de flechas (mock: "Dibujo, Fichas y Balón") ----------
+  const onCanvasPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (modo !== "dibujar") return;
+      const pos = pitchCoords(e.clientX, e.clientY);
+      if (!pos) return;
+      e.preventDefault();
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      const cerca = fichaMasCercana(fichas, pos.x, pos.y, 4);
+      const inicio = cerca ? { x: cerca.sx, y: cerca.sy } : pos;
+      const color = colorDeFicha(cerca);
+      drawRef.current = { x1: inicio.x, y1: inicio.y, x2: inicio.x, y2: inicio.y, color, raf: 0 };
+      setFlechaViva({ x1: inicio.x, y1: inicio.y, x2: inicio.x, y2: inicio.y, color });
+    },
+    [modo, pitchCoords, fichas],
+  );
 
-  function removeEvent(index: number) {
-    setEvents((prev) => prev.filter((_, i) => i !== index));
-  }
+  const onCanvasPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const d = drawRef.current;
+      if (!d) return;
+      const pos = pitchCoords(e.clientX, e.clientY);
+      if (!pos) return;
+      d.x2 = pos.x;
+      d.y2 = pos.y;
+      if (!d.raf) {
+        d.raf = requestAnimationFrame(() => {
+          d.raf = 0;
+          if (drawRef.current === d)
+            setFlechaViva({ x1: d.x1, y1: d.y1, x2: d.x2, y2: d.y2, color: d.color });
+        });
+      }
+    },
+    [pitchCoords],
+  );
+
+  const onCanvasPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const d = drawRef.current;
+      if (!d) return;
+      if (d.raf) cancelAnimationFrame(d.raf);
+      drawRef.current = null;
+      setFlechaViva(null);
+      try {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch {
+        // el puntero ya no estaba capturado — nada que hacer
+      }
+      // solo se queda la flecha si es un trazo real (no un toque accidental)
+      if (Math.hypot(d.x2 - d.x1, d.y2 - d.y1) > 4) {
+        const finCerca = fichaMasCercana(fichas, d.x2, d.y2, 5);
+        const fin = finCerca
+          ? { x: finCerca.sx, y: finCerca.sy }
+          : { x: clampX(d.x2), y: clampY(d.y2) };
+        const color: FlechaColor =
+          d.color !== "blanco"
+            ? d.color
+            : finCerca
+              ? finCerca.kind === "own"
+                ? "verde"
+                : finCerca.kind === "rival"
+                  ? "rojo"
+                  : "blanco"
+              : "blanco";
+        setFlechas((prev) => [
+          ...prev,
+          { x1: clampX(d.x1), y1: clampY(d.y1), x2: fin.x, y2: fin.y, color },
+        ]);
+      }
+    },
+    [fichas],
+  );
+
+  const onCanvasPointerCancel = useCallback(() => {
+    if (drawRef.current?.raf) cancelAnimationFrame(drawRef.current.raf);
+    drawRef.current = null;
+    setFlechaViva(null);
+  }, []);
 
   return (
     <div className="space-y-3">
-      {/* Paleta de eventos (mismo vocabulario que la ingesta) */}
-      <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-        {QUICK_EVENT_TYPES.map((type) => {
-          const meta = EVENT_META[type];
-          const Icon = meta.icon;
-          const selected = activeType === type;
-          return (
-            <button
-              key={type}
-              type="button"
-              onClick={() => setActiveType(type)}
-              aria-pressed={selected}
-              className={`relative min-h-[62px] rounded-2xl border px-1.5 py-2 flex flex-col items-center justify-center gap-1 transition ${selected ? meta.btn : "bg-white border-cream-border text-[#5d7263]"}`}
-            >
-              <Icon className="w-4 h-4" aria-hidden />
-              <span className="text-[10px] font-bold leading-tight text-center">{meta.label}</span>
-              {(counts[type] ?? 0) > 0 && (
-                <span className={`absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full text-[10px] font-black flex items-center justify-center ${meta.text} bg-cream border border-cream-border-strong`}>
-                  {counts[type]}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Responsable */}
-      <div>
-        <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest mb-1.5">
-          Responsable (opcional)
-        </p>
-        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          <button
-            type="button"
-            onClick={() => setActivePlayerId(null)}
-            aria-pressed={activePlayerId === null}
-            className={`shrink-0 min-h-[40px] px-3.5 py-1.5 rounded-full border text-xs font-bold transition ${activePlayerId === null ? "bg-cream-border-strong border-[#a8a389] text-peel" : "bg-white border-cream-border text-[#5d7263]"}`}
-          >
-            Equipo
-          </button>
-          {players.map((p) => {
-            const selected = activePlayerId === p.id;
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => setActivePlayerId(selected ? null : p.id)}
-                aria-pressed={selected}
-                className={`shrink-0 min-h-[40px] px-3 py-1.5 rounded-full border text-xs font-bold transition ${selected ? "bg-brand-600/15 border-emerald-500/50 text-brand-600" : "bg-white border-cream-border text-[#5d7263]"}`}
-              >
-                <span className="font-black mr-1">{p.shirtNumber ?? "–"}</span>
-                {p.lastName}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Fichas y balón (petición del míster: explicar de manera táctil y con ratón) */}
       <div className="rounded-2xl border border-cream-border bg-white/70 px-3 py-2.5">
         <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest mb-2 flex items-center gap-1.5">
@@ -526,29 +613,81 @@ export function PrepWhiteboard({
             <Trash2 className="w-4 h-4" aria-hidden /> Limpiar fichas
           </Button>
         </div>
+        {/* Herramientas de explicación (mock: Dibujo + Restablecer Posiciones) */}
+        <div className="mt-2 grid grid-cols-2 sm:grid-cols-6 gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setModo((m) => (m === "dibujar" ? "mover" : "dibujar"))}
+            aria-pressed={modo === "dibujar"}
+            className={`min-h-[44px] rounded-2xl border text-xs ${
+              modo === "dibujar"
+                ? "border-emerald-500/50 bg-brand-600 text-white hover:bg-brand-600/90"
+                : "border-cream-border-strong bg-white text-[#3d5844]"
+            }`}
+          >
+            {modo === "dibujar" ? (
+              <>
+                <Move className="w-4 h-4" aria-hidden /> Mover fichas
+              </>
+            ) : (
+              <>
+                <Pencil className="w-4 h-4" aria-hidden /> Dibujar flechas
+              </>
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={resetPosiciones}
+            disabled={fichas.length === 0}
+            title="Vuelve a la formación 4-3-3 estándar: cada propio a su demarcación, rivales espejados y balón al centro"
+            className="min-h-[44px] rounded-2xl border-cream-border-strong bg-white text-[#3d5844] text-xs"
+          >
+            <RotateCcw className="w-4 h-4" aria-hidden /> Restablecer Posiciones
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setFlechas((prev) => prev.slice(0, -1))}
+            disabled={flechas.length === 0}
+            className="min-h-[44px] rounded-2xl border-cream-border-strong bg-white text-[#3d5844] text-xs"
+          >
+            <Undo2 className="w-4 h-4" aria-hidden /> Deshacer flecha
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setFlechas([])}
+            disabled={flechas.length === 0}
+            className="min-h-[44px] rounded-2xl border-cream-border-strong bg-white text-[#3d5844] text-xs"
+          >
+            <Eraser className="w-4 h-4" aria-hidden /> Borrar flechas
+          </Button>
+        </div>
         <p className="mt-1.5 text-[11px] text-[#6c8070] leading-snug">
           {ownFichas.length} propios · {rivalFichas.length} rivales · {hayBalon ? "balón en juego" : "sin balón"}
-          {" · "}el balón soltado junto a un jugador queda a su pie.
+          {" · "}el balón soltado junto a un jugador queda a su pie y las flechas nacen/mueren enganchadas al jugador más cercano.
         </p>
       </div>
 
-      {/* Campo táctil libre + fichas arrastrables */}
+      {/* Campo táctil libre + fichas arrastrables + flechas (PIZARRA PURA) */}
       <div
         ref={canvasRef}
-        className="relative rounded-2xl overflow-hidden border border-cream-border select-none"
+        className={`relative rounded-2xl overflow-hidden border border-cream-border select-none touch-none ${
+          modo === "dibujar" ? "cursor-crosshair" : ""
+        }`}
         role="application"
-        aria-label="Pizarra libre de preparación: toca para colocar eventos y arrastra fichas y balón con dedo o ratón. Campo propio a la izquierda."
+        aria-label="Pizarra libre de preparación: arrastra fichas y balón con dedo o ratón y dibuja flechas en modo dibujo. Sin registro de eventos ni telemetría. Campo propio a la izquierda."
+        onPointerDown={onCanvasPointerDown}
+        onPointerMove={onCanvasPointerMove}
+        onPointerUp={onCanvasPointerUp}
+        onPointerCancel={onCanvasPointerCancel}
       >
         <svg
           viewBox="0 0 150 100"
           preserveAspectRatio="none"
           className="block w-full aspect-[3/2] touch-none"
-          onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            const x = Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
-            const y = Math.min(100, Math.max(0, ((e.clientY - rect.top) / rect.height) * 100));
-            addEvent(Math.round(x * 10) / 10, Math.round(y * 10) / 10);
-          }}
         >
           {/* césped */}
           <rect width="150" height="100" fill="#06231a" />
@@ -573,44 +712,70 @@ export function PrepWhiteboard({
           <rect x="0.5" y="44" width="1.8" height="12" fill="#4ade80" opacity="0.8" />
           <rect x="147.7" y="44" width="1.8" height="12" fill="#f87171" opacity="0.8" />
 
-          {/* eventos */}
-          {events.map((e, i) => {
-            const meta = EVENT_META[e.type] ?? EVENT_META.CUSTOM;
-            const big = e.type === "GOAL_FOR" || e.type === "GOAL_AGAINST";
-            return (
-              <g key={`${i}-${e.x}-${e.y}`}>
-                <circle
-                  cx={e.x * 1.5}
-                  cy={e.y}
-                  r={big ? 3.4 : 2.6}
-                  fill={meta.dot}
-                  stroke="#09090b"
-                  strokeWidth="0.7"
-                  className="cursor-pointer"
-                  onClick={(ev) => {
-                    ev.stopPropagation();
-                    removeEvent(i);
-                  }}
-                />
-                {e.playerId && (
-                  <circle
-                    cx={e.x * 1.5}
-                    cy={e.y}
-                    r={big ? 5.2 : 4.4}
-                    fill="none"
-                    stroke={meta.dot}
-                    strokeWidth="0.5"
-                    opacity="0.55"
-                    className="cursor-pointer"
-                    onClick={(ev) => {
-                      ev.stopPropagation();
-                      removeEvent(i);
-                    }}
-                  />
-                )}
-              </g>
-            );
-          })}
+          {/* cabezas de flecha */}
+          <defs>
+            {(["verde", "rojo", "blanco"] as FlechaColor[]).map((c) => (
+              <marker
+                key={c}
+                id={`cabeza-${c}`}
+                markerWidth="7"
+                markerHeight="7"
+                refX="5.2"
+                refY="2.8"
+                orient="auto"
+                markerUnits="strokeWidth"
+              >
+                <path d="M0,0 L5.6,2.8 L0,5.6 z" fill={FLECHA_STROKE[c]} />
+              </marker>
+            ))}
+          </defs>
+
+          {/* flechas dibujadas (toca una para quitarla) */}
+          {flechas.map((a, i) => (
+            <g key={i}>
+              <line
+                x1={a.x1}
+                y1={a.y1}
+                x2={a.x2}
+                y2={a.y2}
+                stroke={FLECHA_STROKE[a.color]}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                markerEnd={`url(#cabeza-${a.color})`}
+                opacity="0.95"
+              />
+              <line
+                x1={a.x1}
+                y1={a.y1}
+                x2={a.x2}
+                y2={a.y2}
+                stroke="transparent"
+                strokeWidth="4"
+                style={{ pointerEvents: "stroke" }}
+                className="cursor-pointer"
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  setFlechas((prev) => prev.filter((_, j) => j !== i));
+                }}
+              />
+            </g>
+          ))}
+
+          {/* flecha en curso (trazo vivo) */}
+          {flechaViva && (
+            <line
+              x1={flechaViva.x1}
+              y1={flechaViva.y1}
+              x2={flechaViva.x2}
+              y2={flechaViva.y2}
+              stroke={FLECHA_STROKE[flechaViva.color]}
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              markerEnd={`url(#cabeza-${flechaViva.color})`}
+              strokeDasharray="4 2.5"
+              opacity="0.85"
+            />
+          )}
         </svg>
 
         {/* fichas (HTML sobre el SVG: arrastre fino con pointer capture) */}
@@ -672,32 +837,22 @@ export function PrepWhiteboard({
             </div>
           );
         })}
+
+        {/* Modo explicación táctica (mock: pizarra pura, sin telemetría) */}
+        <div className="absolute bottom-2 left-2 z-10 max-w-[70%] rounded-lg border border-white/10 bg-black/45 px-2 py-1 text-[9px] sm:text-[10px] font-bold text-white/85 pointer-events-none">
+          Modo explicación táctica activo · sin registro de pérdidas ni telemetría
+        </div>
       </div>
 
       <div className="flex items-center justify-between gap-3 text-sm">
         <p className="text-[#5d7263]">
-          <span className="font-black text-peel">{events.length}</span> posiciones sobre el campo
+          <span className="font-black text-peel">{flechas.length}</span> flechas sobre el césped
         </p>
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setEvents((prev) => prev.slice(0, -1))}
-            disabled={events.length === 0}
-            className="min-h-[44px] rounded-2xl border-cream-border-strong bg-white text-[#3d5844]"
-          >
-            <RotateCcw className="w-4 h-4" aria-hidden /> Deshacer
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setEvents([])}
-            disabled={events.length === 0}
-            className="min-h-[44px] rounded-2xl border-cream-border-strong bg-white text-[#3d5844]"
-          >
-            <Eraser className="w-4 h-4" aria-hidden /> Vaciar
-          </Button>
-        </div>
+        <p className="text-[11px] text-[#6c8070]">
+          {modo === "dibujar"
+            ? "modo dibujo: arrastra sobre el césped para trazar una flecha"
+            : "toca una flecha para quitarla"}
+        </p>
       </div>
     </div>
   );

@@ -75,6 +75,12 @@ check("pizarra: activa en nav (aria-current)", 'href="/dashboard/pizarra"  aria-
 # Volcar once: la UI solo aparece si algún partido tiene alineación confirmada
 check("pizarra: selector de once sincronizado (si hay onces)",
       ("Partido cuyo once confirmado volcar a la pizarra" in pz) or ("Volcar once" not in pz))
+# Mock del míster: pizarra PURA (solo fichas, balón, flechas y restablecer)
+for mk in ["Restablecer Posiciones", "Dibujar flechas",
+           "sin registro de pérdidas ni telemetría", "flechas sobre el césped"]:
+    check(f"pizarra pura: «{mk}»", mk in pz)
+check("pizarra pura: SIN paleta de eventos ni responsable",
+      ("Responsable (opcional)" not in pz) and ("colocar eventos" not in pz))
 
 # ---------- BIBLIOTECA / PLANTILLA (intactas) ----------
 st, h2 = get(f"{BASE}/dashboard/library")

@@ -119,7 +119,80 @@ assert pegado and not centro, f"SNAP FALLÓ: dx={dx:.1f} dy={dy:.1f} centro={cen
 print("✅ BALÓN ARRASTRADO Y SNAP AL PIE DEL JUGADOR OK")
 EOF
 
-# ---------- 6) Móvil: fichas visibles ----------
+# ---------- 6) DIBUJO DE FLECHAS (mock: pizarra pura "Dibujo, Fichas y Balón") ----------
+# Modo dibujo: trazo arrastrado desde el césped al balón → flecha blanca
+# enganchada; trazo desde una ficha rival → flecha ROJA que nace en el rival.
+sacar "Dibujar flechas"
+sleep 0.5
+read BX BY TX TY < /tmp/drag1.txt
+# flecha 1: desde el punto donde estaba el balón al inicio (césped) hasta el balón actual
+agent-browser mouse move $BX $BY >/dev/null
+agent-browser mouse down left >/dev/null
+agent-browser mouse move $TX $TY --duration 250 --steps 12 >/dev/null
+agent-browser mouse up left >/dev/null
+sleep 0.8
+# flecha 2: nace SOBRE el rival GK (ahora en el centro) y muere cerca del balón
+GEO2=$(agent-browser eval '(() => {
+  const rival = document.querySelector("[aria-label^=\"Ficha rival 1\"]")?.getBoundingClientRect();
+  const ball = document.querySelector("[aria-label=\"Balón arrastrable\"]")?.getBoundingClientRect();
+  const c = r => r ? {x: r.left + r.width/2, y: r.top + r.height/2} : null;
+  return JSON.stringify({rival: c(rival), ball: c(ball)});
+})()')
+echo "$GEO2" > /tmp/geo-flecha.txt
+python3 - <<'EOF'
+import json
+geo = json.loads(json.loads(open("/tmp/geo-flecha.txt").read()))
+r, b = geo["rival"], geo["ball"]
+assert r and b, f"faltan elementos: {geo}"
+open("/tmp/drag3.txt","w").write(f"{r['x']:.0f} {r['y']:.0f} {b['x']+18:.0f} {b['y']-14:.0f}\n")
+EOF
+read FX FY TX3 TY3 < /tmp/drag3.txt
+agent-browser mouse move $FX $FY >/dev/null
+agent-browser mouse down left >/dev/null
+agent-browser mouse move $TX3 $TY3 --duration 250 --steps 12 >/dev/null
+agent-browser mouse up left >/dev/null
+sleep 0.8
+agent-browser eval '(() => {
+  const flechas = [...document.querySelectorAll("svg line[marker-end]")].filter(l => l.getAttribute("stroke") !== "transparent");
+  const colores = flechas.map(l => l.getAttribute("marker-end"));
+  const rojas = colores.filter(c => c?.includes("rojo")).length;
+  return JSON.stringify({total: flechas.length, rojas});
+})()' > /tmp/flechas.txt
+cat /tmp/flechas.txt
+python3 - <<'EOF'
+import json
+raw = open("/tmp/flechas.txt").read().strip()
+data = json.loads(json.loads(raw)) if raw.startswith('"') else json.loads(raw)
+assert data["total"] >= 2, f"esperaba >=2 flechas, hay {data['total']}"
+assert data["rojas"] >= 1, f"esperaba >=1 flecha roja (desde ficha rival), hay {data['rojas']}"
+print(f"✅ FLECHAS DIBUJADAS OK: {data['total']} trazos, {data['rojas']} roja(s) enganchada(s) al rival")
+EOF
+agent-browser screenshot /tmp/shots/flechas-dibujadas.png
+
+# ---------- 7) Restablecer Posiciones (mock: formación estándar) ----------
+sacar "Restablecer Posiciones"
+sleep 1.2
+agent-browser eval '(() => {
+  const pitch = document.querySelector("[role=\"application\"]").getBoundingClientRect();
+  const fichas = [...document.querySelectorAll("div.absolute.z-20, div.absolute.z-30")];
+  const c = r => ({x: (r.left + r.width/2 - pitch.left)/pitch.width*150, y: (r.top + r.height/2 - pitch.top)/pitch.height*100});
+  const ball = document.querySelector("[aria-label=\"Balón arrastrable\"]")?.getBoundingClientRect();
+  const b = ball ? c(ball) : null;
+  const gk = fichas.map(f => f.getBoundingClientRect()).map(c).find(p => p.x < 14 && p.y > 40 && p.y < 60);
+  const balonCentro = b && Math.abs(b.x - 75) < 3 && Math.abs(b.y - 50) < 3;
+  return JSON.stringify({gk: gk ?? null, balonCentro});
+})()' > /tmp/reset.txt
+cat /tmp/reset.txt
+python3 - <<'EOF'
+import json
+raw = open("/tmp/reset.txt").read().strip()
+data = json.loads(json.loads(raw)) if raw.startswith('"') else json.loads(raw)
+assert data["gk"], "no hay ficha propia en la zona del portero tras Restablecer"
+assert data["balonCentro"], f"balón no está en el centro: {data}"
+print(f"✅ RESTABLECER OK: portero en su área, balón al centro")
+EOF
+
+# ---------- 8) Móvil: fichas visibles ----------
 agent-browser set device "iPhone 14" >/dev/null 2>&1 || agent-browser set viewport 390 844 >/dev/null
 agent-browser open http://localhost:3000/dashboard/pizarra >/dev/null
 agent-browser wait 5000
@@ -133,4 +206,4 @@ agent-browser screenshot /tmp/shots/fichas-movil.png
 echo "móvil OK"
 
 agent-browser close >/dev/null
-ls -la /tmp/shots/fichas-*
+ls -la /tmp/shots/fichas-* /tmp/shots/flechas-*
