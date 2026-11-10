@@ -214,27 +214,36 @@ export default async function MatchesPage() {
             {analyzed.map((m) => {
               const sem = SEMAPHORE_META[m.report?.sensation ?? "AMBER"];
               return (
-                <Link
-                  key={m.id}
-                  href={`/dashboard/match?g=${m.id}`}
-                  className="flex items-center justify-between gap-2 rounded-xl border border-cream-border bg-white px-3 py-2 transition hover:border-[#b9b49c] active:scale-[0.99]"
-                >
-                  <div className="min-w-0 flex items-center gap-2.5">
-                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${sem.dot}`} title={`Sensación: ${sem.label}`} aria-label={`Sensación ${sem.label}`} />
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-bold text-peel truncate">
-                        {m.isHome ? "vs" : "@"} {m.opponent}
-                      </p>
-                      <p className="text-[10px] text-[#6c8070]">
-                        {format(m.kickoffAt, "d MMM · HH:mm'h'", { locale: es })}
-                        {m.competition ? ` · ${m.competition}` : ""}
-                      </p>
+                <div key={m.id} className="flex items-stretch gap-2">
+                  <Link
+                    href={`/dashboard/match?g=${m.id}`}
+                    className="flex-1 min-w-0 flex items-center justify-between gap-2 rounded-xl border border-cream-border bg-white px-3 py-2 transition hover:border-[#b9b49c] active:scale-[0.99]"
+                  >
+                    <div className="min-w-0 flex items-center gap-2.5">
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${sem.dot}`} title={`Sensación: ${sem.label}`} aria-label={`Sensación ${sem.label}`} />
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-bold text-peel truncate">
+                          {m.isHome ? "vs" : "@"} {m.opponent}
+                        </p>
+                        <p className="text-[10px] text-[#6c8070]">
+                          {format(m.kickoffAt, "d MMM · HH:mm'h'", { locale: es })}
+                          {m.competition ? ` · ${m.competition}` : ""}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <p className="text-sm font-black text-peel shrink-0" aria-label={`Resultado ${m.goalsFor}-${m.goalsAgainst}`}>
-                    {m.goalsFor ?? 0}-{m.goalsAgainst ?? 0}
-                  </p>
-                </Link>
+                    <p className="text-sm font-black text-peel shrink-0" aria-label={`Resultado ${m.goalsFor}-${m.goalsAgainst}`}>
+                      {m.goalsFor ?? 0}-{m.goalsAgainst ?? 0}
+                    </p>
+                  </Link>
+                  <Link
+                    href={`/dashboard/match/live?g=${m.id}`}
+                    className="flex items-center gap-1.5 rounded-xl border border-cream-border bg-cream-dark px-3 text-[11px] font-bold text-[#5d7263] transition hover:border-brand-600/50 hover:text-brand-600 active:scale-[0.99] shrink-0"
+                    aria-label={`Análisis en directo vs ${m.opponent}`}
+                  >
+                    <Radio className="w-3.5 h-3.5" aria-hidden />
+                    <span className="hidden sm:inline">Análisis</span>
+                  </Link>
+                </div>
               );
             })}
           </section>

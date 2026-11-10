@@ -310,6 +310,17 @@ export function IngestFlow({
             </p>
           </div>
           <div className="flex flex-col items-end gap-1.5 shrink-0">
+            {/* Análisis en directo: vídeo de la grabación + voz 🎙️ + pizarra viva.
+              Siempre visible desde cualquier sub-pestaña del partido. */}
+            <Link
+              href={`/dashboard/match/live?g=${match.id}`}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-brand-600/50 bg-brand-600/10 px-3 py-1.5 text-[11px] font-black text-brand-600 transition hover:bg-brand-600/20 active:scale-[0.98]"
+              title="Pizarra en directo de este partido: vídeo de la grabación, dictado por voz y hechos sellados al minuto"
+            >
+              <Radio className="w-3.5 h-3.5" aria-hidden />
+              <span className="hidden sm:inline">Análisis en directo · Vídeo + Voz</span>
+              <span className="sm:hidden">Directo</span>
+            </Link>
             <span
               className="rounded-xl border border-cream-border-strong bg-cream px-3 py-1 font-mono text-lg font-black text-peel leading-none"
               aria-label={`Resultado ${goalsFor}-${goalsAgainst}`}
@@ -418,16 +429,22 @@ export function IngestFlow({
                       />
                     ))}
                     <StatRow label="Hechos sellados en directo" value={String(telemetryTotal)} />
+                    <Link
+                      href={`/dashboard/match/live?g=${match.id}`}
+                      className="flex items-center justify-center gap-1.5 rounded-xl border border-brand-600/50 bg-brand-600/10 px-3 py-2 text-[11px] font-black text-brand-600 transition hover:bg-brand-600/20 active:scale-[0.98]"
+                    >
+                      <Radio className="w-3.5 h-3.5" aria-hidden /> Abrir análisis en directo (vídeo + voz)
+                    </Link>
                   </div>
                 ) : (
                   <div className="flex-1 flex flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-cream-border px-3 py-5 text-center">
                     <Radio className="w-4 h-4 text-[#8a9a8d]" aria-hidden />
                     <p className="text-[11px] text-[#6c8070] leading-snug">
-                      Sin hechos sellados en directo todavía. Los que registres en la{" "}
-                      <Link href="/dashboard/pizarra" className="font-bold text-brand-600 hover:underline">
-                        Pizarra Táctica
-                      </Link>{" "}
-                      aparecerán aquí.
+                      Sin hechos sellados en directo todavía. Regístralos con vídeo y voz en la{" "}
+                      <Link href={`/dashboard/match/live?g=${match.id}`} className="font-bold text-brand-600 hover:underline">
+                        pizarra en directo de este partido
+                      </Link>
+                      .
                     </p>
                   </div>
                 )}
