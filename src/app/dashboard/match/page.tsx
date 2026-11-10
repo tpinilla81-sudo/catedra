@@ -60,6 +60,12 @@ export default async function MatchIngestPage({
     return acc;
   }, {});
 
+  // Alineación confirmada (mock del míster: "N Jugadores en Campo" volcados
+  // automáticamente a la pizarra en directo)
+  const starterCount = await db.liveMatchEvaluation.count({
+    where: { matchId: match.id, isStarter: true },
+  });
+
   const matchData: IngestMatchData = {
     id: match.id,
     opponent: match.opponent,
@@ -110,6 +116,7 @@ export default async function MatchIngestPage({
         initialTab={initialTab}
         actionCounts={actionCounts}
         telemetryTotal={actionEvents.length}
+        starterCount={starterCount}
       />
     </main>
   );

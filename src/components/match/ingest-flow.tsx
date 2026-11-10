@@ -212,6 +212,7 @@ export function IngestFlow({
   initialTab = "summary",
   actionCounts = {},
   telemetryTotal = 0,
+  starterCount = 0,
 }: {
   match: IngestMatchData;
   players: IngestPlayerData[];
@@ -222,6 +223,10 @@ export function IngestFlow({
   actionCounts?: Record<string, number>;
   /** Total de hechos de juego en directo registrados */
   telemetryTotal?: number;
+  /** Titulares confirmados en la alineación (LiveMatchEvaluation.isStarter):
+   *  mock del míster — "Alineación titular volcada automáticamente en la
+   *  Pizarra Táctica · N jugadores en campo". */
+  starterCount?: number;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -321,6 +326,24 @@ export function IngestFlow({
               <span className="hidden sm:inline">Análisis en directo · Vídeo + Voz</span>
               <span className="sm:hidden">Directo</span>
             </Link>
+            {/* Mock del míster: la alineación titular está volcada en la pizarra en directo */}
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                starterCount > 0
+                  ? "border-emerald-500/40 bg-brand-600/10 text-brand-600"
+                  : "border-cream-border bg-white text-[#8a9a8d]"
+              }`}
+              title={
+                starterCount > 0
+                  ? "La alineación titular confirmada ya está colocada en la pizarra en directo"
+                  : "Marca titulares en la pizarra en directo (o con el consejero de once)"
+              }
+            >
+              <span className={starterCount > 0 ? "w-2 h-2 rounded-full bg-brand-600" : "w-2 h-2 rounded-full bg-[#b9c4b9]"} aria-hidden />
+              {starterCount > 0
+                ? `${starterCount} titulares en la pizarra`
+                : "Sin once marcado"}
+            </span>
             <span
               className="rounded-xl border border-cream-border-strong bg-cream px-3 py-1 font-mono text-lg font-black text-peel leading-none"
               aria-label={`Resultado ${goalsFor}-${goalsAgainst}`}

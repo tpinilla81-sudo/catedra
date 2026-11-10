@@ -82,6 +82,9 @@ export default async function LiveMatchPage({
     tacticalStrength: p.tacticalStrength || null,
     status: p.status,
     statusNote: p.statusNote,
+    technicalRating: p.technicalRating,
+    tacticalRating: p.tacticalRating,
+    physicalRating: p.physicalRating,
   }));
 
   const evaluationData: LiveEvaluationData[] = match.liveEvaluations.map((e) => ({

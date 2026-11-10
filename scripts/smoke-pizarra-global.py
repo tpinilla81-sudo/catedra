@@ -68,9 +68,13 @@ st, pz = get(f"{BASE}/dashboard/pizarra")
 check("GET pizarra 200", st == 200, f"status={st}")
 for mk in ["Pizarra Táctica", "Herramienta activa",
            "Sesiones con pizarra en directo",
-           "Pizarra libre · preparación", "/dashboard/match/live?g="]:
+           "Pizarra libre · preparación", "/dashboard/match/live?g=",
+           "alineación sincronizada", "VUELCA el once confirmado"]:
     check(f"pizarra: «{mk}»", mk in pz)
 check("pizarra: activa en nav (aria-current)", 'href="/dashboard/pizarra"  aria-current="page"' in pz or 'aria-current="page"  href="/dashboard/pizarra"' in pz or ('/dashboard/pizarra' in pz and 'aria-current="page"' in pz))
+# Volcar once: la UI solo aparece si algún partido tiene alineación confirmada
+check("pizarra: selector de once sincronizado (si hay onces)",
+      ("Partido cuyo once confirmado volcar a la pizarra" in pz) or ("Volcar once" not in pz))
 
 # ---------- BIBLIOTECA / PLANTILLA (intactas) ----------
 st, h2 = get(f"{BASE}/dashboard/library")
@@ -97,6 +101,9 @@ if game_id:
                "Evaluación del Cuerpo Técnico",
                "aria-label=\"Resultado"]:
         check(f"detalle: «{mk}»", mk in md)
+    # Mock del míster: la alineación titular queda volcada en la pizarra en directo
+    check("detalle: chip de titulares volcados a la pizarra",
+          ("titulares en la pizarra" in md) or ("Sin once marcado" in md))
     check("detalle: SIN paso pizarra del wizard", ("Siguiente: pizarra" not in md) and ("Pizarra táctica: toca" not in md))
 
     # Deep-link pestaña Vestuario
@@ -112,6 +119,12 @@ if game_id:
 
     st, lv = get(f"{BASE}/dashboard/match/live?g={game_id}")
     check("GET match/live 200 (pizarra en directo intacta)", st == 200, f"status={st}")
+    # Mock del míster: fichas + balón arrastrables y consejero de once en directo
+    for mk in ["Consejero de once", "Balón", "Rivales 4-3-3",
+               "titulares volcados", "arrastra fichas",
+               "Material de la pizarra en directo",
+               "Terreno de juego táctil"]:
+        check(f"live: «{mk}»", mk in lv)
 
 fails = [r for r in results if not r[1]]
 print(f"\n═══ SMOKE: {len(results) - len(fails)}/{len(results)} OK ═══")

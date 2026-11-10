@@ -21,7 +21,7 @@
 // sobrevivir a una recarga.
 // ============================================================================
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import {
   Crosshair,
@@ -33,6 +33,7 @@ import {
   Radio,
   Square,
   Video,
+  Zap,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -76,6 +77,10 @@ export type LivePlayerData = {
   tacticalStrength: string | null;
   status: string;
   statusNote: string | null;
+  /// Perfiles cualitativos 1-5 (motor del form score del consejero)
+  technicalRating?: number | null;
+  tacticalRating?: number | null;
+  physicalRating?: number | null;
 };
 
 export type LiveTagData = {
@@ -225,6 +230,71 @@ const BASE_X: Record<string, number> = {
 };
 
 export type PitchSlot = { x: number; y: number };
+
+/**
+ * Form score 0-100 del CONSEJERO DE ALINEACIÓN (mock del míster: "Sugerir
+ * Once Óptimo") calculado con datos REALES del perfil, sin inventar nada:
+ *   · base = media de perfiles técnico/táctico/físico (1-5, 3 si no hay) → 0-100
+ *   · − 12 si el jugador llega como DUDA · − 8 si se está reincorporando
+ *   · − 5 por cada punto de RPE por encima de 6 (fatiga reciente)
+ * Puro — testeable.
+ */
+export function computeFormScore(p: {
+  technicalRating?: number | null;
+  tacticalRating?: number | null;
+  physicalRating?: number | null;
+  fatigueRPE: number | null;
+  status: string;
+}): number {
+  const base =
+    (((p.technicalRating ?? 3) + (p.tacticalRating ?? 3) + (p.physicalRating ?? 3)) / 15) * 100;
+  let score = base;
+  if (p.status === "DOUBTFUL") score -= 12;
+  if (p.status === "RETURNING") score -= 8;
+  if ((p.fatigueRPE ?? 0) > 6) score -= ((p.fatigueRPE ?? 0) - 6) * 5;
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+/**
+ * Once sugerido por el consejero: mejor portero disponible + mejores por form
+ * score con equilibrio de líneas (tope por carril). Lesionados y sancionados
+ * quedan fuera. Puro — testeable.
+ */
+export function suggestLineup(players: LivePlayerData[]): Set<string> {
+  const elegibles = players.filter(
+    (p) => p.status !== "INJURED" && p.status !== "SUSPENDED",
+  );
+  const byForm = (a: LivePlayerData, b: LivePlayerData) =>
+    computeFormScore(b) - computeFormScore(a) ||
+    (a.shirtNumber ?? 99) - (b.shirtNumber ?? 99);
+  const gks = elegibles.filter((p) => p.primaryPosition === "GK").sort(byForm);
+  const resto = elegibles.filter((p) => p.primaryPosition !== "GK").sort(byForm);
+  const once: LivePlayerData[] = [];
+  if (gks[0]) once.push(gks[0]);
+  const caps: Record<string, number> = { DEF: 5, PIV: 2, MID: 4, ATT: 4 };
+  const counts: Record<string, number> = { DEF: 0, PIV: 0, MID: 0, ATT: 0 };
+  for (const p of resto) {
+    if (once.length >= 11) break;
+    const lane = LANE_OF[p.primaryPosition] ?? "MID";
+    if ((counts[lane] ?? 0) >= (caps[lane] ?? 4)) continue;
+    counts[lane] += 1;
+    once.push(p);
+  }
+  // Si los topes dejaron huecos, rellena con los mejores restantes sin tope
+  for (const p of resto) {
+    if (once.length >= 11) break;
+    if (!once.some((q) => q.id === p.id)) once.push(p);
+  }
+  return new Set(once.map((p) => p.id));
+}
+
+/** 4-3-3 rival sobre el campo VERTICAL (ataca hacia abajo: portero arriba) */
+const RIVALES_433: [number, number][] = [
+  [50, 9], // GK
+  [14, 26], [38, 24], [62, 24], [86, 26], // defensa
+  [26, 42], [50, 46], [74, 42], // medios
+  [20, 80], [50, 83], [80, 80], // delanteros (presionan alto)
+];
 
 /**
  * Coloca a los titulares sobre el campo, agrupados por carril (GK / DEF /
@@ -425,6 +495,213 @@ export function LiveMatchBoard({
 
   // Colocación de los titulares por demarcación (recalcula al cambiar la once)
   const slots = useMemo(() => computePitchSlots(starters), [starters]);
+
+  // ---------- PIZARRA TÁCTIL EN DIRECTO (petición del míster): la alineación
+  // titular se vuelca aquí automáticamente y las FICHAS, el BALÓN y los
+  // RIVALES se ARRASTRAN con dedo o ratón (Pointer Events + setPointerCapture
+  // + touch-action:none, el mismo patrón probado de la pizarra libre y del
+  // constructor de animaciones) para explicar de manera táctil. ----------
+  type DragTarget =
+    | { kind: "starter"; id: string }
+    | { kind: "rival"; id: string }
+    | { kind: "ball" };
+  type RivalFicha = { id: string; num: number; x: number; y: number };
+
+  const [overrides, setOverrides] = useState<Map<string, { x: number; y: number }>>(new Map());
+  const [rivals, setRivals] = useState<RivalFicha[]>([]);
+  const [ball, setBall] = useState<{ x: number; y: number } | null>(null);
+  const [dragTarget, setDragTarget] = useState<DragTarget | null>(null);
+  const suppressClickRef = useRef(false);
+  const pitchRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{
+    target: DragTarget;
+    offX: number;
+    offY: number;
+    latest: { x: number; y: number };
+    raf: number;
+    moved: boolean;
+    x0: number;
+    y0: number;
+  } | null>(null);
+
+  // Posición efectiva de cada titular: slot por demarcación + override del arrastre
+  const positions = useMemo(() => {
+    const map = new Map<string, { x: number; y: number }>();
+    for (const [id, slot] of slots) map.set(id, slot);
+    for (const [id, pos] of overrides) map.set(id, pos);
+    return map;
+  }, [slots, overrides]);
+
+  const pitchCoords = useCallback((clientX: number, clientY: number) => {
+    const rect = pitchRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return null;
+    return {
+      x: ((clientX - rect.left) / rect.width) * 100,
+      y: ((clientY - rect.top) / rect.height) * 100,
+    };
+  }, []);
+
+  const commitDrag = useCallback((d: NonNullable<typeof dragRef.current>) => {
+    const target = d.target;
+    const x = Math.min(98, Math.max(2, d.latest.x));
+    const y = Math.min(98, Math.max(2, d.latest.y));
+    if (target.kind === "starter") {
+      setOverrides((prev) => new Map(prev).set(target.id, { x, y }));
+    } else if (target.kind === "rival") {
+      setRivals((prev) =>
+        prev.map((r) => (r.id === target.id ? { ...r, x, y } : r)),
+      );
+    } else {
+      setBall({ x, y });
+    }
+  }, []);
+
+  const onPitchPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLElement>, target: DragTarget, current: { x: number; y: number }) => {
+      const pos = pitchCoords(e.clientX, e.clientY);
+      if (!pos) return;
+      e.preventDefault();
+      e.stopPropagation();
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); // el dedo nunca pierde la ficha
+      setDragTarget(target);
+      dragRef.current = {
+        target,
+        offX: pos.x - current.x,
+        offY: pos.y - current.y,
+        latest: { x: current.x, y: current.y },
+        raf: 0,
+        moved: false,
+        x0: pos.x,
+        y0: pos.y,
+      };
+    },
+    [pitchCoords],
+  );
+
+  const onPitchPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLElement>) => {
+      const d = dragRef.current;
+      if (!d) return;
+      const pos = pitchCoords(e.clientX, e.clientY);
+      if (!pos) return;
+      if (!d.moved && Math.hypot(pos.x - d.x0, pos.y - d.y0) > 1.4) d.moved = true;
+      d.latest = { x: pos.x - d.offX, y: pos.y - d.offY };
+      if (!d.raf) {
+        d.raf = requestAnimationFrame(() => {
+          d.raf = 0;
+          if (dragRef.current === d) commitDrag(d);
+        });
+      }
+    },
+    [pitchCoords, commitDrag],
+  );
+
+  const onPitchPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLElement>) => {
+      const d = dragRef.current;
+      if (!d) return;
+      if (d.raf) cancelAnimationFrame(d.raf);
+      dragRef.current = null;
+      setDragTarget(null);
+      suppressClickRef.current = d.moved;
+      if (d.moved) {
+        commitDrag(d);
+        // Balón soltado junto a un titular → se coloca a su pie (explicar con el balón)
+        if (d.target.kind === "ball") {
+          const bx = Math.min(98, Math.max(2, d.latest.x));
+          const by = Math.min(98, Math.max(2, d.latest.y));
+          let cerca: { x: number; y: number; dist: number } | null = null;
+          for (const s of starters) {
+            const pos = positions.get(s.id);
+            if (!pos) continue;
+            const dist = Math.hypot(pos.x - bx, pos.y - by);
+            if (dist < 8 && (!cerca || dist < cerca.dist)) cerca = { x: pos.x, y: pos.y, dist };
+          }
+          if (cerca) {
+            const lado = bx <= cerca.x ? -1 : 1;
+            setBall({ x: Math.min(97, Math.max(3, cerca.x + lado * 9)), y: cerca.y });
+          }
+        }
+      }
+      try {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch {
+        // el puntero ya no estaba capturado — nada que hacer
+      }
+    },
+    [commitDrag, positions, starters],
+  );
+
+  const onPitchPointerCancel = useCallback(() => {
+    if (dragRef.current?.raf) cancelAnimationFrame(dragRef.current.raf);
+    dragRef.current = null;
+    setDragTarget(null);
+  }, []);
+
+  const toggleRivales = useCallback(() => {
+    setRivals((prev) =>
+      prev.length > 0
+        ? []
+        : RIVALES_433.map((pos, i) => ({
+            id: `rival-${i + 1}-${Math.random().toString(36).slice(2, 7)}`,
+            num: i + 1,
+            x: pos[0],
+            y: pos[1],
+          })),
+    );
+  }, []);
+
+  // ---------- CONSEJERO DE ONCE (mock: "Sugerir Once Óptimo ⚡") ----------
+  const formScores = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of players) map.set(p.id, computeFormScore(p));
+    return map;
+  }, [players]);
+
+  const handleConsejero = async () => {
+    if (players.length === 0 || savingLineup) return;
+    const once = suggestLineup(players);
+    const toAdd = [...once].filter((id) => !starterIds.has(id));
+    const toRemove = [...starterIds].filter((id) => !once.has(id));
+    if (toAdd.length === 0 && toRemove.length === 0) {
+      toast({
+        title: "El consejero confirma el once actual",
+        description: "Nada que cambiar: la alineación ya es la óptima por form score.",
+      });
+      return;
+    }
+    setSavingLineup(true);
+    try {
+      await Promise.all([
+        ...toAdd.map((id) => postEvaluation({ playerId: id, isStarter: true })),
+        ...toRemove.map((id) => postEvaluation({ playerId: id, isStarter: false })),
+      ]);
+      setStarterIds((prev) => {
+        const set = new Set(prev);
+        for (const id of toRemove) set.delete(id);
+        for (const id of toAdd) set.add(id);
+        return set;
+      });
+      setOverrides((prev) => {
+        const next = new Map(prev);
+        for (const id of toRemove) next.delete(id);
+        return next;
+      });
+      toast({
+        title: "Consejero: once óptimo propuesto ⚡",
+        description: `${toAdd.length} entran · ${toRemove.length} salen · form score = perfiles (1-5) − fatiga RPE − dudas.`,
+      });
+    } catch (err) {
+      console.error("Error aplicando el consejero:", err);
+      toast({
+        title: "El consejero no pudo aplicar el once",
+        description: err instanceof Error ? err.message : "Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingLineup(false);
+    }
+  };
 
   // Cerrar la ficha con Escape (el míster tiene las manos ocupadas)
   useEffect(() => {
@@ -688,6 +965,14 @@ export function LiveMatchBoard({
         else set.delete(player.id);
         return set;
       });
+      if (!next) {
+        // al quitar de la alineación se limpia también su posición arrastrada
+        setOverrides((prev) => {
+          const map = new Map(prev);
+          map.delete(player.id);
+          return map;
+        });
+      }
       setSelected(null);
     } catch (err) {
       console.error("Error actualizando la alineación:", err);
@@ -892,17 +1177,70 @@ export function LiveMatchBoard({
       </section>
 
       <div className="flex flex-col lg:flex-row gap-4 p-4 rounded-3xl border border-[#1c3a26] bg-[#0a1a10]">
-      {/* ---------- Terreno de juego (titulares colocados por demarcación) ---------- */}
+      {/* ---------- Terreno de juego (alineación volcada + fichas arrastrables) ---------- */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-2">
           <div className="text-xs uppercase tracking-widest text-lime-brand font-bold flex items-center gap-2">
             <Radio className="w-3.5 h-3.5 text-brand-400 animate-pulse" aria-hidden />
             Terreno de juego · Directo
           </div>
           <span className="text-[11px] text-lime-brand/70">
-            {starters.length} titulares · {bench.length} en la banqueta
+            {starters.length} titulares volcados · {bench.length} en la banqueta
+            {ball ? " · balón en juego" : ""}
           </span>
         </div>
+
+        {/* Material de pizarra en directo (mock del míster: explicar de manera táctil) */}
+        <div
+          className="flex flex-wrap items-center gap-2 mb-3"
+          role="toolbar"
+          aria-label="Material de la pizarra en directo: consejero de once, balón y fichas rivales"
+        >
+          <button
+            type="button"
+            onClick={handleConsejero}
+            disabled={savingLineup || players.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/50 bg-amber-400/15 px-3 py-1.5 min-h-[36px] text-[11px] font-black text-amber-300 transition hover:bg-amber-400/25 active:scale-[0.97] disabled:opacity-50"
+            title="Sugiere el once óptimo por form score: perfiles (1-5) − fatiga RPE − dudas. Se guarda como alineación de partida."
+          >
+            {savingLineup ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
+            ) : (
+              <Zap className="w-3.5 h-3.5" aria-hidden />
+            )}
+            Consejero de once
+          </button>
+          <button
+            type="button"
+            onClick={() => setBall((b) => (b ? null : { x: 50, y: 46 }))}
+            aria-pressed={ball !== null}
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 min-h-[36px] text-[11px] font-bold transition active:scale-[0.97] ${
+              ball
+                ? "border-lime-brand/60 bg-lime-brand/15 text-lime-brand"
+                : "border-[#2a4a34] bg-[#1c3a26]/60 text-[#c3d2c2] hover:bg-[#1c3a26]"
+            }`}
+            title="Balón arrastrable: suéltalo junto a un titular y queda a su pie"
+          >
+            <span aria-hidden>⚽</span> {ball ? "Quitar balón" : "Balón"}
+          </button>
+          <button
+            type="button"
+            onClick={toggleRivales}
+            aria-pressed={rivals.length > 0}
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 min-h-[36px] text-[11px] font-bold transition active:scale-[0.97] ${
+              rivals.length > 0
+                ? "border-[#e05252]/60 bg-[#e05252]/15 text-[#f3b0b0]"
+                : "border-[#2a4a34] bg-[#1c3a26]/60 text-[#c3d2c2] hover:bg-[#1c3a26]"
+            }`}
+            title="11 fichas rivales arrastrables para explicar la presión y el bloque contrario"
+          >
+            <span aria-hidden>🟥</span> {rivals.length > 0 ? "Quitar rivales" : "Rivales 4-3-3"}
+          </button>
+        </div>
+        <p className="mb-3 text-[11px] leading-snug text-[#8aa28d]">
+          La alineación titular se vuelca aquí automáticamente por demarcación · arrastra fichas,
+          rivales y balón con el dedo o el ratón para explicar · toca una ficha para evaluar.
+        </p>
 
         {players.length === 0 ? (
           <div className="rounded-2xl border-4 border-brand-600/30 bg-brand/30 px-6 py-10 text-center text-sm text-lime-soft/70">
@@ -910,7 +1248,11 @@ export function LiveMatchBoard({
             &ldquo;Plantilla&rdquo; para poder evaluar en directo.
           </div>
         ) : (
-          <div className="relative w-full max-w-[430px] mx-auto aspect-[2/3] rounded-2xl border-4 border-brand-600/40 bg-brand/40 overflow-hidden shadow-inner">
+          <div
+            ref={pitchRef}
+            className="relative w-full max-w-[430px] mx-auto aspect-[2/3] rounded-2xl border-4 border-brand-600/40 bg-brand/40 overflow-hidden shadow-inner"
+            aria-label="Terreno de juego táctil: fichas de titulares, rivales y balón arrastrables con dedo o ratón"
+          >
             {/* Marcas del campo */}
             <div className="absolute left-0 right-0 top-1/2 border-t-2 border-lime-brand/20" aria-hidden />
             <div
@@ -934,28 +1276,53 @@ export function LiveMatchBoard({
               </div>
             ) : (
               starters.map((player) => {
-                const slot = slots.get(player.id);
+                const pos = positions.get(player.id);
                 const s = statuses[player.id];
+                const dragging =
+                  dragTarget?.kind === "starter" && dragTarget.id === player.id;
                 return (
                   <button
                     key={player.id}
-                    onClick={() => setSelected(player)}
-                    style={slot ? { left: `${slot.x}%`, top: `${slot.y}%` } : undefined}
-                    className={`absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center transition-transform active:scale-90 ${
-                      selected?.id === player.id ? "scale-110" : ""
+                    onPointerDown={(e) =>
+                      pos && onPitchPointerDown(e, { kind: "starter", id: player.id }, pos)
+                    }
+                    onPointerMove={onPitchPointerMove}
+                    onPointerUp={onPitchPointerUp}
+                    onPointerCancel={onPitchPointerCancel}
+                    onClick={() => {
+                      // tras un arrastre real no se abre la ficha rápida
+                      if (suppressClickRef.current) {
+                        suppressClickRef.current = false;
+                        return;
+                      }
+                      setSelected(player);
+                    }}
+                    style={{
+                      ...(pos ? { left: `${pos.x}%`, top: `${pos.y}%` } : {}),
+                      transform: `translate(-50%, -50%) scale(${
+                        dragging ? 1.18 : selected?.id === player.id ? 1.1 : 1
+                      })`,
+                      transition: dragging ? "none" : "left 180ms, top 180ms, transform 120ms",
+                      willChange: "left, top",
+                      touchAction: "none",
+                      zIndex: dragging ? 30 : 10,
+                    }}
+                    className={`absolute flex flex-col items-center ${
+                      dragging ? "cursor-grabbing" : "cursor-grab"
                     }`}
-                    aria-label={`${player.firstName} ${player.lastName}, ${POSITION_LABEL[player.primaryPosition] ?? player.primaryPosition}, ${tagCounts[player.id] ?? 0} anotaciones`}
+                    aria-label={`${player.firstName} ${player.lastName}, ${POSITION_LABEL[player.primaryPosition] ?? player.primaryPosition}, ${tagCounts[player.id] ?? 0} anotaciones. Arrastra para explicar, toca para evaluar.`}
+                    title="Arrastra para explicar · toca para evaluar"
                   >
                     <span
                       className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-black border-2 shadow-lg transition-colors ${
                         selected?.id === player.id
                           ? "bg-amber-400 border-[#e3a93c] text-[#0a1a10]"
                           : "bg-[#071509]/85 border-brand-400/70 text-cream"
-                      }`}
+                      } ${dragging ? "ring-2 ring-white/80" : ""}`}
                     >
                       {chipBadge(player)}
                     </span>
-                    <span className="mt-0.5 px-1 rounded bg-[#071509]/80 text-[10px] leading-tight font-semibold text-[#eef2e0] max-w-[78px] truncate">
+                    <span className="mt-0.5 px-1 rounded bg-[#071509]/80 text-[10px] leading-tight font-semibold text-[#eef2e0] max-w-[78px] truncate pointer-events-none">
                       {player.firstName}
                     </span>
                     <StatusDots s={s} />
@@ -963,12 +1330,76 @@ export function LiveMatchBoard({
                 );
               })
             )}
+
+            {/* Balón arrastrable (petición del míster): soltado junto a un titular queda a su pie */}
+            {ball && (
+              <div
+                onPointerDown={(e) => onPitchPointerDown(e, { kind: "ball" }, ball)}
+                onPointerMove={onPitchPointerMove}
+                onPointerUp={onPitchPointerUp}
+                onPointerCancel={onPitchPointerCancel}
+                role="button"
+                aria-label="Balón arrastrable: suéltalo junto a un jugador para dejarlo a su pie"
+                style={{
+                  left: `${ball.x}%`,
+                  top: `${ball.y}%`,
+                  transform: `translate(-50%, -50%) scale(${dragTarget?.kind === "ball" ? 1.25 : 1})`,
+                  transition:
+                    dragTarget?.kind === "ball" ? "none" : "left 150ms, top 150ms, transform 120ms",
+                  touchAction: "none",
+                  zIndex: dragTarget?.kind === "ball" ? 40 : 20,
+                }}
+                className="absolute flex items-center justify-center h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-white border-2 border-neutral-800 shadow-md cursor-grab active:cursor-grabbing"
+              >
+                <span className="text-[10px] leading-none" aria-hidden>
+                  ⚽
+                </span>
+              </div>
+            )}
+
+            {/* Fichas rivales arrastrables (explicar la presión y el bloque contrario) */}
+            {rivals.map((r) => {
+              const dragging = dragTarget?.kind === "rival" && dragTarget.id === r.id;
+              return (
+                <div
+                  key={r.id}
+                  onPointerDown={(e) =>
+                    onPitchPointerDown(e, { kind: "rival", id: r.id }, { x: r.x, y: r.y })
+                  }
+                  onPointerMove={onPitchPointerMove}
+                  onPointerUp={onPitchPointerUp}
+                  onPointerCancel={onPitchPointerCancel}
+                  role="button"
+                  aria-label={`Ficha rival ${r.num}, arrastrable`}
+                  style={{
+                    left: `${r.x}%`,
+                    top: `${r.y}%`,
+                    transform: `translate(-50%, -50%) scale(${dragging ? 1.18 : 1})`,
+                    transition: dragging ? "none" : "left 150ms, top 150ms, transform 120ms",
+                    touchAction: "none",
+                    zIndex: dragging ? 40 : 10,
+                  }}
+                  className="absolute flex flex-col items-center cursor-grab active:cursor-grabbing"
+                >
+                  <span
+                    className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-br from-[#e05252] to-[#b4232a] border-2 border-white/60 shadow-md flex items-center justify-center text-[10px] sm:text-[11px] font-black text-white ${
+                      dragging ? "ring-2 ring-white/80" : ""
+                    }`}
+                  >
+                    {r.num}
+                  </span>
+                  <span className="mt-0.5 rounded bg-black/45 px-1 text-[8px] sm:text-[9px] font-bold leading-tight text-white/90 pointer-events-none">
+                    R{r.num}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
 
         {players.length > 0 && (
           <p className="mt-2 text-center text-[10px] text-lime-soft/50" aria-hidden>
-            🟢 arriba · 🟡 al límite · 🔴 pide cambio · ⚠️/❌ clínico · ⭐ plan claro
+            🟢 arriba · 🟡 al límite · 🔴 pide cambio · ⚠️/❌ clínico · ⭐ plan claro · el balón soltado junto a un titular queda a su pie
           </p>
         )}
       </div>
@@ -1003,6 +1434,12 @@ export function LiveMatchBoard({
                   </span>
                 </span>
                 <span className="ml-auto flex items-center gap-1.5 shrink-0">
+                  <span
+                    className="font-mono text-[10px] text-lime-brand/70"
+                    title="Form score: perfiles (1-5) − fatiga RPE − dudas de disponibilidad"
+                  >
+                    Form {formScores.get(player.id) ?? 0}
+                  </span>
                   <StatusDots s={s} size="xs" />
                   {(tagCounts[player.id] ?? 0) > 0 && (
                     <span className="flex h-5 min-w-5 px-1 items-center justify-center rounded-full bg-amber-400 text-[#0a1a10] text-[10px] font-black">
@@ -1065,47 +1502,46 @@ export function LiveMatchBoard({
               </button>
             </div>
 
-            {/* Ficha de hoy (Pilar 2 · pre-partido) */}
-            {(selected.fatigueRPE !== null ||
-              selected.status !== "AVAILABLE" ||
-              selected.medicalNotes ||
-              selected.academicStress ||
-              selected.tacticalStrength) && (
-              <div className="rounded-xl bg-[#071509]/60 border border-[#1c3a26] p-3">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-[#8aa28d] mb-2">
-                  Ficha de hoy · antes del pitido
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {selected.fatigueRPE !== null && rpeLoadLevel(selected.fatigueRPE) && (
-                    <PreMatchChip
-                      label={`RPE ${selected.fatigueRPE}`}
-                      text={`Carga reciente: ${RPE_LOAD_META[rpeLoadLevel(selected.fatigueRPE)!].label}`}
-                      chipClass={RPE_LOAD_META[rpeLoadLevel(selected.fatigueRPE)!].chip}
-                    />
-                  )}
-                  {selected.status !== "AVAILABLE" && PLAYER_STATUS_META[selected.status] && (
-                    <PreMatchChip
-                      label={PLAYER_STATUS_META[selected.status].label}
-                      text={selected.statusNote ?? PLAYER_STATUS_META[selected.status].label}
-                      chipClass={PLAYER_STATUS_META[selected.status].chip}
-                    />
-                  )}
-                  {selected.medicalNotes && (
-                    <PreMatchChip label="Clínico" text={selected.medicalNotes} />
-                  )}
-                  {selected.academicStress && (
-                    <PreMatchChip label="Académico" text={selected.academicStress} />
-                  )}
-                  {selected.tacticalStrength && (
-                    <PreMatchChip
-                      label="Fortaleza"
-                      text={selected.tacticalStrength}
-                      chipClass="bg-violet-500/15 text-violet-300 border-violet-500/40"
-                    />
-                  )}
-                </div>
+            {/* Ficha de hoy (Pilar 2 · pre-partido) + form score del consejero */}
+            <div className="rounded-xl bg-[#071509]/60 border border-[#1c3a26] p-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[#8aa28d] mb-2">
+                Ficha de hoy · antes del pitido
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                <PreMatchChip
+                  label={`Form ${formScores.get(selected.id) ?? 0}`}
+                  text="Form score del consejero: perfiles técnico/táctico/físico (1-5) menos fatiga RPE y dudas de disponibilidad"
+                  chipClass="bg-amber-400/15 text-amber-300 border-amber-400/40"
+                />
+                {selected.fatigueRPE !== null && rpeLoadLevel(selected.fatigueRPE) && (
+                  <PreMatchChip
+                    label={`RPE ${selected.fatigueRPE}`}
+                    text={`Carga reciente: ${RPE_LOAD_META[rpeLoadLevel(selected.fatigueRPE)!].label}`}
+                    chipClass={RPE_LOAD_META[rpeLoadLevel(selected.fatigueRPE)!].chip}
+                  />
+                )}
+                {selected.status !== "AVAILABLE" && PLAYER_STATUS_META[selected.status] && (
+                  <PreMatchChip
+                    label={PLAYER_STATUS_META[selected.status].label}
+                    text={selected.statusNote ?? PLAYER_STATUS_META[selected.status].label}
+                    chipClass={PLAYER_STATUS_META[selected.status].chip}
+                  />
+                )}
+                {selected.medicalNotes && (
+                  <PreMatchChip label="Clínico" text={selected.medicalNotes} />
+                )}
+                {selected.academicStress && (
+                  <PreMatchChip label="Académico" text={selected.academicStress} />
+                )}
+                {selected.tacticalStrength && (
+                  <PreMatchChip
+                    label="Fortaleza"
+                    text={selected.tacticalStrength}
+                    chipClass="bg-violet-500/15 text-violet-300 border-violet-500/40"
+                  />
+                )}
               </div>
-            )}
+            </div>
 
             {/* Estado en directo (1 toque — el último toque gana, repetir apaga) */}
             {renderStatusGroup(

@@ -39,6 +39,10 @@ sacar "Rivales 4-3-3"
 sleep 0.5
 sacar "Balón"
 sleep 1
+# La fila "Volcar once" (alineación sincronizada) puede empujar el campo bajo
+# el pliegue: lo centramos en pantalla antes de medir coordenadas de ratón.
+agent-browser eval 'document.querySelector("[role=\"application\"]")?.scrollIntoView({block: "center"})' >/dev/null
+agent-browser wait 1200
 agent-browser screenshot /tmp/shots/fichas-iniciales.png
 echo "fichas sacadas (captura inicial)"
 
@@ -67,8 +71,8 @@ dest_gk = (p["l"] + p["w"] * 75 / 150, p["t"] + p["h"] * 30 / 100)
 print(f"BALL_START={ball['x']:.0f},{ball['y']:.0f} LW={lw['x']:.0f},{lw['y']:.0f} RGK={rgk['x']:.0f},{rgk['y']:.0f}")
 print(f"DRAG_BALL={ball['x']:.0f} {ball['y']:.0f} {dest[0]:.0f} {dest[1]:.0f}")
 print(f"DRAG_GK={rgk['x']:.0f} {rgk['y']:.0f} {dest_gk[0]:.0f} {dest_gk[1]:.0f} EXPECT={dest_gk[0]:.0f},{dest_gk[1]:.0f}")
-open("/tmp/drag1.txt","w").write(f"{ball['x']:.0f} {ball['y']:.0f} {dest[0]:.0f} {dest[1]:.0f}")
-open("/tmp/drag2.txt","w").write(f"{rgk['x']:.0f} {rgk['y']:.0f} {dest_gk[0]:.0f} {dest_gk[1]:.0f}")
+open("/tmp/drag1.txt","w").write(f"{ball['x']:.0f} {ball['y']:.0f} {dest[0]:.0f} {dest[1]:.0f}\n")
+open("/tmp/drag2.txt","w").write(f"{rgk['x']:.0f} {rgk['y']:.0f} {dest_gk[0]:.0f} {dest_gk[1]:.0f}\n")
 EOF
 
 # ---------- 3) DRAG real 1: balón → al pie del LW (snap) ----------

@@ -18,7 +18,16 @@
 // ============================================================================
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import { CircleDot, Eraser, Layers, Plus, RotateCcw, Trash2, Users } from "lucide-react";
+import {
+  CalendarSync,
+  CircleDot,
+  Eraser,
+  Layers,
+  Plus,
+  RotateCcw,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EVENT_META, QUICK_EVENT_TYPES } from "@/lib/taxonomy";
 
@@ -27,6 +36,21 @@ export type PrepPlayerData = {
   firstName: string;
   lastName: string;
   shirtNumber: number | null;
+};
+
+/** Alineación confirmada de un partido (LiveMatchEvaluation.isStarter=true):
+ *  el mock del míster la llama "Alineación Sincronizada Automáticamente" —
+ *  el once se vuelca a la pizarra en formación real, listo para explicar. */
+export type PrepLineupData = {
+  matchId: string;
+  label: string;
+  starters: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    shirtNumber: number | null;
+    position: string;
+  }>;
 };
 
 type PrepEvent = { x: number; y: number; type: string; playerId: string | null };
@@ -48,18 +72,47 @@ const FORMACION_433: [number, number][] = [
   [68, 18], [66, 50], [68, 82], // LW ST RW
 ];
 
+/** Slot preferente de la formación 4-3-3 para cada demarcación real. Al volcar
+ *  el once se respeta la posición del jugador; si dos caen en el mismo hueco,
+ *  el segundo se desplaza al slot libre más cercano (o a una columna aparte). */
+const SLOT_OF_POSITION: Record<string, number> = {
+  GK: 0,
+  LB: 1,
+  LWB: 1,
+  CB: 2,
+  RB: 4,
+  RWB: 4,
+  DM: 6,
+  CM: 5,
+  AM: 7,
+  LM: 8,
+  RM: 10,
+  LW: 8,
+  RW: 10,
+  SS: 9,
+  CF: 9,
+};
+
 const clampX = (x: number) => Math.min(147, Math.max(3, x));
 const clampY = (y: number) => Math.min(97, Math.max(3, y));
 
 let fichaSeq = 0;
 const nextFichaId = () => `f${++fichaSeq}-${Math.random().toString(36).slice(2, 7)}`;
 
-export function PrepWhiteboard({ players }: { players: PrepPlayerData[] }) {
+export function PrepWhiteboard({
+  players,
+  lineups = [],
+}: {
+  players: PrepPlayerData[];
+  lineups?: PrepLineupData[];
+}) {
   const [events, setEvents] = useState<PrepEvent[]>([]);
   const [activeType, setActiveType] = useState<string>("BALL_LOSS");
   const [activePlayerId, setActivePlayerId] = useState<string | null>(null);
   const [fichas, setFichas] = useState<Ficha[]>([]);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [volcadoSel, setVolcadoSel] = useState<string>(lineups[0]?.matchId ?? "");
+  const [volcadoLabel, setVolcadoLabel] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{
@@ -159,6 +212,54 @@ export function PrepWhiteboard({ players }: { players: PrepPlayerData[] }) {
   }, []);
 
   const clearFichas = useCallback(() => setFichas([]), []);
+
+  // ---------- ALINEACIÓN SINCRONIZADA (mock del míster): volcar el once
+  // confirmado de un partido a la pizarra, cada uno en su demarcación real ----------
+  const volcarOnce = useCallback(
+    (matchId: string) => {
+      const lineup = lineups.find((l) => l.matchId === matchId);
+      if (!lineup || lineup.starters.length === 0) return;
+      setFichas((prev) => {
+        const sinPropios = prev.filter((f) => f.kind !== "own"); // rivales y balón se conservan
+        const usados = new Set<number>();
+        const propias: Ficha[] = [];
+        const sinHueco: typeof lineup.starters = [];
+        for (const p of lineup.starters.slice(0, 11)) {
+          const prefer = SLOT_OF_POSITION[p.position] ?? 9;
+          let slot = prefer;
+          if (usados.has(slot)) {
+            slot = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].find((s) => !usados.has(s)) ?? -1;
+          }
+          if (slot === -1) {
+            sinHueco.push(p);
+            continue;
+          }
+          usados.add(slot);
+          propias.push({
+            id: nextFichaId(),
+            kind: "own",
+            num: p.shirtNumber ?? 0,
+            name: p.lastName,
+            sx: FORMACION_433[slot][0],
+            sy: FORMACION_433[slot][1],
+          });
+        }
+        sinHueco.forEach((p, i) =>
+          propias.push({
+            id: nextFichaId(),
+            kind: "own",
+            num: p.shirtNumber ?? 0,
+            name: p.lastName,
+            sx: 34,
+            sy: Math.min(94, 14 + i * 16),
+          }),
+        );
+        return [...sinPropios, ...propias];
+      });
+      setVolcadoLabel(lineup.label);
+    },
+    [lineups],
+  );
 
   // ---------- arrastre (mismo patrón probado del constructor de Biblioteca) ----------
   const pitchCoords = useCallback((clientX: number, clientY: number) => {
@@ -339,6 +440,37 @@ export function PrepWhiteboard({ players }: { players: PrepPlayerData[] }) {
           <Users className="w-3.5 h-3.5 text-brand-600" aria-hidden />
           Fichas y balón · arrastra con el dedo o el ratón
         </p>
+        {lineups.length > 0 && (
+          <div className="mb-2.5 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-500/30 bg-brand-600/5 px-2.5 py-2">
+            <CalendarSync className="w-4 h-4 shrink-0 text-brand-600" aria-hidden />
+            <select
+              value={volcadoSel}
+              onChange={(e) => setVolcadoSel(e.target.value)}
+              aria-label="Partido cuyo once confirmado volcar a la pizarra"
+              className="min-h-[36px] flex-1 min-w-[140px] rounded-lg border border-cream-border-strong bg-white px-2 text-xs font-bold text-[#3d5844]"
+            >
+              {lineups.map((l) => (
+                <option key={l.matchId} value={l.matchId}>
+                  Once de {l.label} ({l.starters.length})
+                </option>
+              ))}
+            </select>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => volcarOnce(volcadoSel)}
+              disabled={!volcadoSel}
+              className="min-h-[36px] rounded-lg border-emerald-500/50 bg-brand-600 px-3 text-[11px] font-black text-white hover:bg-brand-600/90"
+            >
+              Volcar once ⚡
+            </Button>
+            {volcadoLabel && (
+              <span className="text-[10px] font-bold text-brand-600">
+                volcado: {volcadoLabel}
+              </span>
+            )}
+          </div>
+        )}
         <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
           <Button
             type="button"

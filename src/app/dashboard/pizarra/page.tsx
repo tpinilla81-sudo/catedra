@@ -13,7 +13,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ChevronRight, Presentation, Radio } from "lucide-react";
 import { AppShell } from "@/components/dashboard/app-shell";
-import { PrepWhiteboard } from "@/components/match/prep-whiteboard";
+import { PrepWhiteboard, type PrepLineupData } from "@/components/match/prep-whiteboard";
 import { requireTenantContext } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +39,45 @@ export default async function PizarraPage() {
       },
     }),
   ]);
+
+  // Alineaciones confirmadas (isStarter=true) de esos partidos — mock del
+  // míster: "Alineación Sincronizada Automáticamente" con la pizarra.
+  const starterEvals = matches.length
+    ? await db.liveMatchEvaluation.findMany({
+        where: {
+          matchId: { in: matches.map((m) => m.id) },
+          isStarter: true,
+        },
+        include: {
+          player: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              shirtNumber: true,
+              primaryPosition: true,
+            },
+          },
+        },
+        orderBy: { timestamp: "asc" },
+      })
+    : [];
+
+  const lineups: PrepLineupData[] = matches
+    .map((m) => ({
+      matchId: m.id,
+      label: `${m.isHome ? "vs" : "@"} ${m.opponent} · ${format(m.kickoffAt, "d MMM", { locale: es })}`,
+      starters: starterEvals
+        .filter((e) => e.matchId === m.id)
+        .map((e) => ({
+          id: e.player.id,
+          firstName: e.player.firstName,
+          lastName: e.player.lastName,
+          shirtNumber: e.player.shirtNumber,
+          position: e.player.primaryPosition,
+        })),
+    }))
+    .filter((l) => l.starters.length > 0);
 
   return (
     <AppShell active="pizarra" userName={user.name} role={user.role}>
@@ -131,7 +170,8 @@ export default async function PizarraPage() {
                 Pizarra libre · preparación (nada se sella aquí)
               </h2>
               <p className="text-xs text-[#6c8070] leading-snug">
-                Campo libre para preparar y explicar: saca las fichas de la plantilla real, los
+                Campo libre para preparar y explicar: VUELCA el once confirmado de cualquier
+                partido (alineación sincronizada), saca las fichas de la plantilla real, los
                 rivales y el balón y arrástralos con el dedo o el ratón (el balón soltado junto a
                 un jugador queda a su pie); también puedes tocar el campo para colocar eventos del
                 vocabulario de la ingesta. Para registrar hechos contra el vídeo y el reloj, abre
@@ -145,6 +185,7 @@ export default async function PizarraPage() {
                     lastName: p.lastName,
                     shirtNumber: p.shirtNumber,
                   }))}
+                  lineups={lineups}
                 />
               </div>
             </section>
