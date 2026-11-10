@@ -1,20 +1,18 @@
 name: Autopilot — aplicar paquete del agente
 
 # Aplica a producción el paquete (bundle) que el agente prepara y entrega
-# como URL pública + su sha256. El humano solo pulsa "Run workflow" (vale
-# desde el móvil). Todo lo demás (verificar, fusionar, subir) lo hace aquí,
-# dentro de GitHub, con los permisos del propio repo. El push a main dispara
-# el workflow "CI migraciones Neon" y el deploy nativo de Vercel.
+# como URL pública (dpaste, base64) + su sha256 (del bundle binario).
+# El humano solo pulsa "Run workflow" (vale desde el móvil).
 
 on:
   workflow_dispatch:
     inputs:
       paquete_url:
-        description: "URL del paquete .bundle preparado por el agente"
+        description: "URL del paquete en base64 (dpaste .../raw)"
         required: true
         type: string
       paquete_sha256:
-        description: "SHA256 esperado del paquete (lo da el agente)"
+        description: "SHA256 del bundle binario (lo da el agente)"
         required: true
         type: string
 
@@ -34,10 +32,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Descargar y VERIFICAR el paquete (integridad sha256)
+      - name: Descargar, decodificar y VERIFICAR el paquete (sha256)
         run: |
           set -euo pipefail
-          curl -fL --retry 3 -o /tmp/paquete.bundle "${{ inputs.paquete_url }}"
+          curl -fL --retry 3 --max-time 120 -o /tmp/paquete.b64 "${{ inputs.paquete_url }}"
+          echo "Texto descargado: $(wc -c < /tmp/paquete.b64) bytes"
+          tr -d ' \t\r\n' < /tmp/paquete.b64 | base64 -d > /tmp/paquete.bundle
+          echo "Bundle decodificado: $(wc -c < /tmp/paquete.bundle) bytes"
           echo "${{ inputs.paquete_sha256 }}  /tmp/paquete.bundle" | sha256sum -c -
 
       - name: Incorporar el paquete (SOLO fast-forward, sin fusión a ciegas)
@@ -53,7 +54,18 @@ jobs:
             exit 1
           fi
 
-      - name: Publicar en main (esto dispara migración Neon + deploy Vercel)
+      - name: Migrar Neon ANTES de publicar (BD lista para el código nuevo)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: |
+          set -euo pipefail
+          npx --yes prisma@6.11.1 migrate resolve --applied 20261106222758_init_schema_v0_1 || true
+          npx --yes prisma@6.11.1 migrate resolve --applied 20261107000000_engine_columns_and_report_author || true
+          npx --yes prisma@6.11.1 migrate resolve --applied 20261108000000_p41_scouting_rival || true
+          npx --yes prisma@6.11.1 migrate deploy
+
+      - name: Publicar en main (dispara el deploy nativo de Vercel)
         run: |
           set -euo pipefail
           git push origin main
@@ -65,5 +77,5 @@ jobs:
             echo ""
             echo "Commit en producción: \`$(git log --oneline -1)\`"
             echo ""
-            echo "Siguiente: ver 'CI migraciones Neon' en verde y el deploy en Vercel."
+            echo "Migración Neon aplicada ANTES del push · deploy de Vercel en marcha."
           } >> "$GITHUB_STEP_SUMMARY"
