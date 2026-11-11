@@ -42,6 +42,7 @@ import type { Animacion } from "@/lib/animaciones-ejercicio";
 import { TacticalAnimationBuilder } from "@/components/library/tactical-animation-builder";
 import { useToast } from "@/hooks/use-toast";
 import { FIELD_ZONES } from "@/lib/field-zone";
+import { TASK_TAXONOMY, taskFamilyMeta } from "@/lib/task-taxonomy";
 
 type RecipeDraft = { subPrincipleId: string; relevance: number; usageNote: string };
 
@@ -61,6 +62,8 @@ type Draft = {
   durationMin: number;
   repetitions: string;
   intensity: string;
+  /** Familia de la TAXONOMÍA OFICIAL ("" = sin clasificar) */
+  family: string;
   rules: string[];
   points: string[];
   materials: string[];
@@ -87,6 +90,7 @@ function initialDraft(task: TaskCard | null): Draft {
     durationMin: task?.durationMin ?? 20,
     repetitions: task?.repetitions ?? "",
     intensity: task?.intensity ?? "MEDIUM",
+    family: task?.family ?? "",
     rules: task ? [...task.rulesOfProvocation] : [],
     points: task ? [...task.coachingPoints] : [],
     materials: task ? [...task.materials] : [],
@@ -244,17 +248,23 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 export function TaskEditor({
   task,
+  presetFamily,
   subprinciples,
   platform = false,
   onClose,
 }: {
   task: TaskCard | null;
+  /** Familia de la taxonomía oficial preseleccionada (creación desde la Maestra) */
+  presetFamily?: string;
   subprinciples: SPNode[];
   /** Modo Plataforma: la ficha se crea/edita como contenido global de la Cátedra */
   platform?: boolean;
   onClose: () => void;
 }) {
-  const [draft, setDraft] = useState<Draft>(() => initialDraft(task));
+  const [draft, setDraft] = useState<Draft>(() => {
+    const base = initialDraft(task);
+    return presetFamily && !task ? { ...base, family: presetFamily } : base;
+  });
   const [spQuery, setSpQuery] = useState("");
   const [saving, startTransition] = useTransition();
   const { toast } = useToast();
@@ -308,6 +318,7 @@ export function TaskEditor({
       durationMin: draft.durationMin,
       repetitions: draft.repetitions,
       intensity: draft.intensity,
+      family: draft.family || null,
       rulesOfProvocation: draft.rules,
       coachingPoints: draft.points,
       materials: draft.materials,
@@ -401,6 +412,48 @@ export function TaskEditor({
               </button>
             );
           })}
+        </div>
+
+        {/* ---------- Familia de la TAXONOMÍA OFICIAL (mock 'MasterLibraryTaxonomyView') ---------- */}
+        <SectionTitle>
+          Familia oficial ({TASK_TAXONOMY.length} categorías · opcional)
+        </SectionTitle>
+        <div className="rounded-2xl bg-cream-dark/70 px-3 py-2.5" data-testid="editor-family">
+          {TASK_TAXONOMY.map((cat) => (
+            <div key={cat.id} className={cat.id !== "fisicas" ? "mt-2.5" : ""}>
+              <p className="text-[9px] font-black text-[#6c8070] uppercase tracking-widest">
+                <span aria-hidden>{cat.emoji}</span> {cat.label}
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {cat.families.map((fam) => {
+                  const active = draft.family === fam.id;
+                  return (
+                    <button
+                      key={fam.id}
+                      type="button"
+                      title={`${fam.name} (${fam.descriptor})`}
+                      onClick={() => set("family", active ? "" : fam.id)}
+                      aria-pressed={active}
+                      data-testid={`editor-family-${fam.id}`}
+                      className={`rounded-full border px-2.5 py-1.5 text-[11px] font-bold transition ${
+                        active
+                          ? "border-brand-600 bg-brand-600 text-white"
+                          : "border-cream-border-strong bg-cream text-[#3d5844] hover:border-brand-500"
+                      }`}
+                    >
+                      {fam.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          {taskFamilyMeta(draft.family) && (
+            <p className="mt-2 text-[10px] font-bold text-brand-600" data-testid="editor-family-current">
+              Clasificada como: {taskFamilyMeta(draft.family)!.family.name} ·{" "}
+              {taskFamilyMeta(draft.family)!.family.descriptor}
+            </p>
+          )}
         </div>
 
         {/* ---------- Ingeniería del espacio y la carga ---------- */}

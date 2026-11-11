@@ -104,6 +104,7 @@ export default async function LibraryPage() {
     durationMin: t.durationMin,
     repetitions: t.repetitions,
     intensity: t.intensity,
+    family: t.family,
     rulesOfProvocation: t.rulesOfProvocation,
     coachingPoints: t.coachingPoints,
     materials: t.materials,

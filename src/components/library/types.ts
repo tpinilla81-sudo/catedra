@@ -55,6 +55,8 @@ export type TaskCard = {
   coachingPoints: string[];
   materials: string[];
   diagramUrl: string | null;
+  /** Familia de la TAXONOMÍA OFICIAL (src/lib/task-taxonomy.ts) · null = sin clasificar */
+  family: string | null;
   /** Pizarra animada PERSONALIZADA del míster (si no, la UI usa la plantilla determinista) */
   animationData: Animacion | null;
   createdByName: string | null;

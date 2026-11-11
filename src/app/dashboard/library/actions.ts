@@ -31,6 +31,7 @@ import { getSessionUser } from "@/lib/session";
 import { createTenantClient } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { parseAnimacionGuardada } from "@/lib/animacion-guardada";
+import { TASK_FAMILY_IDS } from "@/lib/task-taxonomy";
 import {
   INTENSITIES,
   MSG_CATEDRA_READONLY,
@@ -77,6 +78,8 @@ export type TaskInput = {
   fieldZoneY: number | null;
   /** Vídeo REAL de la tarea grabado en su zona y metros */
   videoUrl: string | null;
+  /** Familia de la taxonomía oficial (id de TASK_FAMILY_IDS) · null/"" = sin clasificar */
+  family: string | null;
   playersMin: number;
   playersMax: number | null;
   durationMin: number;
@@ -275,6 +278,9 @@ export async function saveTask(input: TaskInput): Promise<ActionResult> {
   const diagramUrl = optStr(input.diagramUrl, 300);
   const videoUrl = optStr(input.videoUrl, 300);
   const intensity = cleanStr(input.intensity, 20);
+  // Familia de la TAXONOMÍA OFICIAL: solo ids válidos; lo demás → sin clasificar
+  const family =
+    input.family && TASK_FAMILY_IDS.has(input.family) ? input.family : null;
 
   const phases = Array.isArray(input.phases)
     ? [...new Set(input.phases.filter((p) => PHASES.includes(p)))]
@@ -367,6 +373,7 @@ export async function saveTask(input: TaskInput): Promise<ActionResult> {
     durationMin: durationMin!,
     repetitions,
     intensity: intensity as never,
+    family,
     rulesOfProvocation: rules as never,
     coachingPoints: points as never,
     materials: materials as never,

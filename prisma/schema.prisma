@@ -522,6 +522,7 @@ model Task {
   durationMin        Int /// Tiempo total sugerido (min)
   repetitions        String? /// "3 series x 6'", "2 bloques x 8'"
   intensity          Intensity   @default(MEDIUM) /// El motor la cruza con la fatiga grupal
+  family             String? /// Familia de la TAXONOMÍA OFICIAL de tareas (src/lib/task-taxonomy.ts): Físicas · Técnicas · Tácticas · Psicológicas · Integradas
   rulesOfProvocation String[] /// Reglas de provocación — array nativo de PostgreSQL
   coachingPoints     String[] /// Puntos clave para el entrenador
   materials          String[] /// Conos, petos, maniquíes...

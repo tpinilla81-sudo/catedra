@@ -89,6 +89,7 @@ export default async function CatedraPage() {
     durationMin: t.durationMin,
     repetitions: t.repetitions,
     intensity: t.intensity,
+    family: t.family,
     rulesOfProvocation: t.rulesOfProvocation,
     coachingPoints: t.coachingPoints,
     materials: t.materials,

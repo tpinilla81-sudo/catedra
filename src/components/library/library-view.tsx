@@ -11,15 +11,17 @@
 // ============================================================================
 
 import { useMemo, useState } from "react";
-import { BookOpen, GitBranch, Landmark, Network, Plus, ShieldCheck, Users } from "lucide-react";
+import { BookOpen, GitBranch, Landmark, ListTree, Network, Plus, ShieldCheck, Users } from "lucide-react";
 import { PHASE_ORDER } from "@/lib/taxonomy";
 import type { Role } from "@/types/auth";
 import { canWriteCatedra, canWriteClubContent } from "@/utils/permissions";
 import type { LibraryData, TaskCard } from "@/components/library/types";
 import { TaskDetailSheet, TasksTab } from "@/components/library/tasks-tab";
 import { TaxonomyTab } from "@/components/library/taxonomy-tab";
+import { MasterTaxonomyTab } from "@/components/library/master-taxonomy-tab";
 import { TaskEditor } from "@/components/library/task-editor";
 import { UserMenu } from "@/components/hoy/user-menu";
+import { TASK_FAMILY_COUNT } from "@/lib/task-taxonomy";
 
 /** Cuadro pequeño estilo vestuario (zona fija) */
 function MiniStat({
@@ -61,9 +63,13 @@ export function LibraryView({
   /** Nombre del usuario (solo modo plataforma, para el UserMenu) */
   userName?: string;
 }) {
-  const [tab, setTab] = useState<"taxonomy" | "tasks">("taxonomy");
+  const [tab, setTab] = useState<"taxonomy" | "tasks" | "maestra">("taxonomy");
   const [taskDetail, setTaskDetail] = useState<TaskCard | null>(null);
-  const [taskEditor, setTaskEditor] = useState<{ task: TaskCard | null } | null>(null);
+  const [taskEditor, setTaskEditor] = useState<{
+    task: TaskCard | null;
+    /** Familia preseleccionada al crear desde la Biblioteca Maestra */
+    presetFamily?: string;
+  } | null>(null);
 
   // RBAC de presentación: el guard real vive en cada Server Action.
   const canWrite = platform ? canWriteCatedra(role) : canWriteClubContent(role);
@@ -80,7 +86,8 @@ export function LibraryView({
     return { catedralSP, clubSP, catedralT, clubT, recipes, phasesCovered };
   }, [data]);
 
-  const openNewTask = () => setTaskEditor({ task: null });
+  const openNewTask = (familyId?: string) =>
+    setTaskEditor({ task: null, presetFamily: familyId });
   const openEditTask = (t: TaskCard) => {
     setTaskDetail(null);
     setTaskEditor({ task: t });
@@ -109,7 +116,7 @@ export function LibraryView({
           </div>
           {canWrite ? (
             <button
-              onClick={openNewTask}
+              onClick={() => openNewTask()}
               className="shrink-0 h-11 px-4 rounded-2xl bg-brand-600 hover:bg-brand text-white font-black text-sm transition flex items-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-600"
             >
               <Plus className="w-4 h-4" aria-hidden /> Tarea
@@ -161,11 +168,12 @@ export function LibraryView({
 
         {/* Pestañas (fijas, siempre a la vista) */}
         <div className="mx-auto max-w-5xl px-4 pb-2">
-          <div className="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-cream border border-cream-border">
+          <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-cream border border-cream-border">
             {(
               [
                 { key: "taxonomy", label: "Taxonomía", icon: GitBranch, count: data.subprinciples.length },
                 { key: "tasks", label: "Tareas", icon: BookOpen, count: data.tasks.length },
+                { key: "maestra", label: "Maestra", icon: ListTree, count: TASK_FAMILY_COUNT },
               ] as const
             ).map((t) => {
               const active = tab === t.key;
@@ -207,6 +215,14 @@ export function LibraryView({
               onEditTask={openEditTask}
               onNewTask={openNewTask}
             />
+          ) : tab === "maestra" ? (
+            <MasterTaxonomyTab
+              data={data}
+              canWrite={canWrite}
+              onOpenTask={(t) => setTaskDetail(t)}
+              onEditTask={openEditTask}
+              onNewTask={openNewTask}
+            />
           ) : (
             <TasksTab
               data={data}
@@ -232,6 +248,7 @@ export function LibraryView({
       {taskEditor && (
         <TaskEditor
           task={taskEditor.task}
+          presetFamily={taskEditor.presetFamily}
           subprinciples={data.subprinciples}
           platform={platform}
           onClose={() => setTaskEditor(null)}
