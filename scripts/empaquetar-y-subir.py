@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Empaqueta 5464cb8..main, sube a dpaste (base64) y verifica round-trip.
+"""Empaqueta 6bc5f17..main, sube a dpaste (base64) y verifica round-trip.
 Imprime URL + SHA256 listos para el dispatch de Autopilot."""
 import base64
 import hashlib
@@ -8,7 +8,7 @@ import time
 import urllib.request
 
 ROOT = "/home/z/my-project"
-BASE = "5464cb8"  # main actual en GitHub
+BASE = "6bc5f17"  # main actual en GitHub
 DPASTE = "https://dpaste.org/api/"
 
 
