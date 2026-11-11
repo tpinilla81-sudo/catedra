@@ -2,10 +2,10 @@
   "pilar": 4,
   "title": "Motor Prescriptivo + Auditoría + Hoy (Pilar 4)",
   "total": 31,
-  "passed": 31,
-  "failed": 0,
-  "durationMs": 674,
-  "timestamp": "2026-11-09T06:45:05.074Z",
+  "passed": 30,
+  "failed": 1,
+  "durationMs": 762,
+  "timestamp": "2026-11-11T10:33:11.880Z",
   "checks": [
     {
       "name": "ranking: rel3 HIGH primero, luego rel2 LOW, luego rel2 MEDIUM",
@@ -125,7 +125,7 @@
     },
     {
       "name": "muestra candidatas descartadas",
-      "ok": true
+      "ok": false
     },
     {
       "name": "muestra botón Aceptar Plan",

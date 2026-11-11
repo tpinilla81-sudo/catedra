@@ -2,10 +2,10 @@
   "pilar": 2,
   "title": "Plantilla y Pulso (Pilar 2)",
   "total": 69,
-  "passed": 69,
-  "failed": 0,
-  "durationMs": 3233,
-  "timestamp": "2026-11-09T06:45:01.423Z",
+  "passed": 68,
+  "failed": 1,
+  "durationMs": 628,
+  "timestamp": "2026-11-11T10:33:10.930Z",
   "checks": [
     {
       "name": "parseCsv: delimitador coma",
@@ -261,7 +261,7 @@
     },
     {
       "name": "COACH_ADMIN: vista Plantilla con stats de disponibilidad",
-      "ok": true
+      "ok": false
     },
     {
       "name": "COACH_ADMIN: acceso a importación CSV/Excel",

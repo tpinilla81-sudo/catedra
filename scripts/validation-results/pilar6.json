@@ -2,10 +2,10 @@
   "pilar": 6,
   "title": "P4.1 Scouting del rival — guard multi-tenant + motor + re-prescripción",
   "total": 33,
-  "passed": 33,
-  "failed": 0,
-  "durationMs": 736,
-  "timestamp": "2026-11-09T06:45:07.408Z",
+  "passed": 31,
+  "failed": 2,
+  "durationMs": 551,
+  "timestamp": "2026-11-11T10:33:13.406Z",
   "checks": [
     {
       "name": "G1 create sin clubId → clubId del tenant INYECTADO (+ hijos anidados)",
@@ -133,11 +133,11 @@
     },
     {
       "name": "GET /dashboard/quality 200",
-      "ok": true
+      "ok": false
     },
     {
       "name": "panel de control integra el bloque Scouting P4.1",
-      "ok": true
+      "ok": false
     }
   ]
 }

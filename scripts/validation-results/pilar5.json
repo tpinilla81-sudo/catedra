@@ -2,10 +2,10 @@
   "pilar": 5,
   "title": "Perfección técnica local — Severidad 3 (pulso vivo · TZ Madrid · factibilidad apoyos)",
   "total": 36,
-  "passed": 36,
-  "failed": 0,
-  "durationMs": 1348,
-  "timestamp": "2026-11-09T06:45:06.566Z",
+  "passed": 34,
+  "failed": 2,
+  "durationMs": 686,
+  "timestamp": "2026-11-11T10:33:12.706Z",
   "checks": [
     {
       "name": "E1 mondayOf(lunes 00:30 Madrid, invierno) → lunes 09-nov 00:00 UTC",
@@ -141,11 +141,11 @@
     },
     {
       "name": "GET /dashboard/quality 200",
-      "ok": true
+      "ok": false
     },
     {
       "name": "panel de control integra el bloque Refino S3 (Severidad 3)",
-      "ok": true
+      "ok": false
     },
     {
       "name": "GET /dashboard/today 200 (smoke post-refino)",
