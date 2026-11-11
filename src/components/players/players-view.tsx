@@ -15,7 +15,8 @@
 // ============================================================================
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Loader2, Minus, Plus, UserCog, Users } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ClipboardList, Loader2, Minus, Plus, UserCog, Users } from "lucide-react";
 import type { PlayerStatus } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -165,6 +166,7 @@ export function PlayersView({
   const [editing, setEditing] = useState<PlayerCardData | null>(null);
   const [draft, setDraft] = useState<EditorDraft | null>(null);
   const [saving, startTransition] = useTransition();
+  const router = useRouter();
   const { toast } = useToast();
 
   const counts = useMemo(() => {
@@ -636,10 +638,22 @@ export function PlayersView({
             </div>
           </div>
 
+          {/* ---------- Acceso a la FICHA DE RENDIMIENTO COMPLETA ---------- */}
+          {editing && (
+            <button
+              onClick={() => router.push(`/dashboard/players/${editing.id}`)}
+              data-testid="open-evaluation"
+              className="mt-4 w-full min-h-[52px] rounded-2xl border border-brand-600/40 bg-brand-600/10 hover:bg-brand-600/20 text-brand-600 font-black text-sm transition flex items-center justify-center gap-2"
+            >
+              <ClipboardList className="w-4 h-4" aria-hidden />
+              Evaluación completa · Ficha de Rendimiento →
+            </button>
+          )}
+
           <Button
             onClick={saveEditor}
             disabled={saving}
-            className="mt-4 w-full min-h-[56px] rounded-2xl bg-brand-600 hover:bg-brand text-white font-black text-base"
+            className="mt-2 w-full min-h-[56px] rounded-2xl bg-brand-600 hover:bg-brand text-white font-black text-base"
           >
             {saving ? (
               <Loader2 className="w-5 h-5 animate-spin" aria-hidden />

@@ -22,6 +22,7 @@ import {
   type ImportSummary,
   type PlayerQuickPatch,
 } from "@/lib/squad-import";
+import { normalizeEvaluationData } from "@/lib/player-evaluation";
 import { normalizePosition } from "@/lib/taxonomy";
 
 export type { ImportRowResult, ImportSummary, PlayerQuickPatch } from "@/lib/squad-import";
@@ -197,4 +198,60 @@ export async function createPlayer(input: NewPlayerInput): Promise<CreatePlayerR
     }
     return { ok: false, error: "No se pudo crear el jugador. Inténtalo de nuevo." };
   }
+}
+
+// ---------- ACTION: guardar la FICHA DE RENDIMIENTO COMPLETA ----------
+// (mock del míster 'PlayerProfileEvaluationView': 6 bloques × 8 métricas 1-10)
+
+export type SaveEvalResult =
+  | { ok: true; updatedAt: string }
+  | { ok: false; error: string };
+
+export async function savePlayerEvaluation(
+  playerId: string,
+  raw: unknown,
+): Promise<SaveEvalResult> {
+  const { db, team, user } = await requireTenantContext();
+
+  // RBAC: la ficha de rendimiento la escribe el cuerpo técnico (Analista,
+  // solo lectura en toda la casa — aquí también).
+  if (user.role === "ANALYST") {
+    return { ok: false, error: "Tu rol (Analista) es de solo lectura: no puede guardar evaluaciones." };
+  }
+
+  // Tenant guard: el jugador debe existir en el equipo activo.
+  const player = await db.player.findFirst({
+    where: { id: playerId, teamId: team.id, isActive: true },
+    select: { id: true, clubId: true, firstName: true, lastName: true },
+  });
+  if (!player) {
+    return { ok: false, error: "El jugador no existe en tu equipo." };
+  }
+
+  // El servidor REVALIDA toda la estructura: 6 bloques × 8 métricas,
+  // notas 1-10, labels ≤ 60. Nunca se persiste un JSON corrupto.
+  const data = normalizeEvaluationData(raw);
+  if (!data) {
+    return { ok: false, error: "La ficha de rendimiento no es válida. Recarga la página e inténtalo de nuevo." };
+  }
+
+  // Una evaluación VIGENTE por jugador (upsert): la ficha refleja el
+  // último estado; updatedAt queda como marca temporal del informe.
+  const saved = await db.playerEvaluation.upsert({
+    where: { playerId: player.id },
+    create: {
+      clubId: player.clubId,
+      teamId: team.id,
+      playerId: player.id,
+      data: data as never,
+      createdById: user.id,
+    },
+    update: {
+      data: data as never,
+    },
+  });
+
+  revalidatePath(`/dashboard/players/${playerId}`);
+  revalidatePath("/dashboard/players");
+  return { ok: true, updatedAt: saved.updatedAt.toISOString() };
 }

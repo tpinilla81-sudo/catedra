@@ -198,6 +198,7 @@ model User {
   createdReports MatchReport[] @relation("ReportAuthor")
   acceptedCycles Microcycle[]  @relation("MicrocycleAccepter")
   capturedPulses TeamPulse[]   @relation("PulseCapturer")
+  playerEvaluations PlayerEvaluation[] @relation("PlayerEvaluationAuthor")
 
   @@index([clubId])
 }
@@ -288,10 +289,36 @@ model Player {
   attendanceRecords AttendanceRecord[] /// Asistencia y carga por sesión (fútbol base)
   liveEvaluations   LiveMatchEvaluation[] /// Evaluaciones en directo desde la pizarra
   telemetryEvents   MatchTelemetryEvent[] /// Telemetría en directo (Pilar 3)
+  performanceEvaluations PlayerEvaluation[] /// Fichas de rendimiento completas (mock 'PlayerProfileEvaluationView')
 
   @@unique([teamId, shirtNumber])
   @@index([clubId, teamId])
   @@index([primaryPosition])
+}
+
+/// FICHA DE RENDIMIENTO COMPLETA DEL JUGADOR (mock 'PlayerProfileEvaluationView')
+/// ---------------------------------------------------------------------------
+/// La evaluación profunda 1:1 con 6 bloques (Físicas · Técnica · Inteligencia
+/// Táctica · Psicológicos · Principios Tácticos · Actitud) × 8 métricas cada
+/// uno (las «Libre N» son configurables por el míster) con nota 1-10. El
+/// contenido completo (labels + notas + flags custom) vive en `data` JSON:
+/// el míster puede renombrar métricas SIN migrar. Una evaluación VIGENTE por
+/// jugador (upsert): la ficha siempre refleja el último estado del jugador.
+model PlayerEvaluation {
+  id          String   @id @default(cuid())
+  clubId      String
+  teamId      String
+  playerId    String
+  data        Json     /// 6 bloques × 8 métricas: [{ key, title, metrics: [{ label, score 1-10, custom }] }]
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  player    Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation("PlayerEvaluationAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([playerId]) /// una evaluación vigente por jugador (upsert)
+  @@index([clubId, teamId])
 }
 
 /// Pulso Colectivo del vestuario — se captura en segundos tras el partido.
