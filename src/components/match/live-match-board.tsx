@@ -430,6 +430,16 @@ export function LiveMatchBoard({
   const [pendingClock, setPendingClock] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [videoOpen, setVideoOpen] = useState(false);
+  /// 📂 MP4 desde el ordenador (mock del míster): blob local del navegador —
+  /// sin subir nada a la nube, se reproduce directo en la pizarra espacial.
+  const [localVideo, setLocalVideo] = useState<{ src: string; name: string } | null>(null);
+  const localVideoInputRef = useRef<HTMLInputElement>(null);
+  /// Liberar el blob anterior al cambiar de archivo y al desmontar (sin fugas)
+  useEffect(() => {
+    return () => {
+      if (localVideo) URL.revokeObjectURL(localVideo.src);
+    };
+  }, [localVideo]);
   const [spatialOpen, setSpatialOpen] = useState(false);
   const [savingSpatial, setSavingSpatial] = useState(false);
 
@@ -1131,6 +1141,40 @@ export function LiveMatchBoard({
               <Video className="w-4 h-4" aria-hidden />
               {session?.videoUrl ? "Vídeo ✓" : "Vídeo"}
             </button>
+            <input
+              ref={localVideoInputRef}
+              type="file"
+              accept="video/mp4,video/webm,video/quicktime"
+              className="hidden"
+              data-testid="local-video-input"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setLocalVideo({ src: URL.createObjectURL(file), name: file.name });
+                e.target.value = ""; // permite volver a elegir el mismo archivo
+              }}
+            />
+            <button
+              onClick={() => localVideoInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-brand-600/60 bg-brand-600/10 px-3.5 py-2.5 text-sm font-bold text-brand-400 hover:bg-brand-600/20 transition-colors active:scale-95"
+              aria-label="Cargar vídeo MP4 desde el ordenador"
+              data-testid="btn-local-video"
+            >
+              📂 {localVideo ? "Cambiar MP4" : "MP4 local"}
+            </button>
+            {localVideo && (
+              <button
+                onClick={() => {
+                  URL.revokeObjectURL(localVideo.src);
+                  setLocalVideo(null);
+                }}
+                className="inline-flex max-w-[180px] items-center gap-1 rounded-xl border border-[#2a4a34] bg-[#0a1a10] px-2.5 py-2.5 font-mono text-[11px] text-brand-400 hover:bg-[#1c3a26] transition-colors active:scale-95"
+                title="Quitar el vídeo local"
+                data-testid="local-video-name"
+              >
+                <span className="truncate">📁 {localVideo.name}</span> ✕
+              </button>
+            )}
             <button
               onClick={() => setSpatialOpen((v) => !v)}
               aria-expanded={spatialOpen}
@@ -1721,6 +1765,8 @@ export function LiveMatchBoard({
           events={events.filter((e) => e.coordinatesX2 != null && e.coordinatesY2 != null)}
           saving={savingSpatial}
           onSaveEvent={handleSpatialSave}
+          localVideo={localVideo}
+          onPickLocalVideo={() => localVideoInputRef.current?.click()}
         />
       )}
 
@@ -1858,6 +1904,13 @@ function VideoSyncPanel({
             );
           })()}
         </div>
+
+        <p className="text-[11px] leading-snug text-[#8aa28d]">
+          ¿El partido está grabado en tu disco duro? No hace falta subir nada:
+          en la cabecera del tablero usa{" "}
+          <strong className="text-[#a9bca9]">📂 MP4 local</strong> y la pizarra lo
+          reproduce con el mismo timecode y auto-clips.
+        </p>
 
         <div className="space-y-1.5">
           <label htmlFor="video-second" className="text-xs font-bold text-[#6c8070] uppercase tracking-widest">

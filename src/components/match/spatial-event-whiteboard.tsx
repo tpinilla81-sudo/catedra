@@ -36,8 +36,12 @@ import {
 import {
   createYouTubePlayer,
   parseVideoUrl,
+  type ParsedVideo,
   type YTPlayerLike,
 } from "@/lib/video-url";
+
+/// 📂 Vídeo cargado del ordenador del míster (blob local, nunca se sube)
+type LocalVideoFile = { src: string; name: string };
 
 export type SpatialSaveInput = {
   startX: number; /// origen del vector (causa), 0-100
@@ -54,6 +58,10 @@ type SpatialWhiteboardProps = {
   events: TelemetryEventDTO[]; /// ya filtrados: solo vectores causa→efecto
   saving: boolean;
   onSaveEvent: (input: SpatialSaveInput) => Promise<void>;
+  /// MP4 cargado desde el ordenador (blob del navegador, manda sobre la URL de la sesión)
+  localVideo: LocalVideoFile | null;
+  /// Dispara el selector de archivos del tablero (un solo picker, un solo estado)
+  onPickLocalVideo: () => void;
 };
 
 type Pt = { x: number; y: number };
@@ -94,6 +102,8 @@ export function SpatialEventWhiteboard({
   events,
   saving,
   onSaveEvent,
+  localVideo,
+  onPickLocalVideo,
 }: SpatialWhiteboardProps) {
   const videoUrl = session?.videoUrl ?? null;
   const videoOffset = session?.videoOffsetSeconds ?? 0;
@@ -103,6 +113,13 @@ export function SpatialEventWhiteboard({
 
   // ---- vídeo: directo (mp4) o YouTube (IFrame API, tipos propios) ----------
   const parsedVideo = useMemo(() => parseVideoUrl(videoUrl), [videoUrl]);
+
+  /// El MP4 local (blob de este navegador) manda sobre la URL de la sesión:
+  /// mismo reproductor, mismo timecode, mismos auto-clips −3s/+2s.
+  const effectiveVideo: ParsedVideo | null = useMemo(
+    () => (localVideo ? { kind: "direct", url: localVideo.src } : parsedVideo),
+    [localVideo, parsedVideo],
+  );
   const ytHostRef = useRef<HTMLDivElement>(null);
   const ytPlayerRef = useRef<YTPlayerLike | null>(null);
   const ytPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -161,7 +178,7 @@ export function SpatialEventWhiteboard({
 
   // ---- segundo de vídeo actual (directo o YouTube) -------------------------
   const getVideoTime = (): number | null => {
-    if (parsedVideo?.kind === "youtube") {
+    if (effectiveVideo?.kind === "youtube") {
       const t = ytPlayerRef.current?.getCurrentTime();
       return typeof t === "number" && Number.isFinite(t) && t >= 0 ? t : null;
     }
@@ -170,7 +187,7 @@ export function SpatialEventWhiteboard({
   };
 
   // ---- montar/destruir el player de YouTube cuando cambia el vídeo --------
-  const ytId = parsedVideo?.kind === "youtube" ? parsedVideo.id : null;
+  const ytId = effectiveVideo?.kind === "youtube" ? effectiveVideo.id : null;
   useEffect(() => {
     if (!ytId) return;
     const host = ytHostRef.current;
@@ -190,6 +207,10 @@ export function SpatialEventWhiteboard({
       if (ytPollRef.current) {
         clearInterval(ytPollRef.current);
         ytPollRef.current = null;
+      }
+      if (ytClipRef.current) {
+        clearInterval(ytClipRef.current);
+        ytClipRef.current = null;
       }
       ytPlayerRef.current = null;
     };
@@ -402,7 +423,7 @@ export function SpatialEventWhiteboard({
   const playClip = useCallback(
     (start: number, end: number) => {
       // ---- YouTube: seek + sondeo hasta el final del clip ----
-      if (parsedVideo?.kind === "youtube") {
+      if (effectiveVideo?.kind === "youtube") {
         const p = ytPlayerRef.current;
         if (!p) return;
         if (ytClipRef.current) clearInterval(ytClipRef.current);
@@ -438,7 +459,7 @@ export function SpatialEventWhiteboard({
       clipStopRef.current = stop;
       v.addEventListener("timeupdate", stop);
     },
-    [parsedVideo],
+    [effectiveVideo],
   );
 
   const busy = saving || pendingOutcome != null;
@@ -459,7 +480,16 @@ export function SpatialEventWhiteboard({
           )}
         </h4>
         <span className="flex items-center gap-2 text-[10px] text-[#6d8070]">
-          {videoUrl ? (
+          {localVideo && (
+            <span
+              className="max-w-[170px] truncate rounded-full border border-brand-500/30 bg-brand-500/10 px-2 py-0.5 font-mono text-brand-400"
+              data-testid="local-video-name"
+              title={localVideo.name}
+            >
+              📁 {localVideo.name}
+            </span>
+          )}
+          {effectiveVideo ? (
             <span className="rounded-full border border-brand-500/30 bg-brand-500/10 px-2 py-0.5 font-mono text-brand-400">
               vídeo T: {videoTime.toFixed(1)}s
             </span>
@@ -468,6 +498,14 @@ export function SpatialEventWhiteboard({
               pizarra pura · {formatClock(elapsedSeconds)}
             </span>
           )}
+          <button
+            onClick={onPickLocalVideo}
+            className="rounded-full border border-[#2a4a34] bg-[#0f2317] px-2.5 py-1 font-bold text-[#dfe9d8] transition hover:border-brand-500 hover:bg-[#1c3a26]"
+            aria-label="Cargar vídeo MP4 desde el ordenador"
+            data-testid="btn-local-video-board"
+          >
+            📂 MP4 del ordenador
+          </button>
         </span>
       </div>
 
@@ -553,10 +591,10 @@ export function SpatialEventWhiteboard({
         {/* ---------- Vídeo sincronizado (si la sesión lo tiene) ---------- */}
         <div className="flex flex-col gap-2">
           <div className="relative aspect-video overflow-hidden rounded-xl border border-[#1c3a26] bg-black">
-            {parsedVideo?.kind === "direct" ? (
+            {effectiveVideo?.kind === "direct" ? (
               <video
                 ref={videoRef}
-                src={parsedVideo.url}
+                src={effectiveVideo.url}
                 controls
                 playsInline
                 preload="metadata"
@@ -564,20 +602,31 @@ export function SpatialEventWhiteboard({
                 className="h-full w-full object-contain"
                 data-testid="spatial-video"
               />
-            ) : parsedVideo?.kind === "youtube" ? (
+            ) : effectiveVideo?.kind === "youtube" ? (
               // YouTube: IFrame API (permite leer el segundo exacto y hacer seek)
               <div className="h-full w-full">
                 <div
-                  key={parsedVideo.id}
+                  key={effectiveVideo.id}
                   ref={ytHostRef}
                   className="h-full w-full"
                   data-testid="spatial-video-yt"
                 />
               </div>
             ) : (
-              <div className="flex h-full items-center justify-center px-6 text-center text-xs text-[#6d8070]">
-                Sin vídeo sincronizado — Modo pizarra pura: los vectores se sellan
-                con el reloj del partido.
+              <div className="flex h-full flex-col items-center justify-center gap-2.5 px-6 text-center text-xs text-[#6d8070]">
+                <span className="text-2xl" aria-hidden>📺</span>
+                <p>
+                  Ningún vídeo cargado — pizarra pura: los vectores se sellan con
+                  el reloj del partido.
+                </p>
+                <button
+                  onClick={onPickLocalVideo}
+                  className="rounded-full bg-brand-600 px-3 py-1.5 text-[11px] font-bold text-[#0a1a10] transition hover:bg-brand-500"
+                  aria-label="Cargar vídeo MP4 desde el ordenador"
+                  data-testid="btn-local-video-empty"
+                >
+                  📂 Cargar MP4 desde Ordenador
+                </button>
               </div>
             )}
           </div>
@@ -612,7 +661,7 @@ export function SpatialEventWhiteboard({
                         {ev.minute}&prime;
                       </span>
                     </div>
-                    {videoUrl && (
+                    {effectiveVideo && (
                       <button
                         onClick={() =>
                           playClip(
