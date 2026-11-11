@@ -86,11 +86,24 @@ $AB mouse move "$FX" "$FY" >/dev/null 2>&1
 $AB mouse up left >/dev/null 2>&1
 sleep 0.6
 MENU=$(ev "!!document.querySelector('[data-testid=spatial-menu]')")
-check "botonera flotante tras el gesto" "$([ "$MENU" = "true" ] && echo 1)"
-$AB screenshot /tmp/espacial-menu.png >/dev/null 2>&1 && ok "screenshot de la botonera"
+check "selector de eventos tras el gesto" "$([ "$MENU" = "true" ] && echo 1)"
+CATS=$(ev "document.querySelectorAll('[data-testid=spatial-cats] button').length")
+check "4 categorías en el filtro (Pérdida·Robo·Tiro·Falta)" "$([ "${CATS:-0}" = "4" ] && echo 1)"
+DET0=$(ev "document.querySelectorAll('[data-testid=spatial-menu] [data-testid^=spatial-detail-]').length")
+check "4 detalles en Pérdida (catálogo configurable)" "$([ "${DET0:-0}" = "4" ] && echo 1)"
+$AB find first "[data-testid=spatial-cat-RECOVERY]" click >/dev/null 2>&1
+sleep 0.3
+DETR=$(ev "!!document.querySelector('[data-testid=spatial-detail-RECOVERY_PRESS]')")
+DETREC=$(ev "document.querySelectorAll('[data-testid=spatial-menu] [data-testid^=spatial-detail-RECOVERY]').length")
+check "cambio a Robo: 4 detalles RECOVERY_* visibles" "$([ "$DETR" = "true" ] && [ "${DETREC:-0}" = "4" ] && echo 1)"
+$AB screenshot /tmp/espacial-menu.png >/dev/null 2>&1 && ok "screenshot del selector"
 
-echo "=== 4 · consecuencia: Disparo rival (POST en vivo) ==="
-$AB find first "[data-testid=spatial-outcome-SHOT_AGAINST]" click >/dev/null 2>&1
+echo "=== 4 · detalle del catálogo: Robo por Presión Alta (POST en vivo) ==="
+# El selector es más alto que la botonera vieja: en móvil puede quedar fuera
+# de pantalla → scroll al botón y clic sintético (React onClick fiable)
+$AB eval "document.querySelector('[data-testid=spatial-detail-RECOVERY_PRESS]')?.scrollIntoView({block:'center'})" >/dev/null 2>&1
+sleep 0.3
+$AB eval "document.querySelector('[data-testid=spatial-detail-RECOVERY_PRESS]')?.click() || 0" >/dev/null 2>&1
 ROW=""
 for i in $(seq 1 15); do
   N=$(ev "document.querySelectorAll('[data-testid=spatial-row]').length")

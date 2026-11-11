@@ -85,12 +85,69 @@ export const SPATIAL_OUTCOMES: SpatialOutcome[] = [
 
 export const SPATIAL_VALUES = new Set(SPATIAL_OUTCOMES.map((s) => s.value));
 
-/// Emoji + label de un ACTION: presets clásicos, espaciales, o null (texto libre)
+// ---------- Catálogo configurable del análisis en directo (mock del míster) ----------
+// El popup del gesto deja de tener 3 salidas fijas: ahora es un selector de
+// 2 niveles — 4 categorías (Pérdida · Robo · Tiro · Falta) y, dentro de cada
+// una, la lista de detalles que el míster elige en directo. Cada detalle se
+// guarda como ACTION de texto libre (schema lo permite, ≤ MAX_VALUE_LENGTH):
+// SIN migración y SIN tocar la voz ni la botonera rápida clásica.
+
+export type SpatialCategoryId = "TURNOVER" | "RECOVERY" | "SHOT" | "FOUL";
+
+export type SpatialCategoryMeta = {
+  id: SpatialCategoryId;
+  label: string;
+  /** Clase del tab activo (acento por categoría, mock del míster) */
+  activeClass: string;
+};
+
+export const SPATIAL_CATEGORIES: SpatialCategoryMeta[] = [
+  { id: "TURNOVER", label: "Pérdida", activeClass: "bg-red-600 text-white" },
+  { id: "RECOVERY", label: "Robo", activeClass: "bg-emerald-600 text-white" },
+  { id: "SHOT", label: "Tiro", activeClass: "bg-amber-600 text-white" },
+  { id: "FOUL", label: "Falta", activeClass: "bg-purple-600 text-white" },
+];
+
+export type SpatialCatalogItem = {
+  value: string; /// ACTION de texto libre que se guarda en telemetría
+  label: string; /// etiqueta exacta del mock
+  emoji: string;
+  categoryId: SpatialCategoryId;
+  /** Punto de color de la lista (mock: bg-red/emerald/teal/amber/sky/purple) */
+  dotClass: string;
+};
+
+export const SPATIAL_CATALOG: SpatialCatalogItem[] = [
+  // ---- Pérdida (TURNOVER) ----
+  { value: "TURNOVER_BUILDUP", label: "Pérdida en Salida", emoji: "🚫", categoryId: "TURNOVER", dotClass: "bg-red-500" },
+  { value: "TURNOVER_MISPASS", label: "Pérdida por Pase Erróneo", emoji: "🚫", categoryId: "TURNOVER", dotClass: "bg-red-500" },
+  { value: "TURNOVER_DRIBBLE", label: "Pérdida en Regate", emoji: "🚫", categoryId: "TURNOVER", dotClass: "bg-red-500" },
+  { value: "TURNOVER_CLEARANCE", label: "Despeje Forzado", emoji: "🧱", categoryId: "TURNOVER", dotClass: "bg-rose-500" },
+  // ---- Robo (RECOVERY) ----
+  { value: "RECOVERY_PRESS", label: "Robo por Presión Alta", emoji: "🛡️", categoryId: "RECOVERY", dotClass: "bg-emerald-500" },
+  { value: "RECOVERY_INTERCEPT", label: "Interceptación", emoji: "🛡️", categoryId: "RECOVERY", dotClass: "bg-emerald-500" },
+  { value: "RECOVERY_AERIAL", label: "Duelo Aéreo Ganado", emoji: "🛡️", categoryId: "RECOVERY", dotClass: "bg-emerald-500" },
+  { value: "RECOVERY_SECOND_BALL", label: "Recuperación 2º Balón", emoji: "♻️", categoryId: "RECOVERY", dotClass: "bg-teal-500" },
+  // ---- Tiro (SHOT) ----
+  { value: "SHOT_ON_TARGET", label: "Tiro a Puerta Rival", emoji: "🎯", categoryId: "SHOT", dotClass: "bg-amber-500" },
+  { value: "SHOT_BLOCKED", label: "Tiro Bloqueado", emoji: "🎯", categoryId: "SHOT", dotClass: "bg-amber-500" },
+  { value: "CHANCE_CLEAR_FOR", label: "Ocasión Clara Favor", emoji: "✨", categoryId: "SHOT", dotClass: "bg-sky-500" },
+  // ---- Falta (FOUL) ----
+  { value: "FOUL_TACTICAL", label: "Falta Táctica", emoji: "🟪", categoryId: "FOUL", dotClass: "bg-purple-500" },
+  { value: "FOUL_BREAK_INTERRUPT", label: "Interrupción Transición", emoji: "🟪", categoryId: "FOUL", dotClass: "bg-purple-500" },
+];
+
+export const SPATIAL_CATALOG_VALUES = new Set(SPATIAL_CATALOG.map((d) => d.value));
+
+/// Emoji + label de un ACTION: presets clásicos, espaciales, catálogo
+/// configurable, o null (texto libre)
 export function actionMeta(value: string): { emoji: string; label: string } | null {
   const a = ACTION_PRESETS.find((x) => x.value === value);
   if (a) return { emoji: a.emoji, label: a.label };
   const s = SPATIAL_OUTCOMES.find((x) => x.value === value);
   if (s) return { emoji: s.emoji, label: s.label };
+  const d = SPATIAL_CATALOG.find((x) => x.value === value);
+  if (d) return { emoji: d.emoji, label: d.label };
   return null;
 }
 

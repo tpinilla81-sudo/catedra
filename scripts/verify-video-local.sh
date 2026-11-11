@@ -116,7 +116,7 @@ agent-browser mouse up left >/dev/null
 agent-browser wait 800
 MENU=$(agent-browser eval 'document.querySelector("[data-testid=\"spatial-menu\"]") ? "SI" : "NO"')
 echo "$MENU" | rg -q '"SI"' || { echo "FALLÓ: menú de clasificación no aparece"; exit 1; }
-agent-browser eval 'document.querySelector("[data-testid=\"spatial-outcome-RECOVERED_BALL\"]")?.click() || 0' >/dev/null
+agent-browser eval 'document.querySelector("[data-testid=\"spatial-detail-RECOVERY_PRESS\"]")?.click() || 0' >/dev/null
 agent-browser wait 2000
 ROW=$(agent-browser eval 'JSON.stringify({
   filas: document.querySelectorAll("[data-testid=\"spatial-row\"]").length,

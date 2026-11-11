@@ -18,10 +18,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   SPATIAL_OUTCOMES,
+  SPATIAL_CATEGORIES,
+  SPATIAL_CATALOG,
   actionMeta,
   formatClock,
   videoSecondsForEvent,
   type MatchSessionDTO,
+  type SpatialCategoryId,
   type TelemetryEventDTO,
 } from "@/lib/pilar3";
 import {
@@ -130,6 +133,9 @@ export function SpatialEventWhiteboard({
   const [dragPos, setDragPos] = useState<Pt | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [pendingOutcome, setPendingOutcome] = useState<string | null>(null);
+  /// Categoría activa del selector de eventos (mock: Pérdida · Robo · Tiro · Falta)
+  /// — persiste entre gestos, como el estado del mock del míster.
+  const [menuCategory, setMenuCategory] = useState<SpatialCategoryId>("TURNOVER");
   /// Evento ARMADO en la botonera fija: tocar el campo registra al instante
   const [armed, setArmed] = useState<string | null>(null);
 
@@ -281,7 +287,7 @@ export function SpatialEventWhiteboard({
     await onSaveEventRef.current(input);
   }, []);
 
-  // ---- confirmación de la consecuencia ------------------------------------
+  // ---- confirmación de la consecuencia (salida clásica o detalle del catálogo) ----
   const handleSelectOutcome = async (outcome: string) => {
     if (!menu || saving || pendingOutcome) return;
     setPendingOutcome(outcome);
@@ -714,7 +720,7 @@ export function SpatialEventWhiteboard({
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerCancel}
             style={{ touchAction: "none" }}
-            className="relative aspect-[16/10] w-full cursor-crosshair select-none overflow-hidden rounded-xl border-2 border-emerald-600/40 bg-emerald-950/40 shadow-inner"
+            className="relative aspect-[16/10] w-full cursor-crosshair select-none rounded-xl border-2 border-emerald-600/40 bg-emerald-950/40 shadow-inner"
             data-testid="spatial-pitch"
             role="application"
             aria-label="Campo para trazar vectores causa a efecto"
@@ -812,39 +818,69 @@ export function SpatialEventWhiteboard({
               />
             )}
 
-            {/* Botonera flotante: consecuencia instantánea */}
+            {/* Botonera flotante: selector de eventos configurable (mock) */}
             {menu && (
               <div
                 onPointerDown={(e) => e.stopPropagation()}
                 onPointerUp={(e) => e.stopPropagation()}
-                className="absolute z-30 flex w-56 -translate-x-1/2 -translate-y-1/2 flex-col gap-1.5 rounded-xl border border-[#2a4a34] bg-[#0a1a10]/95 p-2 shadow-2xl backdrop-blur-md"
+                className="absolute z-30 flex w-60 -translate-x-1/2 -translate-y-1/2 flex-col gap-1.5 rounded-xl border border-[#2a4a34] bg-[#0a1a10]/95 p-2 shadow-2xl backdrop-blur-md"
                 style={{
-                  left: `${Math.max(18, Math.min(82, menu.end.x))}%`,
-                  top: `${Math.max(16, Math.min(84, menu.end.y))}%`,
+                  // El selector es más alto que el campo en móvil: sin
+                  // overflow-hidden en el campo puede desbordar por encima
+                  // (z-30 manda sobre la botonera rápida) y sigue clicable.
+                  left: `${Math.max(25, Math.min(75, menu.end.x))}%`,
+                  top: `${Math.max(20, Math.min(80, menu.end.y))}%`,
                 }}
                 data-testid="spatial-menu"
               >
-                <span className="px-1 text-[10px] font-bold uppercase tracking-wider text-[#6d8070]">
-                  Consecuencia:
-                </span>
-                {SPATIAL_OUTCOMES.map((o) => (
-                  <button
-                    key={o.value}
-                    onClick={() => handleSelectOutcome(o.value)}
-                    disabled={busy}
-                    className={`flex items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold text-white transition disabled:opacity-50 ${TONE_CLASSES[o.tone]}`}
-                    data-testid={`spatial-outcome-${o.value}`}
-                  >
-                    <span>
-                      {o.emoji} {o.label}
-                    </span>
-                    {pendingOutcome === o.value ? (
-                      <span className="text-[10px] opacity-90">guardando…</span>
-                    ) : (
-                      <span className="text-[10px] opacity-75">{o.hint}</span>
-                    )}
-                  </button>
-                ))}
+                <div className="flex items-center justify-between border-b border-[#1c3a26] px-1 pb-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#8aa28d]">
+                    Seleccionar evento:
+                  </span>
+                  {pendingOutcome && (
+                    <span className="text-[10px] text-[#a9bca9]">guardando…</span>
+                  )}
+                </div>
+
+                {/* Filtro de categorías (mock: Pérdida · Robo · Tiro · Falta) */}
+                <div
+                  className="grid grid-cols-4 gap-1 rounded-lg border border-[#1c3a26] bg-[#0a1a10] p-1"
+                  data-testid="spatial-cats"
+                >
+                  {SPATIAL_CATEGORIES.map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setMenuCategory(cat.id)}
+                      className={`rounded py-1 text-[10px] font-bold transition ${
+                        menuCategory === cat.id
+                          ? cat.activeClass
+                          : "text-[#8aa28d] hover:text-[#dfe9d8]"
+                      }`}
+                      data-testid={`spatial-cat-${cat.id}`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Lista de detalles de la categoría activa (punto de color del mock) */}
+                <div className="flex max-h-36 flex-col gap-1 overflow-y-auto">
+                  {SPATIAL_CATALOG.filter((d) => d.categoryId === menuCategory).map((d) => (
+                    <button
+                      key={d.value}
+                      onClick={() => void handleSelectOutcome(d.value)}
+                      disabled={busy}
+                      className="flex w-full items-center justify-between rounded-md bg-[#0f2317] px-2.5 py-1.5 text-left text-[11px] font-semibold text-[#dfe9d8] transition hover:bg-[#1c3a26] disabled:opacity-50"
+                      data-testid={`spatial-detail-${d.value}`}
+                    >
+                      <span className="truncate">
+                        {d.emoji} {d.label}
+                      </span>
+                      <span className={`ml-2 h-2 w-2 shrink-0 rounded-full ${d.dotClass}`} aria-hidden />
+                    </button>
+                  ))}
+                </div>
+
                 <button
                   onClick={() => setMenu(null)}
                   className="mt-1 rounded-md bg-[#1c3a26] py-1 text-center text-[10px] text-[#8aa28d] transition hover:bg-[#2a4a34]"
