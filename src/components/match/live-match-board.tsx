@@ -60,6 +60,11 @@ import {
   SpatialEventWhiteboard,
   type SpatialSaveInput,
 } from "@/components/match/spatial-event-whiteboard";
+import {
+  QuickChronoBoard,
+  type QuickEventRow,
+  type QuickSaveInput,
+} from "@/components/match/quick-chrono-board";
 
 // ---------- Tipos ----------
 
@@ -442,6 +447,9 @@ export function LiveMatchBoard({
   }, [localVideo]);
   const [spatialOpen, setSpatialOpen] = useState(false);
   const [savingSpatial, setSavingSpatial] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [savingQuick, setSavingQuick] = useState(false);
+  const [quickRows, setQuickRows] = useState<QuickEventRow[]>([]);
 
   const playerName = useMemo(() => {
     const map = new Map<string, string>();
@@ -943,6 +951,59 @@ export function LiveMatchBoard({
     }
   };
 
+  /** Análisis dinámico: evento de sección 1-toque + auto-clip del instante
+   *  (el minuto lo sella el reloj autoritativo; value = ACTION texto libre) */
+  const handleQuickSave = async (input: QuickSaveInput) => {
+    setSavingQuick(true);
+    try {
+      const data = await postTelemetry({
+        events: [{ playerId: null, type: "ACTION", value: input.eventLabel }],
+      });
+      const ev = data.created?.[0];
+      if (ev) {
+        if (input.videoSeconds != null) {
+          try {
+            const res = await fetch("/api/pilar3/video-bookmarks", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                telemetryEventId: ev.id,
+                videoTimestampSeconds: input.videoSeconds,
+              }),
+            });
+            const bd = (await res.json().catch(() => null)) as { ok?: boolean } | null;
+            if (res.ok && bd?.ok) {
+              setBookmarked((prev) => new Set(prev).add(ev.id));
+            }
+          } catch {
+            // el clip es un extra: el evento ya está registrado sin él
+          }
+        }
+        setQuickRows((prev) => [
+          {
+            id: ev.id,
+            minute: ev.minute,
+            clockText: formatClock(elapsedSeconds),
+            label: input.eventLabel,
+            sectionLabel: input.sectionLabel,
+            videoSeconds: input.videoSeconds,
+          },
+          ...prev,
+        ]);
+      }
+      toast({ title: "Evento registrado en directo ⚡" });
+    } catch (err) {
+      console.error("Error en el análisis dinámico:", err);
+      toast({
+        title: "No se pudo registrar el evento",
+        description: err instanceof Error ? err.message : "Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingQuick(false);
+    }
+  };
+
   const handleAddTag = async (player: LivePlayerData, code: string, label: string) => {
     setPendingKey(`tag:${code}`);
     try {
@@ -1188,6 +1249,20 @@ export function LiveMatchBoard({
             >
               <Crosshair className="w-4 h-4" aria-hidden />
               Espacial
+            </button>
+            <button
+              onClick={() => setQuickOpen((v) => !v)}
+              aria-expanded={quickOpen}
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2.5 text-sm font-bold transition-colors active:scale-95 ${
+                quickOpen
+                  ? "border-brand-600/60 bg-brand-600/15 text-brand-400"
+                  : "border-[#2a4a34] bg-[#0a1a10] text-[#dfe9d8] hover:bg-[#1c3a26]"
+              }`}
+              aria-label="Análisis dinámico en directo con secciones rápidas"
+              data-testid="btn-dinamico"
+            >
+              <Zap className="w-4 h-4" aria-hidden />
+              Dinámico
             </button>
           </div>
         </div>
@@ -1765,6 +1840,19 @@ export function LiveMatchBoard({
           events={events.filter((e) => e.coordinatesX2 != null && e.coordinatesY2 != null)}
           saving={savingSpatial}
           onSaveEvent={handleSpatialSave}
+          localVideo={localVideo}
+          onPickLocalVideo={() => localVideoInputRef.current?.click()}
+        />
+      )}
+
+      {/* ---------- Análisis dinámico: cronómetro & secciones rápidas ---------- */}
+      {quickOpen && (
+        <QuickChronoBoard
+          session={session}
+          elapsedSeconds={elapsedSeconds}
+          saving={savingQuick}
+          rows={quickRows}
+          onSaveEvent={handleQuickSave}
           localVideo={localVideo}
           onPickLocalVideo={() => localVideoInputRef.current?.click()}
         />
