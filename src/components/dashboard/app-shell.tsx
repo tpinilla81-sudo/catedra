@@ -24,11 +24,13 @@ import {
   LogOut,
   Menu,
   Presentation,
+  Timer,
   Users,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 export type AppShellKey =
+  | "suite"
   | "today"
   | "library"
   | "players"
@@ -56,6 +58,7 @@ const NAV_ITEMS: Array<{
   label: string;
   icon: typeof Home;
 }> = [
+  { key: "suite", href: "/dashboard/suite", label: "Suite Táctica", icon: Timer },
   { key: "today", href: "/dashboard/today", label: "Hoy", icon: Home },
   { key: "library", href: "/dashboard/library", label: "Biblioteca", icon: BookOpen },
   { key: "players", href: "/dashboard/players", label: "Plantilla", icon: Users },
