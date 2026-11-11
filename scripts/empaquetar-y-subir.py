@@ -8,7 +8,7 @@ import time
 import urllib.request
 
 ROOT = "/home/z/my-project"
-BASE = "df2b2fa"  # main actual en GitHub
+BASE = "cbb94c0"  # main actual en GitHub
 DPASTE = "https://dpaste.org/api/"
 
 
