@@ -47,6 +47,7 @@ import {
   LEVEL3_BLOQUES,
   TASK_TAXONOMY,
   TASK_TAXONOMY_LEVEL3,
+  deriveLevel3Ids,
   taskFamilyMeta,
 } from "@/lib/task-taxonomy";
 
@@ -105,7 +106,9 @@ function initialDraft(task: TaskCard | null): Draft {
     family: task?.family ?? "",
     workComments: task?.workComments ?? "",
     etapasFormacion: task ? [...task.etapasFormacion] : [],
-    nivel3Ids: task ? [...task.nivel3Ids] : [],
+    // Backfill Nivel 3: al abrir una tarea legacy se propone su clasificación
+    // derivada (familia + texto) y se PERSISTE al guardar.
+    nivel3Ids: task ? deriveLevel3Ids(task.nivel3Ids, task.family, `${task.title} ${task.objective}`) : [],
     rules: task ? [...task.rulesOfProvocation] : [],
     points: task ? [...task.coachingPoints] : [],
     materials: task ? [...task.materials] : [],

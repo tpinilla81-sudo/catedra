@@ -282,3 +282,139 @@ export const LEVEL3_BLOQUES: readonly TaskLevel3Category["bloque"][] = [
 export function taskLevel3Meta(id: string): TaskLevel3Category | null {
   return TASK_TAXONOMY_LEVEL3.find((c) => c.id === id) ?? null;
 }
+
+// ============================================================================
+// BACKFILL DE CLASIFICACIÓN NIVEL 3 (árbol de la Biblioteca)
+// ----------------------------------------------------------------------------
+// Las tareas creadas ANTES de la migración 20261112150000 tienen nivel3Ids = []
+// y el árbol Nivel 3 las dejaría huérfanas. deriveLevel3Ids clasifica una tarea
+// legacy SIN tocar la BD (backfill en lectura, idempotente y estable):
+//   1) Si ya tiene nivel3Ids válidos → se devuelven limpios y en orden del
+//      catálogo (el catálogo manda, no el orden de selección).
+//   2) Si no, se deduce de la familia oficial Nivel 2 (Task.family) afinando
+//      con palabras clave del título/objetivo (multiselección cruzada válida:
+//      p. ej. «Rondos y Juegos de Posición» → Rondos + Juegos de posición).
+//   3) Sin familia → heurística pura de texto sobre las 27 hojas.
+//   4) Si nada encaja → [] y la tarea aparece en el nodo «Sin clasificar»
+//      del árbol, a un clic de re-clasificar desde el editor.
+// ============================================================================
+
+const LEVEL3_BY_ID = (ids: string[]): string[] =>
+  TASK_TAXONOMY_LEVEL3.filter((c) => ids.includes(c.id)).map((c) => c.id);
+
+/** Texto comparable: minúsculas, sin acentos y espacios colapsados */
+function level3Haystack(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function deriveLevel3Ids(
+  nivel3Ids: string[] | null | undefined,
+  family: string | null | undefined,
+  searchText: string,
+): string[] {
+  // 1) Ya clasificada: catálogo manda (limpieza + orden oficial).
+  const own = (nivel3Ids ?? []).filter((id) => TASK_LEVEL3_IDS.has(id));
+  if (own.length > 0) return LEVEL3_BY_ID(own);
+
+  const text = level3Haystack(searchText);
+  const hit = (re: RegExp) => re.test(text);
+
+  // 2) Deducción desde la familia oficial Nivel 2 + palabras clave.
+  switch (family) {
+    case "FIS_FUERZA":
+      return LEVEL3_BY_ID(["fis_fuerza"]);
+    case "FIS_RESISTENCIA":
+      return LEVEL3_BY_ID(["fis_resistencia"]);
+    case "FIS_VELO_COORD": {
+      const ids: string[] = [];
+      if (hit(/velocidad|reaccion|sprint|agilidad/)) ids.push("fis_velocidad");
+      if (hit(/coordinacion|equilibrio/)) ids.push("fis_coordinacion");
+      return LEVEL3_BY_ID(ids.length ? ids : ["fis_velocidad", "fis_coordinacion"]);
+    }
+    case "TEC_PASE_CONTROL": {
+      const ids: string[] = [];
+      if (hit(/pase|envio|distribucion con el pie/)) ids.push("tec_pase");
+      if (hit(/control|recepcion/)) ids.push("tec_control");
+      return LEVEL3_BY_ID(ids.length ? ids : ["tec_pase", "tec_control"]);
+    }
+    case "TEC_CONDU_REGATE_TIRO": {
+      const ids: string[] = [];
+      if (hit(/conduccion/)) ids.push("tec_conduccion");
+      if (hit(/regate|finta|1v1|1vs1|1x1|dribling/)) ids.push("tec_regate");
+      if (hit(/tiro|disparo|remate|finalizacion|definicion/)) ids.push("tec_tiro");
+      return LEVEL3_BY_ID(ids.length ? ids : ["tec_conduccion", "tec_regate", "tec_tiro"]);
+    }
+    case "TEC_PORTERO":
+      if (hit(/1vs1|1v1|salida/)) return LEVEL3_BY_ID(["int_reales"]);
+      return LEVEL3_BY_ID(["tec_juego_aereo"]);
+    case "TAC_OFENSIVA":
+      return LEVEL3_BY_ID(["tac_ofensiva"]);
+    case "TAC_DEFENSIVA":
+      return LEVEL3_BY_ID(["tac_defensiva"]);
+    case "TAC_TRANSICIONES":
+      return LEVEL3_BY_ID(["tac_transiciones"]);
+    case "TAC_ABP":
+      return LEVEL3_BY_ID(["tac_estrategia"]);
+    case "PSI_ATENCION":
+      if (hit(/motivacion/)) return LEVEL3_BY_ID(["psi_motivacion"]);
+      if (hit(/confianza/)) return LEVEL3_BY_ID(["psi_confianza"]);
+      if (hit(/cohesion|grupo/)) return LEVEL3_BY_ID(["psi_cohesion"]);
+      return LEVEL3_BY_ID(["psi_concentracion"]);
+    case "PSI_EMOCION":
+      if (hit(/cohesion|grupo|liderazgo/)) return LEVEL3_BY_ID(["psi_cohesion"]);
+      if (hit(/confianza/)) return LEVEL3_BY_ID(["psi_confianza"]);
+      return LEVEL3_BY_ID(["psi_emocional"]);
+    case "INT_RONDOS_POSICION": {
+      const ids: string[] = [];
+      if (hit(/rondo/)) ids.push("int_rondos");
+      if (hit(/conservacion|posesion/)) ids.push("int_conservacion");
+      if (hit(/posicion|circulacion/)) ids.push("int_posicion");
+      return LEVEL3_BY_ID(ids.length ? ids : ["int_rondos", "int_posicion"]);
+    }
+    case "INT_SSG_CONDICIONADOS": {
+      const ids: string[] = [];
+      if (hit(/reducid/)) ids.push("int_reducidos");
+      if (hit(/condicionad/)) ids.push("int_condicionados");
+      if (hit(/situacion real|partido real|11 contra 11|11v11/)) ids.push("int_reales");
+      return LEVEL3_BY_ID(ids.length ? ids : ["int_reducidos", "int_condicionados"]);
+    }
+  }
+
+  // 3) Sin familia: heurística pura de texto sobre las 27 hojas.
+  const fromText: string[] = [];
+  if (hit(/fuerza|potencia muscular|core/)) fromText.push("fis_fuerza");
+  if (hit(/resistencia/)) fromText.push("fis_resistencia");
+  if (hit(/velocidad|sprint|reaccion|agilidad/)) fromText.push("fis_velocidad");
+  if (hit(/flexibilidad|estiramiento|movilidad/)) fromText.push("fis_flexibilidad");
+  if (hit(/coordinacion|equilibrio|lateralidad|propiocep/)) fromText.push("fis_coordinacion");
+  if (hit(/pase|pases/)) fromText.push("tec_pase");
+  if (hit(/control|recepcion/)) fromText.push("tec_control");
+  if (hit(/conduccion/)) fromText.push("tec_conduccion");
+  if (hit(/regate|finta|1v1|1vs1|1x1|dribling/)) fromText.push("tec_regate");
+  if (hit(/tiro|disparo|remate|finalizacion|definicion/)) fromText.push("tec_tiro");
+  if (hit(/aereo|aerea|cabeza|cabezazo/)) fromText.push("tec_juego_aereo");
+  if (hit(/entrada al duelo|entradas? (al |a la )?(cancha|duelo)|intercepcion|recuperacion del balon/)) fromText.push("tec_entrada");
+  if (hit(/ofensiva|ataque|atacar|progresion/)) fromText.push("tac_ofensiva");
+  if (hit(/defensiva|defensa|pressing|presion|marcaje|cobertura|basculacion/)) fromText.push("tac_defensiva");
+  if (hit(/transicion|contraataque|reaccion tras perdida/)) fromText.push("tac_transiciones");
+  if (hit(/estrategia|balon parado|corner|faltas|penalti|saque de banda/)) fromText.push("tac_estrategia");
+  if (hit(/concentracion|atencion|focus/)) fromText.push("psi_concentracion");
+  if (hit(/motivacion/)) fromText.push("psi_motivacion");
+  if (hit(/confianza/)) fromText.push("psi_confianza");
+  if (hit(/emocional|manejo del error|gestion de la presion/)) fromText.push("psi_emocional");
+  if (hit(/cohesion|liderazgo|grupo/)) fromText.push("psi_cohesion");
+  if (hit(/juegos? de posicion/)) fromText.push("int_posicion");
+  if (hit(/conservacion|posesion/)) fromText.push("int_conservacion");
+  if (hit(/rondo/)) fromText.push("int_rondos");
+  if (hit(/reducid|ssg/)) fromText.push("int_reducidos");
+  if (hit(/condicionad|regla de provocacion/)) fromText.push("int_condicionados");
+  if (hit(/situacion real|partido real|11 contra 11|11v11/)) fromText.push("int_reales");
+  // «presion» solo lo cuenta como táctica defensiva si ya no cayó en otra:
+  // está cubierto arriba (tac_defensiva) y en psicológicas por frases largas.
+  return LEVEL3_BY_ID(fromText);
+}

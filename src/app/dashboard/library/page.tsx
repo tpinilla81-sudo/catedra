@@ -13,6 +13,7 @@ import { LibraryView } from "@/components/library/library-view";
 import type { LibraryData, RecipeLink, SPNode, TaskCard } from "@/components/library/types";
 import { requireTenantContext } from "@/lib/session";
 import { parseAnimacionGuardada } from "@/lib/animacion-guardada";
+import { deriveLevel3Ids } from "@/lib/task-taxonomy";
 
 export const dynamic = "force-dynamic";
 
@@ -107,7 +108,8 @@ export default async function LibraryPage() {
     family: t.family,
     workComments: t.workComments,
     etapasFormacion: t.etapasFormacion,
-    nivel3Ids: t.nivel3Ids,
+    // Backfill Nivel 3: tareas legacy clasificadas en lectura (familia + texto)
+    nivel3Ids: deriveLevel3Ids(t.nivel3Ids, t.family, `${t.title} ${t.objective}`),
     rulesOfProvocation: t.rulesOfProvocation,
     coachingPoints: t.coachingPoints,
     materials: t.materials,

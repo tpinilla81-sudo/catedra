@@ -31,7 +31,7 @@ import {
 } from "@/lib/library-access";
 import { ANIM_LIMITES, parseAnimacionGuardada } from "@/lib/animacion-guardada";
 import { FIELD_ZONE_DEFAULT, FIELD_ZONE_VALUES } from "@/lib/field-zone";
-import { ETAPAS_FORMACION, TASK_TAXONOMY_LEVEL3 } from "@/lib/task-taxonomy";
+import { ETAPAS_FORMACION, TASK_TAXONOMY_LEVEL3, deriveLevel3Ids } from "@/lib/task-taxonomy";
 
 type DbT = ReturnType<typeof createTenantClient>;
 
@@ -378,7 +378,8 @@ export function taskJSON(row: TaskWithRecipes) {
     intensity: row.intensity,
     workComments: row.workComments ?? null,
     etapasFormacion: row.etapasFormacion,
-    nivel3Ids: row.nivel3Ids,
+    // Backfill Nivel 3 en lectura (tareas legacy sin clasificar aún)
+    nivel3Ids: deriveLevel3Ids(row.nivel3Ids, row.family, `${row.title} ${row.objective}`),
     rulesOfProvocation: row.rulesOfProvocation,
     coachingPoints: row.coachingPoints,
     materials: row.materials,

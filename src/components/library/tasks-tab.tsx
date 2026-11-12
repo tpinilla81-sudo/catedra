@@ -65,110 +65,8 @@ import type { LibraryData, TaskCard } from "@/components/library/types";
 import { taskLevel3Meta } from "@/lib/task-taxonomy";
 import { seleccionarAnimacion } from "@/lib/animaciones-ejercicio";
 import { PizarraAnimada } from "@/components/library/pizarra-animada";
+import { TasksTree } from "@/components/library/tasks-tree";
 import { useToast } from "@/hooks/use-toast";
-
-// ---------- Tarjeta compacta ----------
-
-function TaskCardItem({
-  task,
-  onOpen,
-}: {
-  task: TaskCard;
-  onOpen: (t: TaskCard) => void;
-}) {
-  const origin = task.clubId === null ? ORIGIN_META.cathedral : ORIGIN_META.club;
-  const intensity = INTENSITY_META[task.intensity] ?? INTENSITY_META.MEDIUM;
-  const topRecipes = [...task.recipes].sort((a, b) => b.relevance - a.relevance).slice(0, 2);
-  // Pizarra de la tarea: la PERSONALIZADA del míster si existe; si no, la
-  // plantilla determinista de la mecánica (misma tarea → misma pizarra)
-  const anim = useMemo(() => task.animationData ?? seleccionarAnimacion(task), [task]);
-
-  return (
-    <button
-      onClick={() => onOpen(task)}
-      className="w-full rounded-3xl border border-cream-border bg-white p-4 text-left transition hover:border-[#b9b49c] active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-600"
-      aria-label={`Abrir ficha de la tarea ${task.title}`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <p className="font-bold text-peel leading-snug">{task.title}</p>
-        <span
-          className={`shrink-0 rounded-lg border px-1.5 py-0.5 text-[10px] font-black ${origin.chip}`}
-          title={origin.hint}
-        >
-          {origin.label}
-        </span>
-      </div>
-
-      <p className="text-sm text-[#5d7263] mt-1 line-clamp-2 leading-snug">{task.objective}</p>
-
-      {/* Mini-pizarra animada: la mecánica del ejercicio, en movimiento */}
-      <div className="mt-2.5">
-        <PizarraAnimada animacion={anim} variante="mini" />
-      </div>
-
-      <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
-        {task.phases.map((p) => {
-          const meta = PHASE_META[p] ?? PHASE_META.OFFENSIVE;
-          return (
-            <span
-              key={p}
-              className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold ${meta.chip}`}
-            >
-              {meta.label}
-            </span>
-          );
-        })}
-        <span
-          className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold inline-flex items-center gap-1 ${intensity.chip}`}
-        >
-          <span className={`w-1.5 h-1.5 rounded-full ${intensity.dot}`} aria-hidden />
-          {intensity.label}
-        </span>
-        <span className="rounded-md bg-cream-dark px-1.5 py-0.5 text-[10px] font-bold text-[#3d5844] inline-flex items-center gap-1">
-          <Clock className="w-3 h-3" aria-hidden /> {task.durationMin}′
-        </span>
-        <span className="rounded-md bg-cream-dark px-1.5 py-0.5 text-[10px] font-bold text-[#3d5844] inline-flex items-center gap-1">
-          <Users className="w-3 h-3" aria-hidden />
-          {task.playersMin}
-          {task.playersMax ? `–${task.playersMax}` : "+"}
-        </span>
-      </div>
-
-      {task.recipes.length > 0 ? (
-        <div className="flex items-center flex-wrap gap-1.5 mt-2">
-          <Network className="w-3.5 h-3.5 text-[#8a6206]/90" aria-hidden />
-          {topRecipes.map((r) => {
-            const rel = RELEVANCE_META[r.relevance] ?? RELEVANCE_META[2];
-            return (
-              <span
-                key={r.subPrincipleId}
-                className={`rounded-md border px-1.5 py-0.5 text-[10px] font-bold max-w-[45%] truncate ${rel.chip}`}
-                title={`${rel.label}: ${r.spName}`}
-              >
-                {r.spName}
-              </span>
-            );
-          })}
-          {task.recipes.length > topRecipes.length && (
-            <span className="text-[10px] font-bold text-[#6c8070]">
-              +{task.recipes.length - topRecipes.length}
-            </span>
-          )}
-        </div>
-      ) : (
-        <p className="text-[10px] text-[#8a9a8d] mt-2 font-semibold">
-          Sin recetas — el motor no la prescribirá todavía
-        </p>
-      )}
-
-      {task.usageCount > 0 && (
-        <p className="text-[10px] text-brand-600/90 mt-1.5 font-semibold">
-          Prescrita {task.usageCount} vez{task.usageCount > 1 ? "es" : ""} por el motor
-        </p>
-      )}
-    </button>
-  );
-}
 
 // ---------- Pestaña: catálogo + filtros ----------
 
@@ -191,6 +89,9 @@ export function TasksTab({
   const [phase, setPhase] = useState("ALL");
   const [intensity, setIntensity] = useState("ALL");
   const [origin, setOrigin] = useState<"ALL" | "cathedral" | "club">("ALL");
+
+  // Con cualquier filtro activo el árbol se auto-expande (hojas con resultados)
+  const filtersActive = q.trim() !== "" || phase !== "ALL" || intensity !== "ALL" || origin !== "ALL";
 
   const filtered = useMemo(() => {
     const query = normalizeName(q);
@@ -266,38 +167,33 @@ export function TasksTab({
         </button>
       </div>
 
-      {/* Catálogo */}
-      <section
-        aria-label="Catálogo de tareas"
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
-      >
-        {filtered.length === 0 ? (
-          <div className="col-span-full rounded-3xl border border-dashed border-cream-border px-6 py-10 text-center">
-            <p className="text-[#6c8070]">
-              No hay tareas con estos filtros.{" "}
-              {canWrite ? (
-                <span className="text-[#5d7263]">
-                  Crea una nueva con el botón «+ Tarea» de la cabecera.
-                </span>
-              ) : (
-                <span className="text-[#5d7263]">
-                  Tu rol consulta el catálogo en modo lectura.
-                </span>
-              )}
-            </p>
-            {canWrite && (
-              <Button
-                onClick={onNewTask}
-                className="mt-4 min-h-[48px] rounded-2xl bg-brand-600 hover:bg-brand text-white font-black"
-              >
-                {platform ? "Crear la primera tarea de la Cátedra" : "Crear la primera tarea del club"}
-              </Button>
+      {/* ÁRBOL OFICIAL: raíz → 1. CLASIFICACIÓN GENERAL → bloques → categorías → tareas */}
+      {filtered.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-cream-border px-6 py-10 text-center">
+          <p className="text-[#6c8070]">
+            No hay tareas con estos filtros.{" "}
+            {canWrite ? (
+              <span className="text-[#5d7263]">
+                Crea una nueva con el botón «+ Tarea» de la cabecera.
+              </span>
+            ) : (
+              <span className="text-[#5d7263]">
+                Tu rol consulta el catálogo en modo lectura.
+              </span>
             )}
-          </div>
-        ) : (
-          filtered.map((t) => <TaskCardItem key={t.id} task={t} onOpen={onOpenTask} />)
-        )}
-      </section>
+          </p>
+          {canWrite && (
+            <Button
+              onClick={onNewTask}
+              className="mt-4 min-h-[48px] rounded-2xl bg-brand-600 hover:bg-brand text-white font-black"
+            >
+              {platform ? "Crear la primera tarea de la Cátedra" : "Crear la primera tarea del club"}
+            </Button>
+          )}
+        </div>
+      ) : (
+        <TasksTree tasks={filtered} onOpenTask={onOpenTask} filtersActive={filtersActive} />
+      )}
     </div>
   );
 }
