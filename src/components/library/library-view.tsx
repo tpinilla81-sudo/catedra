@@ -4,8 +4,11 @@
 // PILAR 1 — VISTA BIBLIOTECA (Modo Vestuario, táctil) — STICKY MASTER
 // ----------------------------------------------------------------------------
 // Anatomía ultra-compacta: zona FIJA arriba (cabecera + cuadros pequeños de
-// la biblioteca + pestañas) y el contenido (Taxonomía / Tareas) con scroll
-// propio debajo. Sin scroll de página.
+// la biblioteca + pestañas) y el contenido (Tareas-Árbol / Taxonomía / Maestra)
+// con scroll propio debajo. Sin scroll de página.
+// La vista de ENTRADA es el ÁRBOL DE TAREAS («Tareas de entrenamiento en
+// fútbol» → 1. Clasificación General → 5 bloques → 27 hojas): es la
+// organización oficial de la biblioteca que pide el míster.
 // El detalle de tarea y su editor viven aquí arriba: ambas pestañas pueden
 // abrirlos (conexión bidireccional subprincipio ↔ tarea sin recargar nada).
 // ============================================================================
@@ -63,7 +66,7 @@ export function LibraryView({
   /** Nombre del usuario (solo modo plataforma, para el UserMenu) */
   userName?: string;
 }) {
-  const [tab, setTab] = useState<"taxonomy" | "tasks" | "maestra">("taxonomy");
+  const [tab, setTab] = useState<"taxonomy" | "tasks" | "maestra">("tasks");
   const [taskDetail, setTaskDetail] = useState<TaskCard | null>(null);
   const [taskEditor, setTaskEditor] = useState<{
     task: TaskCard | null;
@@ -166,13 +169,13 @@ export function LibraryView({
           </div>
         </div>
 
-        {/* Pestañas (fijas, siempre a la vista) */}
+        {/* Pestañas (fijas, siempre a la vista) — el ÁRBOL DE TAREAS manda como entrada */}
         <div className="mx-auto max-w-5xl px-4 pb-2">
           <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-cream border border-cream-border">
             {(
               [
-                { key: "taxonomy", label: "Taxonomía", icon: GitBranch, count: data.subprinciples.length },
                 { key: "tasks", label: "Tareas", icon: BookOpen, count: data.tasks.length },
+                { key: "taxonomy", label: "Taxonomía", icon: GitBranch, count: data.subprinciples.length },
                 { key: "maestra", label: "Maestra", icon: ListTree, count: TASK_FAMILY_COUNT },
               ] as const
             ).map((t) => {

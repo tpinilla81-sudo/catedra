@@ -55,11 +55,15 @@ if [ "$(ev "!!document.querySelector('input[type=email]')")" = "true" ]; then
 fi
 check "login demo: aterrizaje con sesión (formulario fuera)" "$(ev "!document.body.innerText.includes('Email del cuerpo técnico')")"
 
-echo "=== 2 · Biblioteca: el ÁRBOL sustituye al grid plano ==="
-# La Biblioteca aterriza en la pestaña «Taxonomía»: el árbol vive en «Tareas»
+echo "=== 2 · Biblioteca: el ÁRBOL es la vista de ENTRADA ==="
+# Tras el paquete del árbol como landing, la pestaña «Tareas» (primera) es la vista por defecto
 $AB open "$PROD/dashboard/library" >/dev/null 2>&1
 $AB wait --load networkidle >/dev/null 2>&1
 sleep 2
+waitfor 'document.querySelector("[data-testid=tasks-tree]")' || true
+check "ÁRBOL presente SIN pulsar ninguna pestaña (vista de entrada)" "$(ev "!!document.querySelector('[data-testid=tasks-tree]')")"
+check "pestaña «Tareas» es la PRIMERA del selector (orden oficial)" "$(ev "(()=>{const b=document.querySelector('.grid-cols-3 button');return !!b&&b.textContent.includes('Tareas')})()")"
+# Clic idempotente en la pestaña (robustez si el paquete aún no estuviera aplicado)
 $AB eval "(()=>{const b=[...document.querySelectorAll('button,[role=tab]')].find(x=>/^Tareas/.test(x.textContent.trim()));if(b)b.click();return !!b})()" >/dev/null 2>&1
 waitfor 'document.querySelector("[data-testid=tasks-tree]")' || true
 check "data-testid tasks-tree presente" "$(ev "!!document.querySelector('[data-testid=tasks-tree]')")"
