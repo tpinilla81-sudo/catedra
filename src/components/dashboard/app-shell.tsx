@@ -17,20 +17,22 @@ import { useState } from "react";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import {
+  BarChart3,
   BookOpen,
   CalendarDays,
+  FileText,
   Home,
   Landmark,
   LogOut,
   Menu,
   Presentation,
-  Timer,
   Users,
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 export type AppShellKey =
-  | "suite"
+  | "cualitativo"
+  | "cuantitativo"
   | "today"
   | "library"
   | "players"
@@ -58,7 +60,10 @@ const NAV_ITEMS: Array<{
   label: string;
   icon: typeof Home;
 }> = [
-  { key: "suite", href: "/dashboard/suite", label: "Suite Táctica", icon: Timer },
+  // Herramientas de análisis (mock del míster: «Análisis Cualitativo» SUSTITUYE
+  // a Suite Táctica y «Análisis Cuantitativo» entra JUSTO DEBAJO).
+  { key: "cualitativo", href: "/dashboard/analisis-cualitativo", label: "Análisis Cualitativo", icon: FileText },
+  { key: "cuantitativo", href: "/dashboard/analisis-cuantitativo", label: "Análisis Cuantitativo", icon: BarChart3 },
   { key: "today", href: "/dashboard/today", label: "Hoy", icon: Home },
   { key: "library", href: "/dashboard/library", label: "Biblioteca", icon: BookOpen },
   { key: "players", href: "/dashboard/players", label: "Plantilla", icon: Users },
