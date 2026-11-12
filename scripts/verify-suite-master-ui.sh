@@ -86,8 +86,8 @@ NTABS=$(ev "['directo','biblioteca','plantilla','abp'].filter(t=>!!document.quer
 check "4 pestañas de la nav maestra" "$([ "$NTABS" = "4" ] && echo 1)"
 check "pestaña Directo activa por defecto (aria-pressed)" \
   "$(ev "document.querySelector('[data-testid=suite-tab-directo]')?.getAttribute('aria-pressed')==='true'")"
-NAV_OK=$(ev "Array.from(document.querySelectorAll('nav a')).some(a=>a.textContent.includes('Suite Táctica')&&a.getAttribute('href')==='/dashboard/suite')")
-check "sidebar: entrada «Suite Táctica»" "$NAV_OK"
+NAV_OK=$(ev "Array.from(document.querySelectorAll('nav a')).some(a=>a.textContent.includes('Análisis Cualitativo')&&a.getAttribute('href')==='/dashboard/analisis-cualitativo')")
+check "sidebar: entrada «Análisis Cualitativo» (renombre del mock)" "$NAV_OK"
 
 echo "=== 3 · estado vacío de la libreta ==="
 check "mensaje de historial vacío" "$(ev "!!document.querySelector('[data-testid=suite-history-empty]')")"

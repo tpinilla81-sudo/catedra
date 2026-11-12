@@ -8,7 +8,7 @@ import time
 import urllib.request
 
 ROOT = "/home/z/my-project"
-BASE = "0a524e2"  # main actual en GitHub (tip tras aplicar la Suite Maestra)
+BASE = "6268157"  # main actual en GitHub (tip tras aplicar la batería prod de la Suite)
 DPASTE = "https://dpaste.org/api/"
 
 
