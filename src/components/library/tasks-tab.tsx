@@ -62,6 +62,7 @@ import {
   normalizeName,
 } from "@/lib/taxonomy";
 import type { LibraryData, TaskCard } from "@/components/library/types";
+import { taskLevel3Meta } from "@/lib/task-taxonomy";
 import { seleccionarAnimacion } from "@/lib/animaciones-ejercicio";
 import { PizarraAnimada } from "@/components/library/pizarra-animada";
 import { useToast } from "@/hooks/use-toast";
@@ -450,6 +451,60 @@ export function TaskDetailSheet({
             </SheetHeader>
 
             <p className="text-sm text-[#3d5844] leading-relaxed mt-1">{task.objective}</p>
+
+            {/* Sección de Trabajo del mock: comentarios, etapas y Nivel 3 */}
+            {task.workComments && (
+              <div
+                className="mt-2 rounded-2xl border border-brand-500/25 bg-brand-600/[0.04] px-3 py-2.5"
+                data-testid="task-detail-comentarios"
+              >
+                <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest">
+                  Comentarios sobre el Trabajo
+                </p>
+                <p className="text-sm text-[#3d5844] leading-relaxed mt-1 whitespace-pre-wrap">
+                  {task.workComments}
+                </p>
+              </div>
+            )}
+            {task.etapasFormacion.length > 0 && (
+              <div className="mt-3" data-testid="task-detail-etapas">
+                <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest">
+                  Etapas del proceso de formación
+                </p>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {task.etapasFormacion.map((e) => (
+                    <span
+                      key={e}
+                      className="rounded-lg border border-brand-600/30 bg-brand-600/10 px-2 py-1 text-[11px] font-bold text-brand-600"
+                    >
+                      {e}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {task.nivel3Ids.length > 0 && (
+              <div className="mt-3" data-testid="task-detail-nivel3">
+                <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest">
+                  Taxonomía Nivel 3
+                </p>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {task.nivel3Ids.map((id) => {
+                    const meta = taskLevel3Meta(id);
+                    if (!meta) return null;
+                    return (
+                      <span
+                        key={id}
+                        className="rounded-lg border border-cream-border-strong bg-cream px-2 py-1 text-[11px] font-bold text-[#3d5844]"
+                      >
+                        {meta.nombre}
+                        <span className="text-[9px] text-[#6c8070] ml-1">{meta.bloque}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Pizarra animada: patrón de movimiento, carriles de pase y rotaciones */}
             <div className="mt-4 rounded-3xl border border-cream-border bg-cream-dark/30 p-3">

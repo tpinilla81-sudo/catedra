@@ -57,6 +57,12 @@ export type TaskCard = {
   diagramUrl: string | null;
   /** Familia de la TAXONOMÍA OFICIAL (src/lib/task-taxonomy.ts) · null = sin clasificar */
   family: string | null;
+  /** «Comentarios sobre el Trabajo» del mock del editor · null = sin comentarios */
+  workComments: string | null;
+  /** Etapas del proceso de formación que sirve (strings literales del documento) */
+  etapasFormacion: string[];
+  /** Clasificación Taxonómica Nivel 3 (ids de TASK_TAXONOMY_LEVEL3) */
+  nivel3Ids: string[];
   /** Pizarra animada PERSONALIZADA del míster (si no, la UI usa la plantilla determinista) */
   animationData: Animacion | null;
   createdByName: string | null;

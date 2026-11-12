@@ -194,3 +194,91 @@ export function taskFamilyMeta(id: string | null | undefined): {
   }
   return null;
 }
+
+// ============================================================================
+// ETAPAS DEL PROCESO DE FORMACIÓN (mock 'EditorTarea' · documento oficial)
+// ----------------------------------------------------------------------------
+// Las 5 fases del proceso de formación del futbolista, con su denominación
+// LITERAL del mock (cada fase entre paréntesis nombre las categorías que la
+// viven). Multiselección en el editor: una tarea puede servir a VARIAS etapas.
+// Se persisten los STRINGS completos en Task.etapasFormacion (String[]).
+// ============================================================================
+
+export const ETAPAS_FORMACION: readonly string[] = [
+  "Fase de Iniciación (Benjamín y Alevín)",
+  "Fase de Desarrollo (Infantil)",
+  "Fase de Perfeccionamiento (Cadete y Juvenil 1º año)",
+  "Fase de Rendimiento (2º y 3º Juvenil, Filial y Primer Equipo)",
+  "Fase de Culminación (Filial y Primer Equipo)",
+];
+
+export const ETAPA_FORMACION_IDS = new Set(ETAPAS_FORMACION);
+
+// ============================================================================
+// CLASIFICACIÓN TAXONÓMICA NIVEL 3 (mock 'EditorTarea' · multiselección cruzada)
+// ----------------------------------------------------------------------------
+// El NIVEL 3 de la taxonomía: las 27 categorías específicas agrupadas en los
+// 5 bloques del documento oficial (Físicas · Técnicas · Tácticas ·
+// Psicológicas · Integradas o Globales). Es la dimensión FINA y MULTISELECT
+// (una tarea toca varias categorías a la vez — "multiselección cruzada"),
+// complementaria a la familia Nivel 2 (Task.family, un único valor).
+// Se persisten los ids en Task.nivel3Ids (String[]). Los nombres son
+// LITERALES del mock, incluidas las nuevas de Técnicas (Juego aéreo, Entrada).
+// ============================================================================
+
+export type TaskLevel3Category = {
+  id: string;
+  bloque: "Físicas" | "Técnicas" | "Tácticas" | "Psicológicas" | "Integradas o Globales";
+  nombre: string;
+};
+
+export const TASK_TAXONOMY_LEVEL3: readonly TaskLevel3Category[] = [
+  // FÍSICAS (5)
+  { id: "fis_fuerza", bloque: "Físicas", nombre: "Fuerza" },
+  { id: "fis_resistencia", bloque: "Físicas", nombre: "Resistencia" },
+  { id: "fis_velocidad", bloque: "Físicas", nombre: "Velocidad" },
+  { id: "fis_flexibilidad", bloque: "Físicas", nombre: "Flexibilidad" },
+  { id: "fis_coordinacion", bloque: "Físicas", nombre: "Coordinación" },
+  // TÉCNICAS (7)
+  { id: "tec_pase", bloque: "Técnicas", nombre: "Pase" },
+  { id: "tec_control", bloque: "Técnicas", nombre: "Control" },
+  { id: "tec_conduccion", bloque: "Técnicas", nombre: "Conducción" },
+  { id: "tec_regate", bloque: "Técnicas", nombre: "Regate" },
+  { id: "tec_tiro", bloque: "Técnicas", nombre: "Tiro" },
+  { id: "tec_juego_aereo", bloque: "Técnicas", nombre: "Juego aéreo" },
+  { id: "tec_entrada", bloque: "Técnicas", nombre: "Entrada" },
+  // TÁCTICAS (4)
+  { id: "tac_ofensiva", bloque: "Tácticas", nombre: "Ofensiva" },
+  { id: "tac_defensiva", bloque: "Tácticas", nombre: "Defensiva" },
+  { id: "tac_transiciones", bloque: "Tácticas", nombre: "Transiciones" },
+  { id: "tac_estrategia", bloque: "Tácticas", nombre: "Estrategia" },
+  // PSICOLÓGICAS (5)
+  { id: "psi_concentracion", bloque: "Psicológicas", nombre: "Concentración" },
+  { id: "psi_motivacion", bloque: "Psicológicas", nombre: "Motivación" },
+  { id: "psi_confianza", bloque: "Psicológicas", nombre: "Confianza" },
+  { id: "psi_emocional", bloque: "Psicológicas", nombre: "Gestión emocional" },
+  { id: "psi_cohesion", bloque: "Psicológicas", nombre: "Cohesión grupal" },
+  // INTEGRADAS O GLOBALES (6)
+  { id: "int_posicion", bloque: "Integradas o Globales", nombre: "Juegos de posición" },
+  { id: "int_conservacion", bloque: "Integradas o Globales", nombre: "Juegos de conservación" },
+  { id: "int_rondos", bloque: "Integradas o Globales", nombre: "Rondos" },
+  { id: "int_reducidos", bloque: "Integradas o Globales", nombre: "Juegos reducidos" },
+  { id: "int_condicionados", bloque: "Integradas o Globales", nombre: "Partidos condicionados" },
+  { id: "int_reales", bloque: "Integradas o Globales", nombre: "Situaciones reales de juego" },
+];
+
+export const TASK_LEVEL3_IDS = new Set(TASK_TAXONOMY_LEVEL3.map((c) => c.id));
+
+/** Orden de los 5 bloques Nivel 3 (cabeceras del mock) */
+export const LEVEL3_BLOQUES: readonly TaskLevel3Category["bloque"][] = [
+  "Físicas",
+  "Técnicas",
+  "Tácticas",
+  "Psicológicas",
+  "Integradas o Globales",
+];
+
+/** Meta de una categoría Nivel 3 por id (null si no existe) */
+export function taskLevel3Meta(id: string): TaskLevel3Category | null {
+  return TASK_TAXONOMY_LEVEL3.find((c) => c.id === id) ?? null;
+}

@@ -42,7 +42,13 @@ import type { Animacion } from "@/lib/animaciones-ejercicio";
 import { TacticalAnimationBuilder } from "@/components/library/tactical-animation-builder";
 import { useToast } from "@/hooks/use-toast";
 import { FIELD_ZONES } from "@/lib/field-zone";
-import { TASK_TAXONOMY, taskFamilyMeta } from "@/lib/task-taxonomy";
+import {
+  ETAPAS_FORMACION,
+  LEVEL3_BLOQUES,
+  TASK_TAXONOMY,
+  TASK_TAXONOMY_LEVEL3,
+  taskFamilyMeta,
+} from "@/lib/task-taxonomy";
 
 type RecipeDraft = { subPrincipleId: string; relevance: number; usageNote: string };
 
@@ -64,6 +70,12 @@ type Draft = {
   intensity: string;
   /** Familia de la TAXONOMÍA OFICIAL ("" = sin clasificar) */
   family: string;
+  /** «Comentarios sobre el Trabajo» (mock del editor: notas, matices, variaciones) */
+  workComments: string;
+  /** Etapas del proceso de formación que sirve (multiselección) */
+  etapasFormacion: string[];
+  /** Clasificación Taxonómica Nivel 3 — multiselección cruzada (ids) */
+  nivel3Ids: string[];
   rules: string[];
   points: string[];
   materials: string[];
@@ -91,6 +103,9 @@ function initialDraft(task: TaskCard | null): Draft {
     repetitions: task?.repetitions ?? "",
     intensity: task?.intensity ?? "MEDIUM",
     family: task?.family ?? "",
+    workComments: task?.workComments ?? "",
+    etapasFormacion: task ? [...task.etapasFormacion] : [],
+    nivel3Ids: task ? [...task.nivel3Ids] : [],
     rules: task ? [...task.rulesOfProvocation] : [],
     points: task ? [...task.coachingPoints] : [],
     materials: task ? [...task.materials] : [],
@@ -319,6 +334,9 @@ export function TaskEditor({
       repetitions: draft.repetitions,
       intensity: draft.intensity,
       family: draft.family || null,
+      workComments: draft.workComments,
+      etapasFormacion: draft.etapasFormacion,
+      nivel3Ids: draft.nivel3Ids,
       rulesOfProvocation: draft.rules,
       coachingPoints: draft.points,
       materials: draft.materials,
@@ -376,14 +394,40 @@ export function TaskEditor({
           maxLength={120}
           className="min-h-[48px] rounded-2xl bg-cream-dark/70 border-cream-border text-peel placeholder:text-[#8a9a8d] font-semibold"
         />
-        <Textarea
-          value={draft.objective}
-          onChange={(e) => set("objective", e.target.value)}
-          placeholder="Objetivo en lenguaje de míster — ¿qué se busca entrenar?"
-          maxLength={600}
-          rows={3}
-          className="mt-2 rounded-2xl bg-cream-dark/70 border-cream-border text-peel placeholder:text-[#8a9a8d]"
-        />
+        {/* ---------- SECCIÓN DE TRABAJO (mock 'EditorTarea': ¿Para qué sirve? + Comentarios) ---------- */}
+        <SectionTitle>Sección de Trabajo</SectionTitle>
+        <div className="rounded-2xl border border-brand-500/25 bg-brand-600/[0.04] p-3 space-y-3" data-testid="editor-seccion-trabajo">
+          <div>
+            <label className="text-xs font-bold text-[#3d5844]" htmlFor="editor-para-que-sirve">
+              ¿Para qué sirve?
+            </label>
+            <Textarea
+              id="editor-para-que-sirve"
+              value={draft.objective}
+              onChange={(e) => set("objective", e.target.value)}
+              placeholder="Objetivo principal de la tarea en lenguaje de míster…"
+              maxLength={600}
+              rows={2}
+              data-testid="editor-para-que-sirve"
+              className="mt-1 rounded-2xl bg-cream-dark/70 border-cream-border text-peel placeholder:text-[#8a9a8d]"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-[#3d5844]" htmlFor="editor-comentarios">
+              Comentarios sobre el Trabajo
+            </label>
+            <Textarea
+              id="editor-comentarios"
+              value={draft.workComments}
+              onChange={(e) => set("workComments", e.target.value)}
+              placeholder="Notas, matices o variaciones editables de la tarea…"
+              maxLength={500}
+              rows={3}
+              data-testid="editor-comentarios"
+              className="mt-1 rounded-2xl bg-cream-dark/70 border-cream-border text-peel placeholder:text-[#8a9a8d]"
+            />
+          </div>
+        </div>
 
         {/* ---------- Fases del juego ---------- */}
         <SectionTitle>Fases del juego que trabaja</SectionTitle>
@@ -452,6 +496,88 @@ export function TaskEditor({
             <p className="mt-2 text-[10px] font-bold text-brand-600" data-testid="editor-family-current">
               Clasificada como: {taskFamilyMeta(draft.family)!.family.name} ·{" "}
               {taskFamilyMeta(draft.family)!.family.descriptor}
+            </p>
+          )}
+        </div>
+
+        {/* ---------- ETAPAS DEL PROCESO DE FORMACIÓN (mock 'EditorTarea': multiselección) ---------- */}
+        <SectionTitle>Etapas del Proceso de Formación (Multiselección)</SectionTitle>
+        <div className="flex flex-col gap-1.5" data-testid="editor-etapas">
+          {ETAPAS_FORMACION.map((etapa, i) => {
+            const active = draft.etapasFormacion.includes(etapa);
+            return (
+              <button
+                key={etapa}
+                type="button"
+                onClick={() =>
+                  set(
+                    "etapasFormacion",
+                    active
+                      ? draft.etapasFormacion.filter((x) => x !== etapa)
+                      : [...draft.etapasFormacion, etapa],
+                  )
+                }
+                aria-pressed={active}
+                data-testid={`editor-etapa-${i}`}
+                className={`min-h-[44px] rounded-2xl border px-3 py-2 text-left text-[13px] font-bold transition ${
+                  active
+                    ? "bg-brand-600 border-brand-600 text-white"
+                    : "bg-cream-dark/60 border-cream-border text-[#3d5844] hover:border-brand-500"
+                }`}
+              >
+                {etapa}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ---------- CLASIFICACIÓN TAXONÓMICA NIVEL 3 (mock: multiselección cruzada) ---------- */}
+        <SectionTitle>
+          Clasificación Taxonómica · Nivel 3 (Multiselección Cruzada)
+        </SectionTitle>
+        <div className="rounded-2xl bg-cream-dark/70 px-3 py-2.5" data-testid="editor-nivel3">
+          {LEVEL3_BLOQUES.map((bloque) => (
+            <div key={bloque} className={bloque !== "Físicas" ? "mt-2.5" : ""}>
+              <p className="text-[9px] font-black text-[#6c8070] uppercase tracking-widest">
+                {bloque}
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {TASK_TAXONOMY_LEVEL3.filter((c) => c.bloque === bloque).map((cat) => {
+                  const active = draft.nivel3Ids.includes(cat.id);
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() =>
+                        set(
+                          "nivel3Ids",
+                          active
+                            ? draft.nivel3Ids.filter((x) => x !== cat.id)
+                            : [...draft.nivel3Ids, cat.id],
+                        )
+                      }
+                      aria-pressed={active}
+                      data-testid={`editor-nivel3-${cat.id}`}
+                      className={`rounded-full border px-2.5 py-1.5 text-[11px] font-bold transition ${
+                        active
+                          ? "border-brand-600 bg-brand-600 text-white"
+                          : "border-cream-border-strong bg-cream text-[#3d5844] hover:border-brand-500"
+                      }`}
+                    >
+                      {cat.nombre}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          {draft.nivel3Ids.length > 0 && (
+            <p className="mt-2 text-[10px] font-bold text-brand-600" data-testid="editor-nivel3-count">
+              {draft.nivel3Ids.length} categorí{draft.nivel3Ids.length === 1 ? "a" : "as"} Nivel 3 marcada{draft.nivel3Ids.length === 1 ? "" : "s"} ·{" "}
+              {draft.nivel3Ids
+                .map((id) => TASK_TAXONOMY_LEVEL3.find((c) => c.id === id)?.nombre)
+                .filter(Boolean)
+                .join(" · ")}
             </p>
           )}
         </div>

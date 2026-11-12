@@ -31,6 +31,7 @@ import {
 } from "@/lib/library-access";
 import { ANIM_LIMITES, parseAnimacionGuardada } from "@/lib/animacion-guardada";
 import { FIELD_ZONE_DEFAULT, FIELD_ZONE_VALUES } from "@/lib/field-zone";
+import { ETAPAS_FORMACION, TASK_TAXONOMY_LEVEL3 } from "@/lib/task-taxonomy";
 
 type DbT = ReturnType<typeof createTenantClient>;
 
@@ -221,6 +222,33 @@ export function normalizeTaskPayload(
     data.intensity = intensity;
   }
 
+  // ---------- Sección de Trabajo (mock 'EditorTarea') ----------
+  if (!partial || has("workComments")) {
+    data.workComments = has("workComments") ? optStr(body.workComments, 500) : null;
+  }
+  if (!partial || has("etapasFormacion")) {
+    const rawEtapas = has("etapasFormacion") ? body.etapasFormacion : [];
+    const listEtapas = Array.isArray(rawEtapas)
+      ? rawEtapas
+      : typeof rawEtapas === "string"
+        ? [rawEtapas]
+        : [];
+    // Solo las 5 oficiales y en el ORDEN DEL DOCUMENTO (el catálogo manda).
+    data.etapasFormacion = ETAPAS_FORMACION.filter((e) => listEtapas.includes(e));
+  }
+  if (!partial || has("nivel3Ids")) {
+    const rawN3 = has("nivel3Ids") ? body.nivel3Ids : [];
+    const listN3 = Array.isArray(rawN3)
+      ? rawN3
+      : typeof rawN3 === "string"
+        ? [rawN3]
+        : [];
+    // Solo ids del catálogo oficial Nivel 3 y en el orden del mock.
+    data.nivel3Ids = TASK_TAXONOMY_LEVEL3.filter((c) =>
+      listN3.includes(c.id),
+    ).map((c) => c.id);
+  }
+
   // ---------- Listas de conocimiento (POST: ausente → [] — cero fricción) ----------
   if (!partial || has("rulesOfProvocation")) {
     const rules = has("rulesOfProvocation") ? strList(body.rulesOfProvocation, 12) : [];
@@ -348,6 +376,9 @@ export function taskJSON(row: TaskWithRecipes) {
     durationMin: row.durationMin,
     repetitions: row.repetitions,
     intensity: row.intensity,
+    workComments: row.workComments ?? null,
+    etapasFormacion: row.etapasFormacion,
+    nivel3Ids: row.nivel3Ids,
     rulesOfProvocation: row.rulesOfProvocation,
     coachingPoints: row.coachingPoints,
     materials: row.materials,

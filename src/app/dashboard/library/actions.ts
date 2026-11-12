@@ -31,7 +31,7 @@ import { getSessionUser } from "@/lib/session";
 import { createTenantClient } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { parseAnimacionGuardada } from "@/lib/animacion-guardada";
-import { TASK_FAMILY_IDS } from "@/lib/task-taxonomy";
+import { TASK_FAMILY_IDS, ETAPAS_FORMACION, TASK_TAXONOMY_LEVEL3 } from "@/lib/task-taxonomy";
 import {
   INTENSITIES,
   MSG_CATEDRA_READONLY,
@@ -80,6 +80,12 @@ export type TaskInput = {
   videoUrl: string | null;
   /** Familia de la taxonomía oficial (id de TASK_FAMILY_IDS) · null/"" = sin clasificar */
   family: string | null;
+  /** «Comentarios sobre el Trabajo» (mock 'EditorTarea': notas, matices o variaciones) */
+  workComments: string | null;
+  /** Etapas del proceso de formación que sirve (strings de ETAPAS_FORMACION) */
+  etapasFormacion: string[];
+  /** Clasificación Taxonómica Nivel 3 — multiselección cruzada (ids de TASK_LEVEL3_IDS) */
+  nivel3Ids: string[];
   playersMin: number;
   playersMax: number | null;
   durationMin: number;
@@ -281,6 +287,17 @@ export async function saveTask(input: TaskInput): Promise<ActionResult> {
   // Familia de la TAXONOMÍA OFICIAL: solo ids válidos; lo demás → sin clasificar
   const family =
     input.family && TASK_FAMILY_IDS.has(input.family) ? input.family : null;
+  // Sección de Trabajo del mock: comentarios libres (500, solo saneo)
+  const workComments = optStr(input.workComments, 500);
+  // Etapas del proceso de formación: solo las 5 oficiales, sin repetidos y en
+  // el ORDEN DEL DOCUMENTO (no el de selección) — el catálogo manda.
+  const etapasFormacion = Array.isArray(input.etapasFormacion)
+    ? ETAPAS_FORMACION.filter((e) => input.etapasFormacion.includes(e))
+    : [];
+  // Nivel 3: solo ids del catálogo oficial, sin repetidos y en orden del mock.
+  const nivel3Ids = Array.isArray(input.nivel3Ids)
+    ? TASK_TAXONOMY_LEVEL3.filter((c) => input.nivel3Ids.includes(c.id)).map((c) => c.id)
+    : [];
 
   const phases = Array.isArray(input.phases)
     ? [...new Set(input.phases.filter((p) => PHASES.includes(p)))]
@@ -374,6 +391,9 @@ export async function saveTask(input: TaskInput): Promise<ActionResult> {
     repetitions,
     intensity: intensity as never,
     family,
+    workComments,
+    etapasFormacion: etapasFormacion as never,
+    nivel3Ids: nivel3Ids as never,
     rulesOfProvocation: rules as never,
     coachingPoints: points as never,
     materials: materials as never,
@@ -483,6 +503,10 @@ export async function duplicateTaskToClub(id: string): Promise<ActionResult> {
       durationMin: row.durationMin,
       repetitions: row.repetitions,
       intensity: row.intensity,
+      family: row.family,
+      workComments: row.workComments,
+      etapasFormacion: row.etapasFormacion,
+      nivel3Ids: row.nivel3Ids,
       rulesOfProvocation: row.rulesOfProvocation,
       coachingPoints: row.coachingPoints,
       materials: row.materials,
