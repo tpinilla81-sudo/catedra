@@ -195,7 +195,10 @@ except Exception as e:
     sys.exit(1)
 EOF
 [ $? = 0 ] && ok "BD: Sección de Trabajo + Etapas + Nivel 3 exactos (orden del catálogo)" || bad "validación BD"
-# abrir el detalle
+# abrir el detalle — la tarjeta vive DENTRO del árbol Nivel 3 (render perezoso):
+# la búsqueda la auto-expande (experiencia real del míster) y luego se clica
+$AB eval "(()=>{const inp=document.querySelector('input[placeholder^=\"Buscar tarea\"]');const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(inp,'Tarea $UNIQ');inp.dispatchEvent(new Event('input',{bubbles:true}));return 'ok'})()" >/dev/null 2>&1
+sleep 1.2
 $AB eval "(()=>{const c=document.querySelector('[aria-label^=\"Abrir ficha de la tarea Tarea $UNIQ\"]');if(c){c.click();return 'ok'}return 'no'})()" >/dev/null 2>&1
 waitfor "document.querySelector('[data-testid=task-detail-comentarios]')" 12
 check "detalle: comentarios visibles" "$(ev "((document.querySelector('[data-testid=task-detail-comentarios]')||{}).textContent||'').includes('variación con comodines')")"
