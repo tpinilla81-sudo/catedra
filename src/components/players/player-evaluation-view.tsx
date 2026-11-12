@@ -6,21 +6,25 @@
 // ----------------------------------------------------------------------------
 // Evaluación 1:1 con 6 bloques × 8 métricas (nota 1-10 con steppers ±),
 // media por bloque en la cabecera de cada bloque, métricas «Libre N» con
-// nombre editable (Principios Tácticos: los 8 configurables), botones
-// «Exportar Informe» (.txt descargable) y «Guardar Evaluación» (Server
-// Action con upsert). Estilo de la casa: crema/verde — NADA del slate
-// oscuro del mock; el código de color de bloques se mantiene con acentos.
+// nombre editable (Principios Tácticos: los 8 configurables) y — mock
+// 'FichaRendimiento' — AÑADIR MÉTRICAS DINÁMICAS por bloque: input «Añadir
+// nueva métrica...» + «+ Añadir» que engancha una fila custom (nota 5,
+// editable) al bloque. Botones «Exportar Informe» (.txt descargable) y
+// «Guardar Evaluación» (Server Action con upsert). Estilo de la casa:
+// crema/verde — NADA del slate oscuro del mock; el código de color de
+// bloques se mantiene con acentos.
 // ============================================================================
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Download, Save } from "lucide-react";
+import { ArrowLeft, Download, Plus, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { savePlayerEvaluation } from "@/app/dashboard/players/actions";
 import {
   blockAverage,
   defaultEvaluationData,
+  EVAL_METRICS_MAX_PER_BLOCK,
   EVAL_SCORE_MAX,
   EVAL_SCORE_MIN,
   normalizeEvaluationData,
@@ -89,6 +93,23 @@ export function PlayerEvaluationView({
         return { ...b, metrics };
       }),
     );
+  }
+
+  // ---------- Métrica DINÁMICA (mock 'FichaRendimiento': «+ Añadir») ----------
+  function addMetric(blockKey: string, rawLabel: string) {
+    const label = rawLabel.trim().slice(0, 60);
+    if (!label) return false;
+    setBlocks((prev) =>
+      prev.map((b) => {
+        if (b.key !== blockKey) return b;
+        if (b.metrics.length >= EVAL_METRICS_MAX_PER_BLOCK) return b;
+        return {
+          ...b,
+          metrics: [...b.metrics, { label, score: 5, custom: true }],
+        };
+      }),
+    );
+    return true;
   }
 
   // ---------- Guardar (Server Action, upsert de la ficha vigente) ----------
@@ -232,6 +253,7 @@ export function PlayerEvaluationView({
                 canWrite={canWrite}
                 onAdjust={adjustScore}
                 onRename={renameMetric}
+                onAdd={addMetric}
               />
             ))}
           </div>
@@ -259,12 +281,14 @@ function Block({
   canWrite,
   onAdjust,
   onRename,
+  onAdd,
 }: {
   block: EvalBlock;
   index: number;
   canWrite: boolean;
   onAdjust: (blockKey: string, metricIndex: number, delta: number) => void;
   onRename: (blockKey: string, metricIndex: number, label: string) => void;
+  onAdd: (blockKey: string, label: string) => boolean;
 }) {
   return (
     <section
@@ -306,7 +330,58 @@ function Block({
           />
         ))}
       </div>
+
+      {/* Métrica DINÁMICA (mock 'FichaRendimiento'): «Añadir nueva métrica...» + «+ Añadir» */}
+      {canWrite && block.metrics.length < EVAL_METRICS_MAX_PER_BLOCK && (
+        <AddMetricRow blockKey={block.key} onAdd={onAdd} />
+      )}
     </section>
+  );
+}
+
+function AddMetricRow({
+  blockKey,
+  onAdd,
+}: {
+  blockKey: string;
+  onAdd: (blockKey: string, label: string) => boolean;
+}) {
+  const [value, setValue] = useState("");
+
+  function submit() {
+    if (onAdd(blockKey, value)) setValue("");
+  }
+
+  return (
+    <div className="flex gap-1.5 mt-1 px-1 pb-1">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            submit();
+          }
+        }}
+        placeholder="Añadir nueva métrica..."
+        maxLength={60}
+        aria-label={`Nombre de la nueva métrica del bloque ${blockKey}`}
+        data-testid={`eval-addinput-${blockKey}`}
+        className="flex-1 min-w-0 min-h-[40px] rounded-xl border border-dashed border-cream-border-strong bg-cream/50 px-2.5 text-[12px] font-semibold text-[#3d5844] placeholder:text-[#8a9a8d] focus:outline-none focus:border-solid focus:border-brand-500"
+      />
+      <button
+        type="button"
+        onClick={submit}
+        disabled={!value.trim()}
+        aria-label={`Añadir métrica al bloque ${blockKey}`}
+        data-testid={`eval-addbtn-${blockKey}`}
+        className="shrink-0 min-h-[40px] px-3 rounded-xl bg-brand-600 text-white text-[12px] font-black hover:bg-brand disabled:opacity-40 transition inline-flex items-center gap-1"
+      >
+        <Plus className="w-3.5 h-3.5" aria-hidden />
+        Añadir
+      </button>
+    </div>
   );
 }
 

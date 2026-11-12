@@ -36,6 +36,8 @@ export type PlayerEvaluationData = EvalBlock[];
 export const EVAL_SCORE_MIN = 1;
 export const EVAL_SCORE_MAX = 10;
 export const EVAL_METRICS_PER_BLOCK = 8;
+/** Techo por bloque con las métricas DINÁMICAS añadidas por el míster */
+export const EVAL_METRICS_MAX_PER_BLOCK = 16;
 
 function free(n: number): EvalMetric {
   return { label: `Libre ${n}`, score: 5, custom: true };
@@ -142,9 +144,13 @@ const clamped = (n: unknown): number | null => {
 
 /**
  * Normaliza y valida el JSON que llega del cliente (o de la BD antigua).
- * Devuelve SIEMPRE 6 bloques × 8 métricas: si el raw trae menos bloques
- * (ficha antigua/parcial), se completa con los defaults — la UI nunca
- * rompe por datos a medias. null → estructura irrecuperable.
+ * Devuelve SIEMPRE los 6 bloques: los 8 primeros puestos respetan la
+ * estructura del mock (fijas + «Libre N»); las métricas DINÁMICAS que el
+ * míster añadió con «+ Añadir» (mock 'FichaRendimiento') se conservan a
+ * partir del índice 8 SIEMPRE que sean custom con nombre no vacío (techo 16
+ * por bloque). Si el raw trae menos bloques (ficha antigua/parcial), se
+ * completa con los defaults — la UI nunca rompe por datos a medias.
+ * null → estructura irrecuperable.
  */
 export function normalizeEvaluationData(raw: unknown): PlayerEvaluationData | null {
   if (!Array.isArray(raw)) return null;
@@ -171,6 +177,22 @@ export function normalizeEvaluationData(raw: unknown): PlayerEvaluationData | nu
         label: labelRaw || (m ? def.metrics[j].label : def.metrics[j].label),
         score,
         custom: def.metrics[j].custom ? true : !!custom,
+      });
+    }
+
+    // ---- Métricas DINÁMICAS (mock 'FichaRendimiento': «+ Añadir») ----
+    // A partir del índice 8 solo sobreviven métricas custom con nombre real;
+    // el techo por bloque evita un JSON sin control. «Libre N» vacías se
+    // descartan (eran restos de la plantilla, no datos del míster).
+    for (let j = EVAL_METRICS_PER_BLOCK; j < Math.min(rawMetrics.length, EVAL_METRICS_MAX_PER_BLOCK); j++) {
+      const m = rawMetrics[j] as Record<string, unknown> | undefined;
+      if (!m) continue;
+      const labelRaw = typeof m?.label === "string" ? m.label.trim().slice(0, 60) : "";
+      if (!labelRaw) continue;
+      metrics.push({
+        label: labelRaw,
+        score: clamped(m?.score) ?? 5,
+        custom: true,
       });
     }
 
