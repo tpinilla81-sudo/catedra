@@ -1,14 +1,16 @@
 #!/bin/bash
-# E2E UI LOCAL — BIBLIOTECA: ÁRBOL OFICIAL DE TAREAS (organización del míster)
+# E2E UI LOCAL — BIBLIOTECA: VISTA ÚNICA + BUSCADOR REFORZADO
 #   [ TAREAS DE ENTRENAMIENTO EN FÚTBOL ] → 1. CLASIFICACIÓN GENERAL →
 #   5 bloques (Físicas/Técnicas/Tácticas/Psicológicas/Integradas) →
 #   27 categorías Nivel 3 → tareas (tarjetas)
-# · el grid plano anterior YA NO existe (quita la que hay)
+# · SIN cuadros de estadísticas (Subprincipios/Tareas/Recetas/Fases) — quitados
+# · SIN pestañas (Tareas/Taxonomía/Maestra) — el árbol ES la vista única
+# · BUSCADOR REFORZADO: multi-palabra Y orden libre, sin acentos, en TODA la
+#   ficha (task-search.ts) · barra sticky · contador de resultados · botón ✕
+#   · atajo «/» · Esc vacía · resaltado <mark> en título/objetivo
 # · 27 hojas presentes · contadores vivos por categoría/bloque/raíz
 # · expandir/colapsar (bloques, categorías, Expandir todo/Contraer todo)
-# · tareas existentes colgadas de su categoría (backfill Nivel 3:
-#   familia Nivel 2 + palabras clave — deriveLevel3Ids en lectura)
-# · búsqueda auto-expande el árbol y muestra la tarjeta
+# · tareas existentes colgadas de su categoría (backfill Nivel 3)
 # · creación desde el editor → la tarea aterriza bajo su categoría (Rondos)
 # · Suite (Análisis Cualitativo) intacta · capturas móvil/desktop · auto-limpieza
 set -uo pipefail
@@ -68,13 +70,16 @@ for i in $(seq 1 30); do
 done
 check "login completado" "$([ "$L" = "true" ] && echo 1)"
 
-echo "=== 2 · Biblioteca → pestaña Tareas: el ÁRBOL monta ==="
+echo "=== 2 · Biblioteca: el ÁRBOL monta DIRECTO (sin pestañas ni cuadros) ==="
 $AB open "$BASE/dashboard/library" >/dev/null 2>&1
 waitfor "document.querySelector('[data-testid=library-root],main')" 20
 sleep 1
-$AB eval "(()=>{const b=Array.from(document.querySelectorAll('button')).find(x=>x.textContent.replace(/\d+$/,'').trim()==='Tareas'&&x.closest('.grid-cols-3'));if(b){b.click();return 'ok'}return 'no'})()" >/dev/null 2>&1
-sleep 1
-check "tasks-tree monta" "$(ev "!!document.querySelector('[data-testid=tasks-tree]')")"
+check "tasks-tree monta SIN pulsar nada (vista única)" "$(ev "!!document.querySelector('[data-testid=tasks-tree]')")"
+check "sin cuadros de estadísticas (Subprincipios/Recetas/Fases)" "$(ev "!Array.from(document.querySelectorAll('p')).some(p=>['Subprincipios','Recetas','Fases cubiertas'].includes(p.textContent.trim()))")"
+check "sin barra de pestañas (.grid-cols-3)" "$(ev "!!document.querySelector('.grid-cols-3') === false")"
+check "sin pestaña Taxonomía" "$(ev "!Array.from(document.querySelectorAll('button')).some(b=>b.textContent.trim()==='Taxonomía'||b.textContent.trim().startsWith('Taxonomía '))")"
+check "sin pestaña Maestra" "$(ev "!Array.from(document.querySelectorAll('button')).some(b=>b.textContent.trim()==='Maestra'||b.textContent.trim().startsWith('Maestra '))")"
+check "buscador reforzado presente (sticky)" "$(ev "!!document.querySelector('[data-testid=library-search]')")"
 ROOT=$(ev "((document.querySelector('[data-testid=tree-root]')||{}).textContent||'').toUpperCase()")
 echo "$ROOT" | rg -q "TAREAS DE ENTRENAMIENTO EN FÚTBOL" && ok "raíz «TAREAS DE ENTRENAMIENTO EN FÚTBOL»" || bad "raíz ('$ROOT')"
 echo "$ROOT" | rg -q "1\. CLASIFICACIÓN GENERAL" && ok "nodo «1. CLASIFICACIÓN GENERAL»" || bad "clasificación general ausente"
@@ -84,10 +89,12 @@ done
 # (las hojas se renderizan al expandir su bloque — check de 27 en la sección 4)
 check "el grid plano anterior YA NO existe" "$(ev "!document.querySelector('section[aria-label=\"Catálogo de tareas\"]')")"
 
-echo "=== 3 · contadores vivos (raíz = pestaña Tareas) ==="
+echo "=== 3 · contadores vivos (raíz = BD) ==="
 ROOTCNT=$(ev "(()=>{const el=document.querySelector('[data-testid=tree-root] .bg-white.border-cream-border');const chips=document.querySelectorAll('[data-testid=tree-root] span[aria-label\$=\" tareas\"]');const first=chips[0];return first?(first.textContent.trim()):'x'})()")
-TABCNT=$(ev "(()=>{const b=Array.from(document.querySelectorAll('button')).find(x=>x.textContent.replace(/\d+$/,'').trim()==='Tareas'&&x.closest('.grid-cols-3'));if(!b)return 'x';const m=b.textContent.match(/(\d+)\s*$/);return m?m[1]:'x'})()")
-if [ "$ROOTCNT" != "x" ] && [ "$ROOTCNT" = "$TABCNT" ]; then ok "contador de la raíz = tareas del catálogo ($ROOTCNT)"; else bad "contador raíz ($ROOTCNT) vs pestaña ($TABCNT)"; fi
+DBCNT=$(export DATABASE_URL="$DBURL"; node -e "
+const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();
+p.task.count().then(c=>{console.log(c);process.exit(0)})" 2>/dev/null)
+if [ "$ROOTCNT" != "x" ] && [ "$ROOTCNT" = "$DBCNT" ]; then ok "contador de la raíz = tareas en BD ($ROOTCNT)"; else bad "contador raíz ($ROOTCNT) vs BD ($DBCNT)"; fi
 
 echo "=== 4 · expansión: bloques, categorías y controles ==="
 $AB eval "(()=>{const b=Array.from(document.querySelectorAll('[data-testid=tasks-tree] button[aria-expanded]')).find(x=>x.textContent.includes('FÍSICAS'));if(b){b.click();return 'ok'}return 'no'})()" >/dev/null 2>&1
@@ -140,13 +147,49 @@ else
   bad "el backfill no clasificó la tarea (EXPECTED=$EXPECTED)"
 fi
 
-echo "=== 6 · búsqueda: auto-expande y encuentra la tarjeta ==="
-$AB eval "(()=>{const inp=document.querySelector('input[placeholder^=\"Buscar tarea\"]');const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(inp,${TITLE@Q});inp.dispatchEvent(new Event('input',{bubbles:true}));return 'ok'})()" >/dev/null 2>&1
+echo "=== 6 · BUSCADOR REFORZADO: multi-palabra, sin acentos, resaltado, contador ==="
+type_search() {
+  $AB eval "(()=>{const inp=document.querySelector('[data-testid=library-search]');const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(inp,$1);inp.dispatchEvent(new Event('input',{bubbles:true}));return 'ok'})()" >/dev/null 2>&1
+}
+# 6a · título de la tarea legacy: auto-expande, contador y resaltado <mark>
+type_search "${TITLE@Q}"
 sleep 1.2
+check "contador de resultados visible (search-count)" "$(ev "!!document.querySelector('[data-testid=search-count]')")"
 SEARCHHIT=$(ev "(()=>{const cards=Array.from(document.querySelectorAll('[data-testid=tasks-tree] button[aria-label^=\"Abrir ficha de la tarea\"]'));return cards.some(c=>c.getAttribute('aria-label').includes(${TITLE@Q}))})()")
 check "búsqueda auto-expande y localiza «${TITLE:0:30}…»" "$SEARCHHIT"
-$AB eval "(()=>{const inp=document.querySelector('input[placeholder^=\"Buscar tarea\"]');const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(inp,'');inp.dispatchEvent(new Event('input',{bubbles:true}));return 'ok'})()" >/dev/null 2>&1
+check "coincidencias resaltadas con <mark>" "$(ev "document.querySelectorAll('[data-testid=search-mark]').length > 0")"
+# 6b · multi-palabra Y en campos DISTINTOS (título + objetivo), orden libre
+T1=$(python3 -c "import json,sys;t=json.loads(sys.argv[1])['title'].split();print(next((w for w in t if len(w)>=4), t[0] if t else ''))" "$ROW" 2>/dev/null)
+O1=$(python3 -c "import json,sys;d=json.loads(sys.argv[1]);o=d['objective'];ws=[w.strip('.,;:()«»\"') for w in o.split()];ws=[w for w in ws if len(w)>=5];print(ws[0] if ws else d['title'].split()[0])" "$ROW" 2>/dev/null)
+[ -n "$T1" ] && [ -n "$O1" ] && ok "tokens multi-campo extraídos (título: $T1 · objetivo: $O1)" || bad "sin tokens para multi-palabra"
+type_search "'$T1 $O1'"
+sleep 1.0
+MWC=$(ev "(()=>{const c=document.querySelector('[data-testid=search-count]');if(!c)return 'x';const t=c.textContent;return t.includes('Sin resultados')?'0':parseInt(t,10)||'x'})()")
+[ "$MWC" != "x" ] && [ "$MWC" != "0" ] 2>/dev/null && ok "multi-palabra Y: «$T1 $O1» encuentra $MWC" || bad "multi-palabra ($MWC)"
+type_search "'$O1 $T1'"
+sleep 1.0
+MWC2=$(ev "(()=>{const c=document.querySelector('[data-testid=search-count]');if(!c)return 'x';const t=c.textContent;return t.includes('Sin resultados')?'0':parseInt(t,10)||'x'})()")
+[ "$MWC2" = "$MWC" ] 2>/dev/null && ok "orden libre: «$O1 $T1» = $MWC2 (igual)" || bad "orden libre ($MWC vs $MWC2)"
+type_search "'$T1 zzqxvv'"
+sleep 1.0
+check "token inexistente → «Sin resultados» + CTA limpiar" "$(ev "(()=>{const c=document.querySelector('[data-testid=search-count]');return c?c.textContent.includes('Sin resultados'):false})() && !!Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Limpiar búsqueda')")"
+# 6c · sin acentos: «organizacion» encuentra la fase «Organización Ofensiva»
+type_search "'organizacion'"
+sleep 1.0
+NOACC=$(ev "(()=>{const c=document.querySelector('[data-testid=search-count]');if(!c)return 'x';const t=c.textContent;return t.includes('Sin resultados')?'0':parseInt(t,10)||'x'})()")
+[ "$NOACC" != "x" ] && [ "$NOACC" != "0" ] 2>/dev/null && ok "sin acentos: «organizacion» encuentra $NOACC" || bad "búsqueda sin acentos ($NOACC)"
+# 6d · limpiar con el botón ✕
+$AB eval "document.querySelector('[data-testid=search-clear]').click()" >/dev/null 2>&1
+sleep 0.6
+check "botón ✕ vacía la búsqueda (y quita el contador)" "$(ev "document.querySelector('[data-testid=library-search]').value === '' && !document.querySelector('[data-testid=search-count]')")"
+# 6e · atajo «/» enfoca · Esc vacía
+FOC=$(ev "(()=>{document.activeElement&&document.activeElement.blur();document.dispatchEvent(new KeyboardEvent('keydown',{key:'/',bubbles:true}));return !!document.activeElement&&document.activeElement.getAttribute('data-testid')==='library-search'})()")
+check "atajo «/» enfoca el buscador" "$FOC"
+type_search "'$T1'"
+sleep 0.6
+$AB eval "document.querySelector('[data-testid=library-search]').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))" >/dev/null 2>&1
 sleep 0.5
+check "Esc vacía la búsqueda" "$(ev "document.querySelector('[data-testid=library-search]').value === '' && !document.querySelector('[data-testid=search-count]')")"
 
 echo "=== 7 · creación desde el editor → aterriza bajo su categoría ==="
 NT0=$(export DATABASE_URL="$DBURL"; node -e "
@@ -170,7 +213,7 @@ check "fila Task creada en BD ($NT0 → $NT1)" "$([ -n "$NT0" ] && [ -n "$NT1" ]
 $AB open "$BASE/dashboard/library" >/dev/null 2>&1
 waitfor "document.querySelector('[data-testid=library-root],main')" 20
 sleep 1
-$AB eval "(()=>{const b=Array.from(document.querySelectorAll('button')).find(x=>x.textContent.replace(/\d+$/,'').trim()==='Tareas'&&x.closest('.grid-cols-3'));if(b){b.click();return 'ok'}return 'no'})()" >/dev/null 2>&1
+# (vista única: no hay pestañas que pulsar)
 sleep 1
 $AB eval "document.querySelector('[data-testid=tree-expand-all]').click()" >/dev/null 2>&1
 sleep 0.6
@@ -190,8 +233,8 @@ echo "=== 9 · capturas (móvil + desktop, árbol) ==="
 $AB open "$BASE/dashboard/library" >/dev/null 2>&1
 waitfor "document.querySelector('[data-testid=tasks-tree]')" 20
 sleep 1
-$AB eval "(()=>{const b=Array.from(document.querySelectorAll('button')).find(x=>x.textContent.replace(/\d+$/,'').trim()==='Tareas'&&x.closest('.grid-cols-3'));if(b){b.click();return 'ok'}return 'no'})()" >/dev/null 2>&1
-sleep 1
+# (vista única: no hay pestañas que pulsar)
+sleep 0.5
 $AB eval "(()=>{const b=Array.from(document.querySelectorAll('[data-testid=tasks-tree] button[aria-expanded]')).find(x=>x.textContent.includes('FÍSICAS'));if(b){b.click();return 'ok'}return 'no'})()" >/dev/null 2>&1
 sleep 0.5
 $AB screenshot /tmp/tree-mobile.png >/dev/null 2>&1 && ok "captura móvil (árbol + Físicas)"

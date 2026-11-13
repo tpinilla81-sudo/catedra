@@ -1,7 +1,10 @@
 #!/bin/bash
-# E2E UI EN PRODUCCIÓN — BIBLIOTECA: ÁRBOL OFICIAL DE TAREAS (variante SOLO-LECTURA)
+# E2E UI EN PRODUCCIÓN — BIBLIOTECA: VISTA ÚNICA + BUSCADOR REFORZADO (SOLO-LECTURA)
 #   [ TAREAS DE ENTRENAMIENTO EN FÚTBOL ] → 1. CLASIFICACIÓN GENERAL →
 #   5 bloques → 27 categorías Nivel 3 → tarjetas de tareas
+# · SIN cuadros de estadísticas · SIN pestañas: el árbol ES la vista única
+# · BUSCADOR REFORZADO: multi-palabra Y, sin acentos, toda la ficha, contador,
+#   botón ✕, Esc, resaltado <mark>
 # Contra https://catedra-sooty.vercel.app con la cuenta demo.
 # NADA DE ESCRITURA: solo navegación, expandir/colapsar, búsqueda client-side,
 # abrir fichas (lectura) y GET a la API. La BD de producción JAMÁS se toca.
@@ -55,17 +58,16 @@ if [ "$(ev "!!document.querySelector('input[type=email]')")" = "true" ]; then
 fi
 check "login demo: aterrizaje con sesión (formulario fuera)" "$(ev "!document.body.innerText.includes('Email del cuerpo técnico')")"
 
-echo "=== 2 · Biblioteca: el ÁRBOL es la vista de ENTRADA ==="
-# Tras el paquete del árbol como landing, la pestaña «Tareas» (primera) es la vista por defecto
+echo "=== 2 · Biblioteca: el ÁRBOL es la vista ÚNICA (sin pestañas ni cuadros) ==="
 $AB open "$PROD/dashboard/library" >/dev/null 2>&1
 $AB wait --load networkidle >/dev/null 2>&1
 sleep 2
 waitfor 'document.querySelector("[data-testid=tasks-tree]")' || true
-check "ÁRBOL presente SIN pulsar ninguna pestaña (vista de entrada)" "$(ev "!!document.querySelector('[data-testid=tasks-tree]')")"
-check "pestaña «Tareas» es la PRIMERA del selector (orden oficial)" "$(ev "(()=>{const b=document.querySelector('.grid-cols-3 button');return !!b&&b.textContent.includes('Tareas')})()")"
-# Clic idempotente en la pestaña (robustez si el paquete aún no estuviera aplicado)
-$AB eval "(()=>{const b=[...document.querySelectorAll('button,[role=tab]')].find(x=>/^Tareas/.test(x.textContent.trim()));if(b)b.click();return !!b})()" >/dev/null 2>&1
-waitfor 'document.querySelector("[data-testid=tasks-tree]")' || true
+check "ÁRBOL presente SIN pulsar nada (vista única)" "$(ev "!!document.querySelector('[data-testid=tasks-tree]')")"
+check "SIN barra de pestañas (.grid-cols-3 eliminada)" "$(ev "!!document.querySelector('.grid-cols-3') === false")"
+check "SIN pestañas Taxonomía/Maestra" "$(ev "![...document.querySelectorAll('button')].some(b=>{const t=b.textContent.trim();return t==='Taxonomía'||t.startsWith('Taxonomía ')||t==='Maestra'||t.startsWith('Maestra ')})")"
+check "SIN cuadros de estadísticas (Subprincipios/Recetas/Fases cubiertas)" "$(ev "![...document.querySelectorAll('p')].some(p=>['Subprincipios','Recetas','Fases cubiertas'].includes(p.textContent.trim()))")"
+check "buscador reforzado presente ([data-testid=library-search])" "$(ev "!!document.querySelector('[data-testid=library-search]')")"
 check "data-testid tasks-tree presente" "$(ev "!!document.querySelector('[data-testid=tasks-tree]')")"
 check "raíz «TAREAS DE ENTRENAMIENTO EN FÚTBOL» (uppercase del mock)" "$(ev "document.querySelector('[data-testid=tree-root]').innerText.includes('TAREAS DE ENTRENAMIENTO EN FÚTBOL')")"
 check "subtítulo «organización oficial por clasificación general»" "$(ev "document.querySelector('[data-testid=tree-root]').innerText.includes('organización oficial por clasificación general')")"
@@ -125,14 +127,47 @@ $AB eval "(()=>{const b=[...document.querySelectorAll('[data-testid=tree-root] b
 sleep 1
 check "cerrar el bloque esconde sus categorías (0 hojas en DOM)" "$(ev "document.querySelectorAll('[data-testid=tree-cat]').length===0")"
 
-echo "=== 7 · Búsqueda auto-expande el árbol ==="
-$AB find first 'input[placeholder^="Buscar tarea"]' fill "rondo" >/dev/null 2>&1
+echo "=== 7 · BUSCADOR REFORZADO (client-side, sin escrituras) ==="
+type_search_prod() {
+  $AB eval "(()=>{const i=document.querySelector('[data-testid=library-search]');if(!i)return false;const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(i,$1);i.dispatchEvent(new Event('input',{bubbles:true}));return true})()" >/dev/null 2>&1
+}
+# 7a · «rondo»: auto-expande + contador + <mark>
+type_search_prod "'rondo'"
 sleep 2
+check "contador «tareas encontradas» visible (search-count)" "$(ev "(()=>{const c=document.querySelector('[data-testid=search-count]');return !!c&&!c.textContent.includes('Sin resultados')})()")"
 check "con árbol colapsado, la búsqueda auto-expande (≥1 hoja visible)" "$(ev "document.querySelectorAll('[data-testid=tree-cat]').length>=1")"
+check "coincidencias resaltadas con <mark>" "$(ev "document.querySelectorAll('[data-testid=search-mark]').length>0")"
 check "la tarjeta coincidente es visible en su hoja" "$(ev "[...document.querySelectorAll('[data-testid=tree-root] button[aria-label^=\"Abrir ficha de la tarea\"]')].some(b=>b.offsetParent!==null)")"
-$AB eval "(()=>{const i=document.querySelector('input[placeholder^=\"Buscar tarea\"]');if(!i)return false;const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(i,'');i.dispatchEvent(new Event('input',{bubbles:true}));return true})()" >/dev/null 2>&1
+# 7b · sin acentos: «organizacion» (fase «Organización Ofensiva»)
+type_search_prod "'organizacion'"
 sleep 1.5
-check "al limpiar la búsqueda el árbol vuelve a su reposo (0 hojas)" "$(ev "document.querySelectorAll('[data-testid=tree-cat]').length===0")"
+NOACC="$(ev "(()=>{const c=document.querySelector('[data-testid=search-count]');if(!c)return 'x';const t=c.textContent;return t.includes('Sin resultados')?'0':(parseInt(t,10)||'x')})()")"
+[ "$NOACC" != "x" ] && [ "$NOACC" != "0" ] 2>/dev/null && ok "sin acentos: «organizacion» encuentra $NOACC" || bad "búsqueda sin acentos ($NOACC)"
+# 7c · multi-palabra Y con tokens de la API (título+objetivo), orden libre
+APIROW="$(ev "fetch('/api/pilar2/tasks').then(r=>r.json()).then(d=>{const t=(d.tasks||[]).find(t=>(t.nivel3Ids||[]).length>0)||d.tasks[0];return JSON.stringify({title:t.title,objective:t.objective})})")"
+PT1="$(python3 -c "import json,sys;t=json.loads(sys.argv[1])['title'].split();print(next((w for w in t if len(w)>=4), t[0] if t else ''))" "$APIROW" 2>/dev/null)"
+PO1="$(python3 -c "import json,sys;d=json.loads(sys.argv[1]);o=d['objective'];ws=[w.strip('.,;:()«»\"') for w in o.split()];ws=[w for w in ws if len(w)>=5];print(ws[0] if ws else d['title'].split()[0])" "$APIROW" 2>/dev/null)"
+type_search_prod "'$PT1 $PO1'"
+sleep 1.5
+MWC="$(ev "(()=>{const c=document.querySelector('[data-testid=search-count]');if(!c)return 'x';const t=c.textContent;return t.includes('Sin resultados')?'0':(parseInt(t,10)||'x')})()")"
+[ "$MWC" != "x" ] && [ "$MWC" != "0" ] 2>/dev/null && ok "multi-palabra Y: «$PT1 $PO1» encuentra $MWC" || bad "multi-palabra ($MWC)"
+type_search_prod "'$PO1 $PT1'"
+sleep 1.5
+MWC2="$(ev "(()=>{const c=document.querySelector('[data-testid=search-count]');if(!c)return 'x';const t=c.textContent;return t.includes('Sin resultados')?'0':(parseInt(t,10)||'x')})()")"
+[ "$MWC2" = "$MWC" ] 2>/dev/null && ok "orden libre: «$PO1 $PT1» = $MWC2 (igual)" || bad "orden libre ($MWC vs $MWC2)"
+type_search_prod "'$PT1 zzqxvv'"
+sleep 1.5
+check "token inexistente → «Sin resultados» + botón Limpiar búsqueda" "$(ev "(()=>{const c=document.querySelector('[data-testid=search-count]');return c?c.textContent.includes('Sin resultados'):false})() && !![...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Limpiar búsqueda')")"
+# 7d · el botón ✕ limpia y el árbol vuelve a su reposo (0 hojas)
+$AB eval "document.querySelector('[data-testid=search-clear]').click()" >/dev/null 2>&1
+sleep 1.5
+check "botón ✕ vacía la búsqueda (contador fuera, árbol en reposo)" "$(ev "document.querySelector('[data-testid=library-search]').value === '' && !document.querySelector('[data-testid=search-count]') && document.querySelectorAll('[data-testid=tree-cat]').length===0")"
+# 7e · Esc también vacía
+type_search_prod "'rondo'"
+sleep 1
+$AB eval "document.querySelector('[data-testid=library-search]').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))" >/dev/null 2>&1
+sleep 1.5
+check "Esc vacía la búsqueda" "$(ev "document.querySelector('[data-testid=library-search]').value === '' && !document.querySelector('[data-testid=search-count]')")"
 $AB find first '[data-testid="tree-expand-all"]' click >/dev/null 2>&1
 sleep 1.5
 check "expandir todo tras la búsqueda → 27 hojas otra vez" "$(ev "document.querySelectorAll('[data-testid=tree-cat]').length===27")"
@@ -160,7 +195,6 @@ echo "=== 10 · Capturas (crema/verde, sin página en blanco) ==="
 $AB open "$PROD/dashboard/library" >/dev/null 2>&1
 $AB wait --load networkidle >/dev/null 2>&1
 sleep 2
-$AB eval "(()=>{const b=[...document.querySelectorAll('button,[role=tab]')].find(x=>/^Tareas/.test(x.textContent.trim()));if(b)b.click();return !!b})()" >/dev/null 2>&1
 waitfor 'document.querySelector("[data-testid=tasks-tree]")' || true
 $AB find first '[data-testid="tree-expand-all"]' click >/dev/null 2>&1
 sleep 2
@@ -170,7 +204,6 @@ $AB set viewport 1440 900 >/dev/null 2>&1
 $AB reload >/dev/null 2>&1
 $AB wait --load networkidle >/dev/null 2>&1
 sleep 2
-$AB eval "(()=>{const b=[...document.querySelectorAll('button,[role=tab]')].find(x=>/^Tareas/.test(x.textContent.trim()));if(b)b.click();return !!b})()" >/dev/null 2>&1
 waitfor 'document.querySelector("[data-testid=tasks-tree]")' || true
 $AB find first '[data-testid="tree-expand-all"]' click >/dev/null 2>&1
 sleep 2

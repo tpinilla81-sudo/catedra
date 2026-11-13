@@ -1,17 +1,21 @@
 "use client";
 
 // ============================================================================
-// PILAR 1 — CATÁLOGO DE TAREAS PROFESIONALES (pestaña "Tareas")
+// PILAR 1 — CATÁLOGO DE TAREAS: BUSCADOR REFORZADO + ÁRBOL OFICIAL (vista única)
 // ----------------------------------------------------------------------------
-// • Filtros de un toque: búsqueda libre, fase, intensidad y origen
-//   (Cátedra global vs. club).
-// • Tarjetas compactas con la metainformación clave de un vistazo.
+// • Búsqueda de DEPÓSITO: multi-palabra (Y, orden libre), sin acentos y en TODA
+//   la ficha vía task-search.ts (título, objetivo, comentarios, reglas,
+//   co-achéo, materiales, categorías Nivel 3, subprincipios, fases…).
+//   Barra sticky: siempre visible mientras se recorre el árbol, con contador
+//   de resultados, botón limpiar, atajo «/» y Esc para vaciar.
+// • Resaltado <mark> de las coincidencias en título y objetivo.
+// • Filtros de un toque: fase, intensidad y origen (Cátedra global vs. club).
 // • TaskDetailSheet: ficha COMPLETA (espacio, carga, reglas de provocación,
 //   co-achéo, materiales) + recetas bidireccionales + trazabilidad de uso
 //   ("prescrita N veces por el motor").
 // ============================================================================
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarClock,
@@ -27,6 +31,7 @@ import {
   Trash2,
   Users,
   Video,
+  X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { fieldZoneLabel } from "@/lib/field-zone";
@@ -59,16 +64,16 @@ import {
   PHASE_META,
   PHASE_ORDER,
   RELEVANCE_META,
-  normalizeName,
 } from "@/lib/taxonomy";
 import type { LibraryData, TaskCard } from "@/components/library/types";
 import { taskLevel3Meta } from "@/lib/task-taxonomy";
+import { taskHaystack, taskMatches, queryTokens } from "@/lib/task-search";
 import { seleccionarAnimacion } from "@/lib/animaciones-ejercicio";
 import { PizarraAnimada } from "@/components/library/pizarra-animada";
 import { TasksTree } from "@/components/library/tasks-tree";
 import { useToast } from "@/hooks/use-toast";
 
-// ---------- Pestaña: catálogo + filtros ----------
+// ---------- Vista única: buscador reforzado + árbol oficial ----------
 
 export function TasksTab({
   data,
@@ -89,21 +94,41 @@ export function TasksTab({
   const [phase, setPhase] = useState("ALL");
   const [intensity, setIntensity] = useState("ALL");
   const [origin, setOrigin] = useState<"ALL" | "cathedral" | "club">("ALL");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Atajo «/»: enfoca el buscador desde cualquier punto de la Biblioteca
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) {
+        return;
+      }
+      e.preventDefault();
+      searchRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Con cualquier filtro activo el árbol se auto-expande (hojas con resultados)
-  const filtersActive = q.trim() !== "" || phase !== "ALL" || intensity !== "ALL" || origin !== "ALL";
+  const tokens = useMemo(() => queryTokens(q), [q]);
+  const filtersActive =
+    tokens.length > 0 || phase !== "ALL" || intensity !== "ALL" || origin !== "ALL";
 
+  // BUSCADOR REFORZADO: cada palabra debe aparecer en ALGÚN campo de la ficha
+  // completa (título, objetivo, comentarios, reglas, co-achéo, materiales,
+  // categorías Nivel 3, subprincipios, fases…) — sin acentos, orden libre.
   const filtered = useMemo(() => {
-    const query = normalizeName(q);
     return data.tasks.filter((t) => {
       if (phase !== "ALL" && !t.phases.includes(phase)) return false;
       if (intensity !== "ALL" && t.intensity !== intensity) return false;
       if (origin === "cathedral" && t.clubId !== null) return false;
       if (origin === "club" && t.clubId === null) return false;
-      if (query && !normalizeName(`${t.title} ${t.objective}`).includes(query)) return false;
+      if (tokens.length > 0 && !taskMatches(taskHaystack(t), tokens)) return false;
       return true;
     });
-  }, [data.tasks, q, phase, intensity, origin]);
+  }, [data.tasks, tokens, phase, intensity, origin]);
 
   const chip = (active: boolean) =>
     `shrink-0 min-h-[44px] px-3.5 py-2 rounded-full border text-sm font-bold transition ${
@@ -114,19 +139,53 @@ export function TasksTab({
 
   return (
     <div className="space-y-4">
-      {/* Búsqueda */}
-      <div className="relative">
-        <Search
-          className="w-4 h-4 text-[#6c8070] absolute left-3.5 top-1/2 -translate-y-1/2"
-          aria-hidden
-        />
-        <Input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar tarea u objetivo…"
-          aria-label="Buscar tareas"
-          className="min-h-[48px] pl-10 rounded-2xl bg-white border-cream-border text-peel placeholder:text-[#6c8070]"
-        />
+      {/* Búsqueda REFORZADA — barra fija mientras se recorre el árbol */}
+      <div className="sticky top-0 z-20 -mx-4 px-4 pt-1 pb-2.5 -mt-1 bg-white/95 backdrop-blur border-b border-cream-border/70">
+        <div className="relative">
+          <Search
+            className="w-4 h-4 text-[#6c8070] absolute left-3.5 top-1/2 -translate-y-1/2"
+            aria-hidden
+          />
+          <Input
+            ref={searchRef}
+            data-testid="library-search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && q) {
+                e.stopPropagation();
+                setQ("");
+              }
+            }}
+            placeholder="Buscar tarea, objetivo, material, categoría…"
+            aria-label="Buscar en toda la ficha: título, objetivo, reglas, materiales, categorías y subprincipios (pulsa / para ir aquí)"
+            title="Pulsa / para buscar · mira TODA la ficha, sin acentos y multi-palabra"
+            className="min-h-[48px] pl-10 pr-11 rounded-2xl bg-white border-cream-border text-peel placeholder:text-[#6c8070]"
+          />
+          {q !== "" && (
+            <button
+              type="button"
+              data-testid="search-clear"
+              onClick={() => setQ("")}
+              aria-label="Limpiar búsqueda"
+              title="Limpiar búsqueda"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-cream border border-cream-border-strong text-[#5d7263] hover:text-[#2a4630] flex items-center justify-center transition"
+            >
+              <X className="w-4 h-4" aria-hidden />
+            </button>
+          )}
+        </div>
+        {tokens.length > 0 && (
+          <p data-testid="search-count" className="mt-1.5 px-1 text-[11px] font-bold text-[#6c8070]">
+            {filtered.length === 0
+              ? `Sin resultados para «${q.trim()}»`
+              : `${filtered.length} ${filtered.length === 1 ? "tarea encontrada" : "tareas encontradas"} para «${q.trim()}»`}
+            <span className="font-semibold text-[#8a9a8d]">
+              {" "}
+              · toda la ficha, sin acentos, multi-palabra
+            </span>
+          </p>
+        )}
       </div>
 
       {/* Filtros: fase */}
@@ -168,7 +227,22 @@ export function TasksTab({
       </div>
 
       {/* ÁRBOL OFICIAL: raíz → 1. CLASIFICACIÓN GENERAL → bloques → categorías → tareas */}
-      {filtered.length === 0 ? (
+      {filtered.length === 0 && tokens.length > 0 ? (
+        <div className="rounded-3xl border border-dashed border-cream-border px-6 py-10 text-center">
+          <p className="text-[#6c8070]">
+            Sin resultados para «{q.trim()}». El buscador mira TODA la ficha — título, objetivo,
+            reglas, materiales, categorías Nivel 3 y subprincipios — sin acentos.{" "}
+            <span className="text-[#5d7263]">Prueba con menos palabras.</span>
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => setQ("")}
+            className="mt-4 min-h-[44px] rounded-2xl border-cream-border-strong bg-cream text-[#2a4630] font-black"
+          >
+            Limpiar búsqueda
+          </Button>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-cream-border px-6 py-10 text-center">
           <p className="text-[#6c8070]">
             No hay tareas con estos filtros.{" "}
@@ -192,7 +266,12 @@ export function TasksTab({
           )}
         </div>
       ) : (
-        <TasksTree tasks={filtered} onOpenTask={onOpenTask} filtersActive={filtersActive} />
+        <TasksTree
+          tasks={filtered}
+          onOpenTask={onOpenTask}
+          filtersActive={filtersActive}
+          tokens={tokens}
+        />
       )}
     </div>
   );

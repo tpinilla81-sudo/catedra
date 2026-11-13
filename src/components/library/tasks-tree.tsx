@@ -18,7 +18,8 @@
 //   deriveLevel3Ids (familia Nivel 2 + palabras clave) y las que no encajan
 //   caen en el nodo «Sin clasificar».
 // • Con búsqueda/filtros activos el árbol se auto-expande y solo muestra
-//   hojas con resultados.
+//   hojas con resultados; las coincidencias se RESALTAN con <mark> en
+//   título y objetivo (highlightRanges sobre los tokens normalizados).
 // ============================================================================
 
 import { useMemo, useState } from "react";
@@ -42,17 +43,46 @@ import {
   deriveLevel3Ids,
 } from "@/lib/task-taxonomy";
 import type { TaskCard } from "@/components/library/types";
+import { highlightRanges } from "@/lib/task-search";
 import { seleccionarAnimacion } from "@/lib/animaciones-ejercicio";
 import { PizarraAnimada } from "@/components/library/pizarra-animada";
+
+// ---------- Resaltado de coincidencias del buscador ----------
+
+/** Pinta el texto con <mark> donde caen los tokens (insensible a acentos) */
+export function Marked({ text, tokens }: { text: string; tokens: string[] }) {
+  const ranges = useMemo(() => highlightRanges(text, tokens), [text, tokens]);
+  if (ranges.length === 0) return <>{text}</>;
+  const out: React.ReactNode[] = [];
+  let cursor = 0;
+  for (const [s, e] of ranges) {
+    if (s > cursor) out.push(text.slice(cursor, s));
+    out.push(
+      <mark
+        key={`${s}-${e}`}
+        className="rounded-[4px] bg-[#ffe9a8] px-0.5 text-[#2a4630]"
+        data-testid="search-mark"
+      >
+        {text.slice(s, e)}
+      </mark>,
+    );
+    cursor = e;
+  }
+  if (cursor < text.length) out.push(text.slice(cursor));
+  return <>{out}</>;
+}
 
 // ---------- Tarjeta compacta (hoja del árbol) ----------
 
 export function TaskCardItem({
   task,
   onOpen,
+  tokens = [],
 }: {
   task: TaskCard;
   onOpen: (t: TaskCard) => void;
+  /** Tokens de búsqueda para resaltar coincidencias en título/objetivo */
+  tokens?: string[];
 }) {
   const origin = task.clubId === null ? ORIGIN_META.cathedral : ORIGIN_META.club;
   const intensity = INTENSITY_META[task.intensity] ?? INTENSITY_META.MEDIUM;
@@ -68,7 +98,9 @@ export function TaskCardItem({
       aria-label={`Abrir ficha de la tarea ${task.title}`}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="font-bold text-peel leading-snug">{task.title}</p>
+        <p className="font-bold text-peel leading-snug">
+          <Marked text={task.title} tokens={tokens} />
+        </p>
         <span
           className={`shrink-0 rounded-lg border px-1.5 py-0.5 text-[10px] font-black ${origin.chip}`}
           title={origin.hint}
@@ -77,7 +109,9 @@ export function TaskCardItem({
         </span>
       </div>
 
-      <p className="text-sm text-[#5d7263] mt-1 line-clamp-2 leading-snug">{task.objective}</p>
+      <p className="text-sm text-[#5d7263] mt-1 line-clamp-2 leading-snug">
+        <Marked text={task.objective} tokens={tokens} />
+      </p>
 
       {/* Mini-pizarra animada: la mecánica del ejercicio, en movimiento */}
       <div className="mt-2.5">
@@ -205,12 +239,15 @@ export function TasksTree({
   tasks,
   onOpenTask,
   filtersActive,
+  tokens = [],
 }: {
   /** Tareas YA filtradas por búsqueda/fase/intensidad/origen */
   tasks: TaskCard[];
   onOpenTask: (t: TaskCard) => void;
   /** Con filtros activos el árbol se auto-expande */
   filtersActive: boolean;
+  /** Tokens de búsqueda para resaltar coincidencias en las tarjetas */
+  tokens?: string[];
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(["cls"]));
   const toggle = (id: string) =>
@@ -355,7 +392,12 @@ export function TasksTree({
                                         tareas.length > 0 ? (
                                           <div className="grid grid-cols-1 gap-2.5 pt-1.5 pb-1 lg:grid-cols-2 xl:grid-cols-3">
                                             {tareas.map((t) => (
-                                              <TaskCardItem key={`${cat.id}:${t.id}`} task={t} onOpen={onOpenTask} />
+                                              <TaskCardItem
+                                                key={`${cat.id}:${t.id}`}
+                                                task={t}
+                                                onOpen={onOpenTask}
+                                                tokens={tokens}
+                                              />
                                             ))}
                                           </div>
                                         ) : (
@@ -387,7 +429,7 @@ export function TasksTree({
                       children: (
                         <div className="grid grid-cols-1 gap-2.5 pt-1.5 pb-1 lg:grid-cols-2 xl:grid-cols-3">
                           {byCat.unclassified.map((t) => (
-                            <TaskCardItem key={t.id} task={t} onOpen={onOpenTask} />
+                            <TaskCardItem key={t.id} task={t} onOpen={onOpenTask} tokens={tokens} />
                           ))}
                         </div>
                       ),
