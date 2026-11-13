@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Empaqueta e7e9c05..main, sube a dpaste (base64) y verifica round-trip.
+"""Empaqueta ffffa74019ab8fdebc4576a6ae11ee26565ad8bd..main, sube a dpaste (base64) y verifica round-trip.
 Imprime URL + SHA256 listos para el dispatch de Autopilot."""
 import base64
 import hashlib
@@ -8,7 +8,7 @@ import time
 import urllib.request
 
 ROOT = "/home/z/my-project"
-BASE = "51056ea"  # main actual en GitHub (tip tras aplicar el ÁRBOL de la Biblioteca)
+BASE = "ffffa74019ab8fdebc4576a6ae11ee26565ad8bd"  # main actual en GitHub (tip; la vista única + buscador reforzado viaja encima)
 DPASTE = "https://dpaste.org/api/"
 
 
