@@ -177,6 +177,7 @@ $AB eval "[...document.querySelectorAll('[data-testid=tree-root] button[aria-lab
 sleep 2
 check "abre el diálogo de detalle de la tarea" "$(ev "!!document.querySelector('[role=dialog]')")"
 check "el detalle muestra contenido real (Objetivo/Duración/Nivel 3/Etapas)" "$(ev "(()=>{const d=document.querySelector('[role=dialog]');return !!d&&/OBJETIVO|Duración|NIVEL 3|ETAPAS|Comentarios/i.test(d.innerText)})()")"
+check "«Definición del Trabajo» + «Etapa» SIEMPRE visibles en la ficha (aunque sin rellenar)" "$(ev "(()=>{const d=document.querySelector('[role=dialog]');const a=d&&d.querySelector('[data-testid=task-detail-definicion]');const b=d&&d.querySelector('[data-testid=task-detail-etapas]');return !!a&&!!b&&a.textContent.includes('Sin definir')})()")"
 $AB press Escape >/dev/null 2>&1
 sleep 1
 check "Escape cierra el detalle" "$(ev "!document.querySelector('[role=dialog]')")"

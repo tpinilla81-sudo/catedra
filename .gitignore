@@ -71,3 +71,6 @@ download/catedra-deploy.bundle
 tool-results/
 upload/
 download/
+
+# capturas generadas por las baterías de verificación (no viajar)
+/prod-shots/

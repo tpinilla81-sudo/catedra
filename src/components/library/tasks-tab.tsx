@@ -21,6 +21,8 @@ import {
   CalendarClock,
   Clock,
   CopyPlus,
+  FileText,
+  Layers,
   Loader2,
   MapPin,
   MonitorPlay,
@@ -427,21 +429,6 @@ export function TaskDetailSheet({
 
             <p className="text-sm text-[#3d5844] leading-relaxed mt-1">{task.objective}</p>
 
-            {/* «Definición del Trabajo» (petición del míster, al lado de espacio/jugadores/intensidad) */}
-            {task.definicionTrabajo && (
-              <div
-                className="mt-2 rounded-2xl border border-brand-500/25 bg-brand-600/[0.04] px-3 py-2.5"
-                data-testid="task-detail-definicion"
-              >
-                <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest">
-                  Definición del Trabajo
-                </p>
-                <p className="text-sm text-[#3d5844] leading-relaxed mt-1 whitespace-pre-wrap">
-                  {task.definicionTrabajo}
-                </p>
-              </div>
-            )}
-
             {/* Sección de Trabajo del mock: comentarios, etapas y Nivel 3 */}
             {task.workComments && (
               <div
@@ -454,23 +441,6 @@ export function TaskDetailSheet({
                 <p className="text-sm text-[#3d5844] leading-relaxed mt-1 whitespace-pre-wrap">
                   {task.workComments}
                 </p>
-              </div>
-            )}
-            {task.etapasFormacion.length > 0 && (
-              <div className="mt-3" data-testid="task-detail-etapas">
-                <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest">
-                  Etapas del proceso de formación
-                </p>
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  {task.etapasFormacion.map((e) => (
-                    <span
-                      key={e}
-                      className="rounded-lg border border-brand-600/30 bg-brand-600/10 px-2 py-1 text-[11px] font-bold text-brand-600"
-                    >
-                      {e}
-                    </span>
-                  ))}
-                </div>
               </div>
             )}
             {task.nivel3Ids.length > 0 && (
@@ -553,6 +523,47 @@ export function TaskDetailSheet({
                       : undefined
                 }
               />
+            </div>
+
+            {/* «Definición del Trabajo» + «Etapa» (petición del míster: al lado de
+                espacio/jugadores/intensidad) — SIEMPRE visibles, aunque estén sin
+                rellenar, igual que el resto de metadatos («Libre» en espacio) */}
+            <div
+              className="rounded-2xl bg-cream-dark/60 px-3 py-2.5 mt-2"
+              data-testid="task-detail-definicion"
+            >
+              <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5" aria-hidden /> Definición del Trabajo
+              </p>
+              <p
+                className={`text-sm leading-relaxed mt-1 whitespace-pre-wrap ${
+                  task.definicionTrabajo ? "text-[#3d5844]" : "text-[#8a9a8d]"
+                }`}
+              >
+                {task.definicionTrabajo || "Sin definir"}
+              </p>
+            </div>
+            <div
+              className="rounded-2xl bg-cream-dark/60 px-3 py-2.5 mt-2"
+              data-testid="task-detail-etapas"
+            >
+              <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5" aria-hidden /> Etapa — Proceso de Formación
+              </p>
+              {task.etapasFormacion.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {task.etapasFormacion.map((e) => (
+                    <span
+                      key={e}
+                      className="rounded-lg border border-brand-600/30 bg-brand-600/10 px-2 py-1 text-[11px] font-bold text-brand-600"
+                    >
+                      {e}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-[#8a9a8d] mt-1">Sin definir</p>
+              )}
             </div>
 
             {/* Conocimiento entrenable */}

@@ -143,6 +143,9 @@ if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "[]" ]; then
   $AB eval "(()=>{const cat=document.querySelector('[data-cat=$CAT0]');const card=cat&&cat.querySelector('button[aria-label^=\"Abrir ficha de la tarea\"]');if(card){card.click();return 'ok'}return 'no'})()" >/dev/null 2>&1
   DET_OPEN=$(waitfor "document.querySelector('[data-testid=task-detail-comentarios], [data-slot=sheet-content]')" 10; echo $?)
   check "ficha de la tarea abre desde el árbol" "$([ "$DET_OPEN" = "0" ] && echo 1)"
+  # los 2 campos nuevos SIEMPRE visibles en la ficha, aunque la tarea no los tenga rellenados
+  check "ficha (tarea sin rellenar): «Definición del Trabajo» visible con «Sin definir»" "$(ev "(()=>{const d=document.querySelector('[data-testid=task-detail-definicion]');return !!d&&d.textContent.includes('Definición del Trabajo')&&d.textContent.includes('Sin definir')})()")"
+  check "ficha (tarea sin rellenar): «Etapa — Proceso de Formación» visible aunque vacía" "$(ev "(()=>{const e=document.querySelector('[data-testid=task-detail-etapas]');return !!e&&e.textContent.includes('Etapa')})()")"
   $AB eval "document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))" >/dev/null 2>&1
   sleep 0.8
 else
