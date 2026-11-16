@@ -377,7 +377,7 @@ export async function applySquadImport(
       continue;
     }
     if (!primaryPosition) {
-      rows.push({ row: rowNo, name: displayName, ok: false, action: "error", error: `Posición "${posRaw}" no reconocida (usa GK, CB, LB, RB, DM, CM, AM, LM, RM, LW, RW, SS, CF o su nombre castellano).` });
+      rows.push({ row: rowNo, name: displayName, ok: false, action: "error", error: `Posición "${posRaw}" no reconocida (usa GK, CB, LB, RB, PD, CM, AM, LM, RM, LW, RW, SS, CF o su nombre castellano).` });
       continue;
     }
 

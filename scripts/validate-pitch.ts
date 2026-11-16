@@ -23,7 +23,7 @@ const once = [
   mk(3, "Marc", "Central", "CB"),
   mk(4, "Pau", "Zagа", "CB"), // dos centrales → colisión de baseX resuelta
   mk(5, "Ot", "LateralDer", "RB"),
-  mk(6, "Rodri", "Pivote", "DM"),
+  mk(6, "Rodri", "Pivote", "PD"),
   mk(7, "Gavi", "Interior", "CM"),
   mk(8, "Pedri", "Mediapunta", "AM"),
   mk(9, "Lamine", "Extremo", "RW"),

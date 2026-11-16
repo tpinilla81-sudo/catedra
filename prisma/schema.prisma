@@ -59,7 +59,7 @@ enum Position {
   RB /// Lateral derecho
   LWB /// Carrilero izquierdo
   RWB /// Carrilero derecho
-  DM /// Pivot defensivo (MCD)
+  PD /// Pivote defensivo (código del míster; antes DM)
   CM /// Medio centro
   AM /// Mediapunta (MCO)
   LM /// Interior / extremo retrasado izquierdo
@@ -261,7 +261,7 @@ model Player {
   firstName          String
   lastName           String
   shirtNumber        Int? /// Dorsal
-  primaryPosition    String /// Demarcación principal (código: GK, CB, DM, LW...) — String para admitir demarcaciones propias del fútbol base
+  primaryPosition    String /// Demarcación principal (código: GK, CB, PD, LW...) — String para admitir demarcaciones propias del fútbol base
   secondaryPositions String[] /// Polivalencias — array nativo de PostgreSQL
   technicalRating    Int? /// Perfil técnico 1-5
   tacticalRating     Int? /// Perfil táctico 1-5

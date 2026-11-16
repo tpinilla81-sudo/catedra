@@ -137,7 +137,7 @@ check(
 check("normalizePosition: 'central' → CB", normalizePosition("Central") === "CB");
 check("normalizePosition: 'MCO' → AM", normalizePosition("MCO") === "AM");
 check("normalizePosition: 'Delantero Centro' → CF", normalizePosition("Delantero Centro") === "CF");
-check("normalizePosition: 'pivote' → DM", normalizePosition("pivote") === "DM");
+check("normalizePosition: 'pivote' → PD", normalizePosition("pivote") === "PD");
 check("normalizePosition: desconocida → null", normalizePosition("delantero raro") === null);
 check("normalizeName: acentos/caso/espacios", normalizeName(" Íker  Méndez ") === "iker mendez");
 
@@ -217,7 +217,7 @@ const CSV_DOS_COL = "Nombre,Apellidos,Posición,Dorsal\nXavi,Guardiola,DM,6";
 const summaryCols = await applySquadImport(dbA, testTeam, parseCsv(CSV_DOS_COL));
 check("import 2 columnas: nombre y apellidos separados", summaryCols.created === 1 && summaryCols.errors === 0, JSON.stringify(summaryCols.rows));
 const xavi = await dbA.player.findFirstOrThrow({ where: { teamId: testTeam.id, firstName: "Xavi" } });
-check("import 2 columnas: lastName 'Guardiola' + pivote DM", xavi.lastName === "Guardiola" && xavi.primaryPosition === "DM");
+check("import 2 columnas: lastName 'Guardiola' + pivote (CSV 'DM' por alias) → PD", xavi.lastName === "Guardiola" && xavi.primaryPosition === "PD");
 
 // Importación XLSX real (buffer → File → fileToMatrix → applySquadImport)
 const wb = XLSX.utils.book_new();

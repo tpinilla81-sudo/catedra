@@ -114,12 +114,12 @@ async function main() {
   }> = [
     { shirt: 1, first: "Iker", last: "Sanz", pos: "GK", poly: [], tec: 4, tac: 3, fis: 4 },
     { shirt: 13, first: "Adrián", last: "Fuster", pos: "GK", poly: [], tec: 3, tac: 3, fis: 3 },
-    { shirt: 4, first: "Mario", last: "Domínguez", pos: "CB", poly: ["DM"], tec: 3, tac: 4, fis: 4 },
+    { shirt: 4, first: "Mario", last: "Domínguez", pos: "CB", poly: ["PD"], tec: 3, tac: 4, fis: 4 },
     { shirt: 5, first: "Hugo", last: "Beltrán", pos: "CB", poly: ["LB"], tec: 3, tac: 4, fis: 3, status: "INJURED", note: "molestias isquios izq." },
     { shirt: 3, first: "Pablo", last: "Ferrer", pos: "LB", poly: ["LWB", "CM"], tec: 3, tac: 3, fis: 4 },
     { shirt: 2, first: "Raúl", last: "Ortega", pos: "RB", poly: ["RWB"], tec: 3, tac: 3, fis: 4 },
-    { shirt: 6, first: "Jorge", last: "Palencia", pos: "DM", poly: ["CM", "CB"], tec: 4, tac: 5, fis: 3 },
-    { shirt: 8, first: "Dani", last: "Sevilla", pos: "CM", poly: ["AM", "DM"], tec: 4, tac: 4, fis: 4 },
+    { shirt: 6, first: "Jorge", last: "Palencia", pos: "PD", poly: ["CM", "CB"], tec: 4, tac: 5, fis: 3 },
+    { shirt: 8, first: "Dani", last: "Sevilla", pos: "CM", poly: ["AM", "PD"], tec: 4, tac: 4, fis: 4 },
     { shirt: 10, first: "Iván", last: "Carrión", pos: "AM", poly: ["SS", "LW"], tec: 5, tac: 4, fis: 3 },
     { shirt: 7, first: "Nico", last: "Alcázar", pos: "RM", poly: ["RW", "CM"], tec: 4, tac: 3, fis: 4 },
     { shirt: 11, first: "Luis", last: "Bermejo", pos: "LM", poly: ["LW", "LB"], tec: 3, tac: 3, fis: 5 },
@@ -127,7 +127,7 @@ async function main() {
     { shirt: 17, first: "Álvaro", last: "Cuesta", pos: "RW", poly: ["LM", "CF"], tec: 4, tac: 3, fis: 4 },
     { shirt: 9, first: "Sergio", last: "Vidal", pos: "CF", poly: ["SS"], tec: 4, tac: 4, fis: 4, status: "RETURNING", note: "reposición tras rotura fibular" },
     { shirt: 19, first: "Jony", last: "Aguirre", pos: "SS", poly: ["AM", "LW"], tec: 4, tac: 3, fis: 3 },
-    { shirt: 21, first: "Óscar", last: "Prats", pos: "CM", poly: ["DM", "LB"], tec: 3, tac: 4, fis: 3 },
+    { shirt: 21, first: "Óscar", last: "Prats", pos: "CM", poly: ["PD", "LB"], tec: 3, tac: 4, fis: 3 },
   ];
 
   for (const p of playersPrimerEquipo) {
@@ -154,7 +154,7 @@ async function main() {
   const playersJuvenil = [
     { shirt: 1, first: "Marc", last: "Aliaga", pos: "GK" as Position },
     { shirt: 2, first: "Eric", last: "Valls", pos: "CB" as Position },
-    { shirt: 5, first: "Pol", last: "Rueda", pos: "DM" as Position },
+    { shirt: 5, first: "Pol", last: "Rueda", pos: "PD" as Position },
     { shirt: 7, first: "Aitor", last: "Cano", pos: "RM" as Position },
     { shirt: 9, first: "Ibrahim", last: "Diallo", pos: "CF" as Position },
     { shirt: 10, first: "Joel", last: "Matas", pos: "AM" as Position },
@@ -474,7 +474,7 @@ async function main() {
 
   // Eventing táctico: pérdidas en construcción (lado izquierdo) → evidencia del motor
   const losses = [
-    [18, 22, 12, "CB"], [26, 15, 21, "LB"], [31, 30, 19, "DM"],
+    [18, 22, 12, "CB"], [26, 15, 21, "LB"], [31, 30, 19, "PD"],
     [22, 38, 34, "LB"], [15, 42, 27, "GK"], [29, 26, 41, "CM"],
     [24, 33, 55, "LB"], [33, 19, 63, "CB"],
   ];
@@ -482,7 +482,7 @@ async function main() {
     playerId: string | null; minute: number | null; x: number; y: number; type: TacticalEventType;
   }> = [
     ...losses.map(([minute, x, y, posChar]) => ({
-      playerId: posChar === "GK" ? byNumber(1).id : posChar === "CB" ? byNumber(4).id : posChar === "LB" ? byNumber(3).id : posChar === "DM" ? byNumber(6).id : byNumber(8).id,
+      playerId: posChar === "GK" ? byNumber(1).id : posChar === "CB" ? byNumber(4).id : posChar === "LB" ? byNumber(3).id : posChar === "PD" ? byNumber(6).id : byNumber(8).id,
       minute: minute as number,
       x: x as number,
       y: y as number,

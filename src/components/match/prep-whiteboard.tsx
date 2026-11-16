@@ -89,7 +89,7 @@ const FLECHA_STROKE: Record<FlechaColor, string> = {
 const FORMACION_433: [number, number][] = [
   [9, 50], // GK
   [26, 14], [24, 38], [24, 62], [26, 86], // LB CB CB RB
-  [48, 28], [43, 50], [48, 72], // CM DM CM
+  [48, 28], [43, 50], [48, 72], // CM PD CM
   [68, 18], [66, 50], [68, 82], // LW ST RW
 ];
 
@@ -101,7 +101,7 @@ const SLOT_OF_POSITION: Record<string, number> = {
   CB: 2,
   RB: 4,
   RWB: 4,
-  DM: 6,
+  PD: 6,
   CM: 5,
   AM: 7,
   LM: 8,

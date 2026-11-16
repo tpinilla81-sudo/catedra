@@ -139,7 +139,7 @@ console.log("\n══ 3) DB — round-trip de los 4 campos pre-partido ══");
       medicalNotes: "Pubalgia leve (prueba)",
       academicStress: "Selectividad (prueba)",
       tacticalStrength: "Juego aéreo (prueba)",
-      secondaryPositions: ["LB", "DM"],
+      secondaryPositions: ["LB", "PD"],
     },
   });
   const back = await raw.player.findUniqueOrThrow({ where: { id: p.id } });
@@ -147,7 +147,7 @@ console.log("\n══ 3) DB — round-trip de los 4 campos pre-partido ══");
   check("create+read: lesiones", back.medicalNotes === "Pubalgia leve (prueba)");
   check("create+read: académico", back.academicStress === "Selectividad (prueba)");
   check("create+read: fortaleza", back.tacticalStrength === "Juego aéreo (prueba)");
-  check("create+read: polivalencias [LB, DM]", back.secondaryPositions.join(",") === "LB,DM");
+  check("create+read: polivalencias [LB, PD]", back.secondaryPositions.join(",") === "LB,PD");
   await raw.player.update({ where: { id: p.id }, data: { fatigueRPE: null, medicalNotes: null, academicStress: null, tacticalStrength: "" } });
   const cleared = await raw.player.findUniqueOrThrow({ where: { id: p.id } });
   check("update a null/\"\": campos borrados", cleared.fatigueRPE === null && cleared.medicalNotes === null && cleared.academicStress === null && cleared.tacticalStrength === "");

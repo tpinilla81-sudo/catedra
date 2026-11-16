@@ -32,7 +32,7 @@ export const POSITION_LABEL: Record<string, string> = {
   RB: "Lateral der.",
   LWB: "Carrilero izq.",
   RWB: "Carrilero der.",
-  DM: "Pivote defensivo",
+  PD: "Pivote defensivo",
   PO: "Pivote ofensivo",
   CM: "Medio centro",
   AM: "Mediapunta",
@@ -54,7 +54,7 @@ export const POSITION_GROUPS: Array<{
 }> = [
   { key: "GK", label: "Porteros", positions: ["GK"] },
   { key: "DEF", label: "Defensas", positions: ["CB", "LB", "RB", "LWB", "RWB"] },
-  { key: "MED", label: "Medios", positions: ["DM", "PO", "CM", "AM", "LM", "RM"] },
+  { key: "MED", label: "Medios", positions: ["PD", "PO", "CM", "AM", "LM", "RM"] },
   { key: "DEL", label: "Ataque", positions: ["LW", "RW", "SS", "CF"] },
 ];
 
@@ -83,7 +83,7 @@ export function normalizePosition(raw: string): string | null {
     rb: "RB", ld: "RB", "lateral derecho": "RB", "lateral der": "RB",
     lwb: "LWB", ci: "LWB", "carrilero izquierdo": "LWB", "carrilero izq": "LWB",
     rwb: "RWB", cd: "RWB", "carrilero derecho": "RWB", "carrilero der": "RWB",
-    dm: "DM", mcd: "DM", pd: "DM", pivote: "DM", pivot: "DM", "medio centro defensivo": "DM", "mediocentro defensivo": "DM", "pivote defensivo": "DM",
+    dm: "PD", mcd: "PD", pd: "PD", pivote: "PD", pivot: "PD", "medio centro defensivo": "PD", "mediocentro defensivo": "PD", "pivote defensivo": "PD",
     po: "PO", "pivote ofensivo": "PO",
     cm: "CM", mc: "CM", "medio centro": "CM", mediocentro: "CM",
     am: "AM", mco: "AM", mediapunta: "AM", "media punta": "AM", "medio centro ofensivo": "AM", "mediocentro ofensivo": "AM",
@@ -213,7 +213,7 @@ export const POSITION_SHORT: Record<string, string> = {
   RB: "LD",
   LWB: "CI",
   RWB: "CD",
-  DM: "MCD",
+  PD: "PD",
   CM: "MC",
   AM: "MCO",
   LM: "MI",
