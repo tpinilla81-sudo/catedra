@@ -226,6 +226,9 @@ export function normalizeTaskPayload(
   if (!partial || has("workComments")) {
     data.workComments = has("workComments") ? optStr(body.workComments, 500) : null;
   }
+  if (!partial || has("definicionTrabajo")) {
+    data.definicionTrabajo = has("definicionTrabajo") ? optStr(body.definicionTrabajo, 600) : null;
+  }
   if (!partial || has("etapasFormacion")) {
     const rawEtapas = has("etapasFormacion") ? body.etapasFormacion : [];
     const listEtapas = Array.isArray(rawEtapas)
@@ -377,6 +380,7 @@ export function taskJSON(row: TaskWithRecipes) {
     repetitions: row.repetitions,
     intensity: row.intensity,
     workComments: row.workComments ?? null,
+    definicionTrabajo: row.definicionTrabajo ?? null,
     etapasFormacion: row.etapasFormacion,
     // Backfill Nivel 3 en lectura (tareas legacy sin clasificar aún)
     nivel3Ids: deriveLevel3Ids(row.nivel3Ids, row.family, `${row.title} ${row.objective}`),

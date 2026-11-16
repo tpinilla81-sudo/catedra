@@ -427,6 +427,21 @@ export function TaskDetailSheet({
 
             <p className="text-sm text-[#3d5844] leading-relaxed mt-1">{task.objective}</p>
 
+            {/* «Definición del Trabajo» (petición del míster, al lado de espacio/jugadores/intensidad) */}
+            {task.definicionTrabajo && (
+              <div
+                className="mt-2 rounded-2xl border border-brand-500/25 bg-brand-600/[0.04] px-3 py-2.5"
+                data-testid="task-detail-definicion"
+              >
+                <p className="text-[10px] font-bold text-[#6c8070] uppercase tracking-widest">
+                  Definición del Trabajo
+                </p>
+                <p className="text-sm text-[#3d5844] leading-relaxed mt-1 whitespace-pre-wrap">
+                  {task.definicionTrabajo}
+                </p>
+              </div>
+            )}
+
             {/* Sección de Trabajo del mock: comentarios, etapas y Nivel 3 */}
             {task.workComments && (
               <div

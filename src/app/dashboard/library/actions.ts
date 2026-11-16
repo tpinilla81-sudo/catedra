@@ -82,6 +82,8 @@ export type TaskInput = {
   family: string | null;
   /** «Comentarios sobre el Trabajo» (mock 'EditorTarea': notas, matices o variaciones) */
   workComments: string | null;
+  /** «Definición del Trabajo»: qué es el trabajo, en claro (mock 'EditorTarea') */
+  definicionTrabajo: string | null;
   /** Etapas del proceso de formación que sirve (strings de ETAPAS_FORMACION) */
   etapasFormacion: string[];
   /** Clasificación Taxonómica Nivel 3 — multiselección cruzada (ids de TASK_LEVEL3_IDS) */
@@ -289,6 +291,8 @@ export async function saveTask(input: TaskInput): Promise<ActionResult> {
     input.family && TASK_FAMILY_IDS.has(input.family) ? input.family : null;
   // Sección de Trabajo del mock: comentarios libres (500, solo saneo)
   const workComments = optStr(input.workComments, 500);
+  // «Definición del Trabajo»: texto libre saneado (600 máx)
+  const definicionTrabajo = optStr(input.definicionTrabajo, 600);
   // Etapas del proceso de formación: solo las 5 oficiales, sin repetidos y en
   // el ORDEN DEL DOCUMENTO (no el de selección) — el catálogo manda.
   const etapasFormacion = Array.isArray(input.etapasFormacion)
@@ -392,6 +396,7 @@ export async function saveTask(input: TaskInput): Promise<ActionResult> {
     intensity: intensity as never,
     family,
     workComments,
+    definicionTrabajo,
     etapasFormacion: etapasFormacion as never,
     nivel3Ids: nivel3Ids as never,
     rulesOfProvocation: rules as never,
@@ -505,6 +510,7 @@ export async function duplicateTaskToClub(id: string): Promise<ActionResult> {
       intensity: row.intensity,
       family: row.family,
       workComments: row.workComments,
+      definicionTrabajo: row.definicionTrabajo,
       etapasFormacion: row.etapasFormacion,
       nivel3Ids: row.nivel3Ids,
       rulesOfProvocation: row.rulesOfProvocation,

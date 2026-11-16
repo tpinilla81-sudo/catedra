@@ -11,6 +11,8 @@
 # · 27 hojas presentes · contadores vivos por categoría/bloque/raíz
 # · expandir/colapsar (bloques, categorías, Expandir todo/Contraer todo)
 # · tareas existentes colgadas de su categoría (backfill Nivel 3)
+# · Definición del Trabajo + Etapa: dos campos nuevos al lado de espacio/jugadores/intensidad
+#   (editor: relleno y posición · ficha: visibles · buscador: la definición es texto buscable)
 # · creación desde el editor → la tarea aterriza bajo su categoría (Rondos)
 # · Suite (Análisis Cualitativo) intacta · capturas móvil/desktop · auto-limpieza
 set -uo pipefail
@@ -125,7 +127,7 @@ const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();
 p.task.findFirst({where:{title:{contains:'Rondo'}},orderBy:{createdAt:'asc'},select:{title:true,objective:true,family:true,nivel3Ids:true}})
 .then(r=>{console.log(r?JSON.stringify(r):'NONE');process.exit(0)}).catch(()=>console.log('NONE'))" 2>/dev/null)
 [ "$ROW" != "NONE" ] && ok "tarea legacy en BD para verificar backfill" || bad "sin tareas legacy en BD"
-EXPECTED=$(npx tsx /tmp/derive-one.mts "$ROW" 2>/dev/null)
+EXPECTED=$(npx tsx scripts/derive-one.mts "$ROW" 2>/dev/null)
 echo "  · backfill esperado (deriveLevel3Ids): $EXPECTED"
 TITLE=$(python3 -c "import json,sys;print(json.loads(sys.argv[1])['title'])" "$ROW" 2>/dev/null)
 # categorías ESPERADAS: las que el MISMO deriveLevel3Ids de producción asigna
@@ -202,6 +204,16 @@ $AB eval "(()=>{const ta=document.querySelector('[data-testid=editor-para-que-si
 $AB eval "(()=>{const sc=document.querySelector('[data-slot=sheet-content]');const b=sc&&Array.from(sc.querySelectorAll('button[aria-pressed]')).find(x=>x.textContent.includes('Organización Ofensiva'));if(b){b.click();return 'ok'}return 'nofase'})()" >/dev/null 2>&1
 $AB eval "document.querySelector('[data-testid=editor-nivel3-int_rondos]').click()" >/dev/null 2>&1
 sleep 0.4
+# ★ CAMPOS NUEVOS (petición del míster): «Definición del Trabajo» + «Etapa» al lado de espacio/jugadores/intensidad
+$AB eval "(()=>{const ta=document.querySelector('[data-testid=editor-definicion-trabajo]');if(!ta)return 'nofield';const s=Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set;s.call(ta,'Definición E2E $UNIQ: rondo de conservación con triple orientación.');ta.dispatchEvent(new Event('input',{bubbles:true}));return 'ok'})()" >/dev/null 2>&1
+DEFIN=$(ev "(()=>{const ta=document.querySelector('[data-testid=editor-definicion-trabajo]');return !!(ta&&ta.value.includes('Definición E2E'))})()")
+check "editor: «Definición del Trabajo» rellenable" "$DEFIN"
+ETA_CLICK=$(ev "(()=>{const chips=document.querySelectorAll('[data-testid=editor-etapas] button');const b=chips[0];if(!b||chips.length!==5)return 'no5';b.click();return 'clicked'})()")
+sleep 0.4
+ETA=$(ev "(()=>{const chips=document.querySelectorAll('[data-testid=editor-etapas] button');return chips.length===5&&chips[0].getAttribute('aria-pressed')==='true'&&'${ETA_CLICK}'==='clicked'})()")
+check "editor: «Etapa» — 5 chips del proceso de formación, marquable" "$ETA"
+POS=$(ev "(()=>{const def=document.querySelector('[data-testid=editor-definicion-trabajo]');const eta=document.querySelector('[data-testid=editor-etapas]');const inten=Array.from(document.querySelectorAll('button[aria-pressed]')).find(x=>x.textContent.includes('Media'));if(!def||!eta||!inten)return false;const r1=def.getBoundingClientRect(),r2=eta.getBoundingClientRect(),r3=inten.getBoundingClientRect();return r3.top<r1.top&&r1.top<r2.top})()")
+check "editor: Definición y Etapa quedan al lado de Intensidad (mismo bloque de ingeniería)" "$POS"
 $AB eval "(()=>{const sc=document.querySelector('[data-slot=sheet-content]');const b=sc&&Array.from(sc.querySelectorAll('button')).find(x=>x.textContent.trim()==='Crear tarea');if(b){b.click();return 'ok'}return 'no'})()" >/dev/null 2>&1
 waitfor "!document.querySelector('[data-testid=editor-seccion-trabajo]')" 15
 sleep 1.5
@@ -221,6 +233,13 @@ UNDER_RONDOS=$(ev "(()=>{const cat=document.querySelector('[data-cat=int_rondos]
 check "la tarea nueva cuelga de Rondos (int_rondos)" "$UNDER_RONDOS"
 ROOTCNT2=$(ev "(()=>{const chips=document.querySelectorAll('[data-testid=tree-root] span[aria-label\$=\" tareas\"]');return chips[0]?chips[0].textContent.trim():'x'})()")
 [ -n "$ROOTCNT" ] && [ -n "$ROOTCNT2" ] && [ "$ROOTCNT2" = "$((ROOTCNT+1))" ] 2>/dev/null && ok "contador de la raíz sube a $ROOTCNT2" || bad "contador raíz tras crear ($ROOTCNT2, antes $ROOTCNT)"
+# ★ FICHA: los dos campos nuevos visibles en el detalle de la tarea creada
+$AB eval "(()=>{const cat=document.querySelector('[data-cat=int_rondos]');const b=cat&&Array.from(cat.querySelectorAll('button')).find(x=>x.textContent.includes('Tarea $UNIQ Árbol'));if(b){b.click();return 'ok'}return 'no'})()" >/dev/null 2>&1
+sleep 0.8
+FICHA=$(ev "(()=>{const d=document.querySelector('[data-testid=task-detail-definicion]');const e=document.querySelector('[data-testid=task-detail-etapas]');return !!(d&&e&&d.textContent.includes('Definición E2E $UNIQ')&&e.textContent.includes('Fase de Iniciación'))})()")
+check "ficha: «Definición del Trabajo» + «Etapa» visibles en el detalle" "$FICHA"
+$AB eval "document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))" >/dev/null 2>&1
+sleep 0.5
 
 echo "=== 8 · Suite (Análisis Cualitativo) intacta ==="
 $AB open "$BASE/dashboard/analisis-cualitativo" >/dev/null 2>&1

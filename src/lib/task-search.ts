@@ -1,11 +1,11 @@
 // ============================================================================
 // BUSCADOR REFORZADO DE LA BIBLIOTECA — ficha completa, multi-palabra, sin acentos
 // ----------------------------------------------------------------------------
-// • Heno (texto buscable) de CADA tarea: título, objetivo, comentarios del
-//   trabajo, familia, etapas de formación, reglas de provocación, puntos de
-//   co-achéo, materiales, categorías Nivel 3 (nombre + bloque), subprincipios
-//   de sus recetas, fases, intensidad, origen, zona del campo, notas de espacio
-//   y autora. Buscar «conservacion» encuentra las tareas de Juegos de
+// • Heno (texto buscable) de CADA tarea: título, objetivo, definición del
+//   trabajo, comentarios del trabajo, familia, etapas de formación, reglas de
+//   provocación, puntos de co-achéo, materiales, categorías Nivel 3 (nombre +
+//   bloque), subprincipios de sus recetas, fases, intensidad, origen, zona del
+//   campo, notas de espacio y autora. Buscar «conservacion» encuentra las tareas de Juegos de
 //   conservación aunque el título no lo diga.
 // • Multi-palabra Y: cada palabra debe aparecer en ALGÚN campo (orden libre):
 //   «rondo comodines» ≠ substring, ahora sí filtra.
@@ -26,6 +26,7 @@ export function taskHaystack(t: TaskCard): string {
   const parts: string[] = [
     t.title,
     t.objective,
+    t.definicionTrabajo ?? "",
     t.workComments ?? "",
     t.family ?? "",
     ...t.etapasFormacion,

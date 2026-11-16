@@ -73,6 +73,8 @@ type Draft = {
   family: string;
   /** «Comentarios sobre el Trabajo» (mock del editor: notas, matices, variaciones) */
   workComments: string;
+  /** «Definición del Trabajo»: qué es el trabajo, en claro (mock 'EditorTarea') */
+  definicionTrabajo: string;
   /** Etapas del proceso de formación que sirve (multiselección) */
   etapasFormacion: string[];
   /** Clasificación Taxonómica Nivel 3 — multiselección cruzada (ids) */
@@ -105,6 +107,7 @@ function initialDraft(task: TaskCard | null): Draft {
     intensity: task?.intensity ?? "MEDIUM",
     family: task?.family ?? "",
     workComments: task?.workComments ?? "",
+    definicionTrabajo: task?.definicionTrabajo ?? "",
     etapasFormacion: task ? [...task.etapasFormacion] : [],
     // Backfill Nivel 3: al abrir una tarea legacy se propone su clasificación
     // derivada (familia + texto) y se PERSISTE al guardar.
@@ -338,6 +341,7 @@ export function TaskEditor({
       intensity: draft.intensity,
       family: draft.family || null,
       workComments: draft.workComments,
+      definicionTrabajo: draft.definicionTrabajo,
       etapasFormacion: draft.etapasFormacion,
       nivel3Ids: draft.nivel3Ids,
       rulesOfProvocation: draft.rules,
@@ -501,37 +505,6 @@ export function TaskEditor({
               {taskFamilyMeta(draft.family)!.family.descriptor}
             </p>
           )}
-        </div>
-
-        {/* ---------- ETAPAS DEL PROCESO DE FORMACIÓN (mock 'EditorTarea': multiselección) ---------- */}
-        <SectionTitle>Etapas del Proceso de Formación (Multiselección)</SectionTitle>
-        <div className="flex flex-col gap-1.5" data-testid="editor-etapas">
-          {ETAPAS_FORMACION.map((etapa, i) => {
-            const active = draft.etapasFormacion.includes(etapa);
-            return (
-              <button
-                key={etapa}
-                type="button"
-                onClick={() =>
-                  set(
-                    "etapasFormacion",
-                    active
-                      ? draft.etapasFormacion.filter((x) => x !== etapa)
-                      : [...draft.etapasFormacion, etapa],
-                  )
-                }
-                aria-pressed={active}
-                data-testid={`editor-etapa-${i}`}
-                className={`min-h-[44px] rounded-2xl border px-3 py-2 text-left text-[13px] font-bold transition ${
-                  active
-                    ? "bg-brand-600 border-brand-600 text-white"
-                    : "bg-cream-dark/60 border-cream-border text-[#3d5844] hover:border-brand-500"
-                }`}
-              >
-                {etapa}
-              </button>
-            );
-          })}
         </div>
 
         {/* ---------- CLASIFICACIÓN TAXONÓMICA NIVEL 3 (mock: multiselección cruzada) ---------- */}
@@ -764,6 +737,49 @@ export function TaskEditor({
               >
                 <span className={`w-2.5 h-2.5 rounded-full ${meta.dot}`} aria-hidden />
                 {meta.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ---------- Definición del Trabajo + Etapa (petición del míster: al lado de espacio, jugadores, intensidad) ---------- */}
+        <SectionTitle>Definición del Trabajo</SectionTitle>
+        <Textarea
+          id="editor-definicion-trabajo"
+          value={draft.definicionTrabajo}
+          onChange={(e) => set("definicionTrabajo", e.target.value)}
+          placeholder="Qué es este trabajo — ej. «Rondo 6v2 que obliga a la salida de balón en triple cambio de orientación»…"
+          maxLength={600}
+          rows={3}
+          data-testid="editor-definicion-trabajo"
+          className="rounded-2xl bg-cream-dark/70 border-cream-border text-peel placeholder:text-[#8a9a8d]"
+        />
+
+        <SectionTitle>Etapa — Proceso de Formación (multiselección)</SectionTitle>
+        <div className="flex flex-wrap gap-1.5" data-testid="editor-etapas">
+          {ETAPAS_FORMACION.map((etapa, i) => {
+            const active = draft.etapasFormacion.includes(etapa);
+            return (
+              <button
+                key={etapa}
+                type="button"
+                onClick={() =>
+                  set(
+                    "etapasFormacion",
+                    active
+                      ? draft.etapasFormacion.filter((x) => x !== etapa)
+                      : [...draft.etapasFormacion, etapa],
+                  )
+                }
+                aria-pressed={active}
+                data-testid={`editor-etapa-${i}`}
+                className={`rounded-full border px-3 py-2 text-xs font-bold transition ${
+                  active
+                    ? "border-brand-600 bg-brand-600 text-white"
+                    : "bg-cream-dark/60 border-cream-border text-[#3d5844] hover:border-brand-500"
+                }`}
+              >
+                {etapa}
               </button>
             );
           })}

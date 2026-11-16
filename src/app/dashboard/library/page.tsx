@@ -107,6 +107,7 @@ export default async function LibraryPage() {
     intensity: t.intensity,
     family: t.family,
     workComments: t.workComments,
+    definicionTrabajo: t.definicionTrabajo,
     etapasFormacion: t.etapasFormacion,
     // Backfill Nivel 3: tareas legacy clasificadas en lectura (familia + texto)
     nivel3Ids: deriveLevel3Ids(t.nivel3Ids, t.family, `${t.title} ${t.objective}`),

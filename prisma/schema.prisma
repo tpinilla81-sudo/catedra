@@ -551,6 +551,7 @@ model Task {
   intensity          Intensity   @default(MEDIUM) /// El motor la cruza con la fatiga grupal
   family             String? /// Familia de la TAXONOMÍA OFICIAL de tareas (src/lib/task-taxonomy.ts): Físicas · Técnicas · Tácticas · Psicológicas · Integradas
   workComments       String? /// «Comentarios sobre el Trabajo» del mock del editor (notas, matices o variaciones editables)
+  definicionTrabajo  String? /// «Definición del Trabajo» del mock del editor: qué es el trabajo, en claro — junto a espacio/jugadores/intensidad
   etapasFormacion    String[] /// Etapas del proceso de formación que sirve (mock 'EditorTarea'): 5 fases oficiales — String[] nativo
   nivel3Ids          String[] /// Clasificación TAXONÓMICA NIVEL 3, multiselección cruzada (ids de TASK_TAXONOMY_LEVEL3) — String[] nativo
   rulesOfProvocation String[] /// Reglas de provocación — array nativo de PostgreSQL

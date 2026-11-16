@@ -222,6 +222,12 @@ PYEOF
   check "captura $V con contenido (no en blanco)" "$NB"
 done
 
+echo "=== 10b · Campos nuevos en la API (solo-lectura: GET, cero escrituras) ==="
+DEFK="$(ev "fetch('/api/pilar2/tasks').then(r=>r.json()).then(d=>Array.isArray(d.tasks)&&d.tasks.length>0&&('definicionTrabajo' in d.tasks[0])?'si':'no')")"
+check "la API devuelve «definicionTrabajo» (migración desplegada + serializer)" "$([ "$DEFK" = "si" ] && echo 1 || echo 0)"
+ETAPE="$(ev "fetch('/api/pilar2/tasks').then(r=>r.json()).then(d=>Array.isArray(d.tasks)&&d.tasks.length>0&&Array.isArray(d.tasks[0].etapasFormacion)?'si':'no')")"
+check "la API mantiene «etapasFormacion» (Etapa del proceso de formación)" "$([ "$ETAPE" = "si" ] && echo 1 || echo 0)"
+
 echo "=== 11 · Sello SOLO-LECTURA ==="
 FIN="$(ev "fetch('/api/pilar2/tasks').then(r=>r.json()).then(d=>String(d.count))")"
 check "la BD no cambió durante la batería ($ROOTN → $FIN tareas)" "$([ "$FIN" = "$ROOTN" ] && echo 1 || echo 0)"

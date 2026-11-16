@@ -91,6 +91,7 @@ export default async function CatedraPage() {
     intensity: t.intensity,
     family: t.family,
     workComments: t.workComments,
+    definicionTrabajo: t.definicionTrabajo,
     etapasFormacion: t.etapasFormacion,
     nivel3Ids: t.nivel3Ids,
     rulesOfProvocation: t.rulesOfProvocation,
